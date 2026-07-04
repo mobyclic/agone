@@ -306,3 +306,105 @@ DEFINE FIELD OVERWRITE legacy_wp_id ON page TYPE option<int>;
 DEFINE FIELD OVERWRITE created_at   ON page TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at   ON page TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_page_slug ON page FIELDS slug UNIQUE;
+
+-- ══════════════════════════════════════════════════════════════
+-- DROITS D'AUTEUR (Phase 4) — contrats à paliers, ventes multi-canaux, reddition
+-- ══════════════════════════════════════════════════════════════
+
+-- CANAL DE VENTE (référentiel extensible : web, bldd, + autres à venir)
+DEFINE TABLE OVERWRITE sales_channel SCHEMAFULL;
+DEFINE FIELD OVERWRITE code       ON sales_channel TYPE string;         -- 'web' | 'bldd' | …
+DEFINE FIELD OVERWRITE name       ON sales_channel TYPE string;
+DEFINE FIELD OVERWRITE sort       ON sales_channel TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE created_at ON sales_channel TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_channel_code ON sales_channel FIELDS code UNIQUE;
+
+-- CONTRAT DE DROITS : par livre × contributeur (× rôle)
+DEFINE TABLE OVERWRITE royalty_contract SCHEMAFULL;
+DEFINE FIELD OVERWRITE book        ON royalty_contract TYPE record<book>;
+DEFINE FIELD OVERWRITE author      ON royalty_contract TYPE record<author>;
+DEFINE FIELD OVERWRITE role        ON royalty_contract TYPE string
+  ASSERT $value IN ['author','editor','translator','preface','postface','illustrator','other'] DEFAULT 'author';
+-- Barème par PALIERS (droits progressifs) : liste ordonnée { up_to?: cumul max du palier, rate: % }
+--   ex. [{up_to:2000, rate:8}, {up_to:5000, rate:10}, {rate:12}]  (dernier palier sans plafond)
+DEFINE FIELD OVERWRITE tiers       ON royalty_contract TYPE array<object> DEFAULT [];
+DEFINE FIELD OVERWRITE tiers.*.up_to ON royalty_contract TYPE option<int>;
+DEFINE FIELD OVERWRITE tiers.*.rate  ON royalty_contract TYPE number;
+-- Périmètre & base de calcul
+DEFINE FIELD OVERWRITE scope       ON royalty_contract TYPE string
+  ASSERT $value IN ['paper','ebook','all'] DEFAULT 'all';
+DEFINE FIELD OVERWRITE base        ON royalty_contract TYPE string
+  ASSERT $value IN ['ppht','ppttc','net'] DEFAULT 'ppht';   -- prix public HT / TTC / net éditeur
+DEFINE FIELD OVERWRITE net_rate    ON royalty_contract TYPE number DEFAULT 60;  -- % du prix public si base='net'
+-- À-valoir / avance
+DEFINE FIELD OVERWRITE advance          ON royalty_contract TYPE number DEFAULT 0;   -- montant à-valoir
+DEFINE FIELD OVERWRITE advance_recouped ON royalty_contract TYPE number DEFAULT 0;   -- déjà récupéré (cumul)
+DEFINE FIELD OVERWRITE min_guarantee    ON royalty_contract TYPE option<number>;
+DEFINE FIELD OVERWRITE signed_at   ON royalty_contract TYPE option<datetime>;
+DEFINE FIELD OVERWRITE term_start  ON royalty_contract TYPE option<datetime>;
+DEFINE FIELD OVERWRITE term_end    ON royalty_contract TYPE option<datetime>;
+DEFINE FIELD OVERWRITE document    ON royalty_contract TYPE option<record<media>>;   -- contrat scanné
+DEFINE FIELD OVERWRITE status      ON royalty_contract TYPE string
+  ASSERT $value IN ['draft','active','ended'] DEFAULT 'active';
+DEFINE FIELD OVERWRITE notes       ON royalty_contract TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at  ON royalty_contract TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at  ON royalty_contract TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_contract_book   ON royalty_contract FIELDS book;
+DEFINE INDEX OVERWRITE idx_contract_author ON royalty_contract FIELDS author;
+DEFINE INDEX OVERWRITE idx_contract_uniq   ON royalty_contract FIELDS book, author, role UNIQUE;
+
+-- RELEVÉ DE VENTES : une période × un canal (import ou saisie)
+DEFINE TABLE OVERWRITE sales_report SCHEMAFULL;
+DEFINE FIELD OVERWRITE channel      ON sales_report TYPE record<sales_channel>;
+DEFINE FIELD OVERWRITE period_start ON sales_report TYPE datetime;
+DEFINE FIELD OVERWRITE period_end   ON sales_report TYPE datetime;
+DEFINE FIELD OVERWRITE label        ON sales_report TYPE option<string>;
+DEFINE FIELD OVERWRITE source_file  ON sales_report TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE imported_at  ON sales_report TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE created_at   ON sales_report TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_report_period ON sales_report FIELDS period_start, period_end;
+
+-- LIGNE DE VENTE : un livre × relevé (unités vendues / retournées / SP)
+DEFINE TABLE OVERWRITE sales_line SCHEMAFULL;
+DEFINE FIELD OVERWRITE report         ON sales_line TYPE record<sales_report>;
+DEFINE FIELD OVERWRITE book           ON sales_line TYPE option<record<book>>;  -- résolu par ISBN
+DEFINE FIELD OVERWRITE isbn           ON sales_line TYPE option<string>;
+DEFINE FIELD OVERWRITE format         ON sales_line TYPE string
+  ASSERT $value IN ['paper','ebook','souscription'] DEFAULT 'paper';
+DEFINE FIELD OVERWRITE units_sold     ON sales_line TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE units_returned ON sales_line TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE units_free     ON sales_line TYPE int DEFAULT 0;   -- SP / service de presse
+DEFINE FIELD OVERWRITE gross_price    ON sales_line TYPE option<number>;  -- prix unitaire de référence
+DEFINE FIELD OVERWRITE created_at     ON sales_line TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_saleline_report ON sales_line FIELDS report;
+DEFINE INDEX OVERWRITE idx_saleline_book   ON sales_line FIELDS book;
+
+-- REDDITION DE COMPTES : un état par auteur × période
+DEFINE TABLE OVERWRITE royalty_statement SCHEMAFULL;
+DEFINE FIELD OVERWRITE author       ON royalty_statement TYPE record<author>;
+DEFINE FIELD OVERWRITE period_start ON royalty_statement TYPE datetime;
+DEFINE FIELD OVERWRITE period_end   ON royalty_statement TYPE datetime;
+DEFINE FIELD OVERWRITE status       ON royalty_statement TYPE string
+  ASSERT $value IN ['draft','issued','paid'] DEFAULT 'draft';
+-- lignes détaillées (snapshot du calcul)
+DEFINE FIELD OVERWRITE lines            ON royalty_statement TYPE array<object> DEFAULT [];
+DEFINE FIELD OVERWRITE lines.*.contract        ON royalty_statement TYPE option<string>;
+DEFINE FIELD OVERWRITE lines.*.book            ON royalty_statement TYPE option<string>;
+DEFINE FIELD OVERWRITE lines.*.book_title       ON royalty_statement TYPE option<string>;
+DEFINE FIELD OVERWRITE lines.*.role            ON royalty_statement TYPE option<string>;
+DEFINE FIELD OVERWRITE lines.*.units           ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.base_amount      ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.gross           ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.advance_applied  ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.net             ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE gross_total      ON royalty_statement TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE advance_applied  ON royalty_statement TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE total_due        ON royalty_statement TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE issued_at    ON royalty_statement TYPE option<datetime>;
+DEFINE FIELD OVERWRITE paid_at      ON royalty_statement TYPE option<datetime>;
+DEFINE FIELD OVERWRITE document     ON royalty_statement TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE created_at   ON royalty_statement TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON royalty_statement TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_statement_author ON royalty_statement FIELDS author;
+DEFINE INDEX OVERWRITE idx_statement_period ON royalty_statement FIELDS period_start, period_end;
