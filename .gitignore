@@ -1,0 +1,18 @@
+node_modules
+build
+.svelte-kit
+.surrealdata
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Backups locaux
+_archive/
+
+# Dumps SurrealDB (sauvegardes locales)
+dump-*.surql
+
+# Sauvegardes de données générées par les scripts de migration
+scripts/backups/
