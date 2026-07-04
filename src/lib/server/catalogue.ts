@@ -208,15 +208,21 @@ export async function getCollectionBySlug(slug: string): Promise<{ collection: a
 // ADMINISTRATION (back-office)
 // ══════════════════════════════════════════════════════════════
 
-export async function listBooksAdmin(opts: { q?: string; status?: string; limit?: number; offset?: number } = {}) {
+const ADMIN_SORT: Record<string, string> = {
+  title: 'title', price: 'price_paper', stock: 'stock_qty', date: 'published_at', recent: 'updated_at'
+};
+
+export async function listBooksAdmin(opts: { q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const field = ADMIN_SORT[opts.sort ?? 'recent'] ?? 'updated_at';
+  const dir = opts.dir === 'asc' ? 'ASC' : 'DESC';
   const rows = await query<any>(
-    `SELECT id, title, slug, status, isbn_paper, price_paper, stock_qty, updated_at, cover.url AS cover_url
-       FROM book ${whereSql} ORDER BY updated_at DESC LIMIT $limit START $start`, vars);
+    `SELECT id, title, slug, status, isbn_paper, price_paper, stock_qty, published_at, updated_at, cover.url AS cover_url
+       FROM book ${whereSql} ORDER BY ${field} ${dir} LIMIT $limit START $start`, vars);
   const count = await query<any>(`SELECT count() AS n FROM book ${whereSql} GROUP ALL`, vars);
   return { books: rows, total: count[0]?.n ?? 0 };
 }
