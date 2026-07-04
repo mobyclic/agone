@@ -3,6 +3,7 @@
  * Le graphe : book ->contributed_by-> author (typé par rôle).
  */
 import { query, recId } from './surreal';
+import { uniqueSlug } from './slug';
 import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
 export { ROLE_LABEL };
 
@@ -201,4 +202,112 @@ export async function getCollectionBySlug(slug: string): Promise<{ collection: a
     { slug }
   );
   return { collection, books: books.map(toCard) };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADMINISTRATION (back-office)
+// ══════════════════════════════════════════════════════════════
+
+export async function listBooksAdmin(opts: { q?: string; status?: string; limit?: number; offset?: number } = {}) {
+  const where: string[] = [];
+  const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
+  if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await query<any>(
+    `SELECT id, title, slug, status, isbn_paper, price_paper, stock_qty, updated_at, cover.url AS cover_url
+       FROM book ${whereSql} ORDER BY updated_at DESC LIMIT $limit START $start`, vars);
+  const count = await query<any>(`SELECT count() AS n FROM book ${whereSql} GROUP ALL`, vars);
+  return { books: rows, total: count[0]?.n ?? 0 };
+}
+
+export async function getBookAdmin(id: string) {
+  const rows = await query<any>(`SELECT *, cover.url AS cover_url FROM book WHERE id = $id LIMIT 1`, { id: recId('book', id) });
+  const book = rows[0];
+  if (!book) return null;
+  const contributors = await query<any>(
+    `SELECT out AS author_id, out.full_name AS author_name, role, share, position
+       FROM contributed_by WHERE in = $id ORDER BY position`, { id: recId('book', id) });
+  return { book, contributors };
+}
+
+export async function allRubriques() {
+  return query<any>(`SELECT id, name, slug FROM rubrique ORDER BY name ASC`);
+}
+
+/** Toutes les collections (non filtrées) — pour les sélecteurs d'admin. */
+export async function allCollections() {
+  return query<any>(`SELECT id, name, slug, sort FROM collection ORDER BY sort ASC`);
+}
+
+export interface BookInput {
+  title: string; subtitle?: string; description_html?: string; extra_info_html?: string;
+  title_original?: string; title_alt?: string; language_original?: string;
+  status: string; isbn_paper?: string; isbn_ebook?: string;
+  price_paper?: number; price_ebook?: number; subscription_price?: number;
+  published_at?: string; page_count?: number; width_cm?: number; height_cm?: number;
+  stock_qty?: number; featured?: boolean;
+  collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string;
+}
+
+/**
+ * Construit une clause SET : champ vide → `= NONE` (efface / laisse NONE),
+ * sinon `= $var`. Évite d'envoyer `NULL` (rejeté par les champs `option<record>`).
+ */
+function buildSet(fields: Record<string, unknown>): { sql: string; vars: Record<string, unknown> } {
+  const parts: string[] = [];
+  const vars: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+    if (empty) parts.push(`${k} = NONE`);
+    else { vars[k] = v; parts.push(`${k} = $${k}`); }
+  }
+  return { sql: parts.join(', '), vars };
+}
+
+export async function upsertBook(id: string | null, d: BookInput): Promise<string> {
+  const { sql, vars } = buildSet({
+    title: d.title, subtitle: d.subtitle, description_html: d.description_html,
+    extra_info_html: d.extra_info_html, title_original: d.title_original, title_alt: d.title_alt,
+    language_original: d.language_original, status: d.status || 'draft',
+    isbn_paper: d.isbn_paper, isbn_ebook: d.isbn_ebook,
+    price_paper: d.price_paper, price_ebook: d.price_ebook, subscription_price: d.subscription_price,
+    published_at: d.published_at ? new Date(d.published_at) : undefined,
+    page_count: d.page_count, width_cm: d.width_cm, height_cm: d.height_cm,
+    stock_qty: d.stock_qty ?? 0, featured: !!d.featured,
+    primary_collection: d.primaryCollectionId ? recId('collection', d.primaryCollectionId) : undefined,
+    cover: d.coverId ? recId('media', d.coverId) : undefined
+  });
+  // Les tableaux sont toujours écrits (même vides).
+  vars.collections = d.collectionIds.map((x) => recId('collection', x));
+  vars.rubriques = d.rubriqueIds.map((x) => recId('rubrique', x));
+  const arraysSql = 'collections = $collections, rubriques = $rubriques';
+
+  if (id) {
+    await query(`UPDATE $id SET ${sql}, ${arraysSql}`, { ...vars, id: recId('book', id) });
+    return id;
+  }
+  const slug = await uniqueSlug('book', d.title);
+  const rows = await query<any>(`CREATE book SET ${sql}, ${arraysSql}, slug = $slug`, { ...vars, slug });
+  return String(rows[0].id).replace(/^book:/, '');
+}
+
+export async function setBookContributors(
+  bookId: string,
+  contributors: { authorId: string; role: string; share?: number }[]
+) {
+  await query(`DELETE contributed_by WHERE in = $id`, { id: recId('book', bookId) });
+  let pos = 0;
+  for (const c of contributors) {
+    if (!c.authorId) continue;
+    await query(`RELATE $b->contributed_by->$a SET role = $role, share = $share, position = $position`, {
+      b: recId('book', bookId), a: recId('author', c.authorId),
+      role: c.role || 'author', share: c.share ?? 100, position: pos++
+    });
+  }
+}
+
+export async function deleteBook(id: string) {
+  await query(`DELETE contributed_by WHERE in = $id`, { id: recId('book', id) });
+  await query(`DELETE $id`, { id: recId('book', id) });
 }

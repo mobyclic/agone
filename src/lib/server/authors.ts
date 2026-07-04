@@ -4,6 +4,7 @@
  * l'arête inverse `<-contributed_by<-book`.
  */
 import { query, recId } from './surreal';
+import { uniqueSlug } from './slug';
 import { ROLE_LABEL, ROLE_ORDER } from '$lib/labels';
 
 export interface AuthorCard {
@@ -117,4 +118,65 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
     website: a.website ?? undefined,
     works: worksGrouped
   };
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADMINISTRATION (back-office)
+// ══════════════════════════════════════════════════════════════
+
+export async function listAuthorsAdmin(opts: { q?: string; limit?: number; offset?: number } = {}) {
+  const where: string[] = [];
+  const vars: Record<string, unknown> = { limit: opts.limit ?? 60, start: opts.offset ?? 0 };
+  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(full_name) CONTAINS $q'); }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await query<any>(
+    `SELECT id, full_name, slug, last_name, first_name, hidden,
+        array::len(array::distinct(<-contributed_by<-book)) AS book_count
+      FROM author ${whereSql} ORDER BY last_name ASC, first_name ASC LIMIT $limit START $start`, vars);
+  const count = await query<any>(`SELECT count() AS n FROM author ${whereSql} GROUP ALL`, vars);
+  return { authors: rows, total: count[0]?.n ?? 0 };
+}
+
+export async function getAuthorAdmin(id: string) {
+  const rows = await query<any>(`SELECT *, portrait.url AS portrait_url FROM author WHERE id = $id LIMIT 1`, { id: recId('author', id) });
+  return rows[0] ?? null;
+}
+
+export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string }[]> {
+  if (!q || !q.trim()) return [];
+  return query<any>(
+    `SELECT id, full_name FROM author WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 12`,
+    { q: q.trim().toLowerCase() });
+}
+
+export interface AuthorInput {
+  first_name: string; last_name: string; bio_html?: string; portraitId?: string; hidden?: boolean;
+  nationality?: string; birth_year?: number; death_year?: number; website?: string;
+  legal_name?: string; siret?: string;
+}
+
+export async function upsertAuthor(id: string | null, d: AuthorInput): Promise<string> {
+  const fields: Record<string, unknown> = {
+    first_name: d.first_name ?? '', last_name: d.last_name ?? '', hidden: !!d.hidden,
+    bio_html: d.bio_html, nationality: d.nationality, birth_year: d.birth_year,
+    death_year: d.death_year, website: d.website, legal_name: d.legal_name, siret: d.siret,
+    portrait: d.portraitId ? recId('media', d.portraitId) : undefined
+  };
+  const parts: string[] = [];
+  const vars: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+    if (empty) parts.push(`${k} = NONE`);
+    else { vars[k] = v; parts.push(`${k} = $${k}`); }
+  }
+  const setSql = parts.join(', ');
+  if (id) { await query(`UPDATE $id SET ${setSql}`, { ...vars, id: recId('author', id) }); return id; }
+  const slug = await uniqueSlug('author', `${d.first_name} ${d.last_name}`.trim());
+  const rows = await query<any>(`CREATE author SET ${setSql}, slug = $slug`, { ...vars, slug });
+  return String(rows[0].id).replace(/^author:/, '');
+}
+
+export async function deleteAuthor(id: string) {
+  await query(`DELETE contributed_by WHERE out = $id`, { id: recId('author', id) });
+  await query(`DELETE $id`, { id: recId('author', id) });
 }
