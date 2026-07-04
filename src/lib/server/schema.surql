@@ -480,3 +480,33 @@ DEFINE FIELD OVERWRITE user        ON download_log TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE ebook_asset ON download_log TYPE record<ebook_asset>;
 DEFINE FIELD OVERWRITE at          ON download_log TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE ip          ON download_log TYPE option<string>;
+
+-- ══════════════════════════════════════════════════════════════
+-- BELLES LETTRES (Phase 3) — stock (import) & expéditions EDI (export)
+-- ══════════════════════════════════════════════════════════════
+
+-- Mouvement de stock (audit de chaque sync BLDD)
+DEFINE TABLE OVERWRITE stock_movement SCHEMAFULL;
+DEFINE FIELD OVERWRITE book       ON stock_movement TYPE option<record<book>>;
+DEFINE FIELD OVERWRITE isbn       ON stock_movement TYPE option<string>;
+DEFINE FIELD OVERWRITE old_qty    ON stock_movement TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE new_qty    ON stock_movement TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE delta      ON stock_movement TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE source     ON stock_movement TYPE string DEFAULT 'bldd';
+DEFINE FIELD OVERWRITE synced_at  ON stock_movement TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_movement_book ON stock_movement FIELDS book;
+DEFINE INDEX OVERWRITE idx_movement_at   ON stock_movement FIELDS synced_at;
+
+-- Fichier d'export EDI vers les Belles Lettres (une ligne par fichier généré)
+DEFINE TABLE OVERWRITE bl_export SCHEMAFULL;
+DEFINE FIELD OVERWRITE filename    ON bl_export TYPE string;           -- CDAGO{YmdHis}.txt
+DEFINE FIELD OVERWRITE body        ON bl_export TYPE string;           -- contenu EDI complet
+DEFINE FIELD OVERWRITE order_count ON bl_export TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE book_count  ON bl_export TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE order_refs  ON bl_export TYPE option<array<string>>;
+DEFINE FIELD OVERWRITE status      ON bl_export TYPE string
+  ASSERT $value IN ['staged','uploaded','failed'] DEFAULT 'staged';   -- 'uploaded' seulement en prod
+DEFINE FIELD OVERWRITE dry_run     ON bl_export TYPE bool DEFAULT true;
+DEFINE FIELD OVERWRITE created_at  ON bl_export TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE uploaded_at ON bl_export TYPE option<datetime>;
+DEFINE INDEX OVERWRITE idx_blexport_at ON bl_export FIELDS created_at;
