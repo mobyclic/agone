@@ -5,6 +5,7 @@
 
   let { data } = $props();
   const article = $derived(data.feature ?? data.articles[0]);
+  const lede = $derived(article?.summary ?? article?.excerpt);
   const books = $derived(data.recent.slice(0, 4));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const dayNum = (s?: string) => (s ? new Date(s).getDate() : '');
@@ -18,7 +19,7 @@
 
 <!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
 <section class="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
-  <div class="grid gap-x-12 gap-y-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+  <div class="grid gap-x-12 gap-y-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
 
     <!-- Manchette : le dernier article de L'Antichambre -->
     {#if article}
@@ -33,7 +34,7 @@
         {/if}
 
         <a href="/article/{article.slug}" class="group mt-5 block">
-          <h1 class="display-title break-words text-4xl leading-[0.9] group-hover:text-link sm:text-5xl lg:text-6xl xl:text-7xl">{article.title}</h1>
+          <h1 class="display-title break-words text-4xl leading-[0.92] group-hover:text-link sm:text-5xl lg:text-[3.25rem] xl:text-6xl">{article.title}</h1>
         </a>
 
         {#if article.author || article.published_at}
@@ -42,8 +43,8 @@
           </p>
         {/if}
 
-        {#if article.excerpt}
-          <p class="mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-lg">{article.excerpt}</p>
+        {#if lede}
+          <p class="mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-[1.0625rem]">{lede}</p>
         {/if}
 
         <a href="/article/{article.slug}" class="link mt-8 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider lg:mt-auto lg:pt-10">
@@ -60,7 +61,7 @@
           <a href="/catalogue" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le catalogue →</a>
         </div>
 
-        <div class="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-x-8 gap-y-10">
           {#each books as book (book.slug)}
             <a href="/livre/{book.slug}" class="group flex min-w-0 flex-col">
               <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">

@@ -13,6 +13,32 @@ export interface ArticleCard {
   rubrique_slug?: string;
   author?: string;
   is_newsletter_issue: boolean;
+  /** Résumé texte plus long, coupé en fin de mot (manchette d'accueil). */
+  summary?: string;
+}
+
+/** Résumé en texte brut depuis le HTML, tronqué proprement en FIN DE MOT. */
+function plainSummary(html?: string, maxLen = 360): string | undefined {
+  if (!html) return undefined;
+  const text = html
+    .replace(/<\/?(strong|em|b|i|u|sup|sub|span|a|mark|small|code)\b[^>]*>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#8217;|&rsquo;/g, '’')
+    .replace(/&#8230;|&hellip;/g, '…')
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return undefined;
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  const base = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.…«»–—-]+$/u, '');
+  return `${base} …`;
 }
 
 const CARD = `
@@ -57,9 +83,12 @@ export async function recentArticles(limit = 6): Promise<ArticleCard[]> {
 /** Dernier article éditorial (hors lettres d'info) — pour la manchette de l'accueil. */
 export async function latestArticle(): Promise<ArticleCard | null> {
   const rows = await query<any>(
-    `SELECT ${CARD} FROM article WHERE status = 'published' AND is_newsletter_issue != true ORDER BY published_at DESC LIMIT 1`
+    `SELECT ${CARD}, body_html FROM article WHERE status = 'published' AND is_newsletter_issue != true ORDER BY published_at DESC LIMIT 1`
   );
-  return rows[0] ? toCard(rows[0]) : null;
+  if (!rows[0]) return null;
+  const card = toCard(rows[0]);
+  card.summary = plainSummary(rows[0].body_html) ?? card.excerpt;
+  return card;
 }
 
 export interface RubriqueInfo { id: string; name: string; slug: string; count: number }
