@@ -54,6 +54,14 @@ export async function recentArticles(limit = 6): Promise<ArticleCard[]> {
   return rows.map(toCard);
 }
 
+/** Dernier article éditorial (hors lettres d'info) — pour la manchette de l'accueil. */
+export async function latestArticle(): Promise<ArticleCard | null> {
+  const rows = await query<any>(
+    `SELECT ${CARD} FROM article WHERE status = 'published' AND is_newsletter_issue != true ORDER BY published_at DESC LIMIT 1`
+  );
+  return rows[0] ? toCard(rows[0]) : null;
+}
+
 export interface RubriqueInfo { id: string; name: string; slug: string; count: number }
 
 export async function listBlogRubriques(): Promise<RubriqueInfo[]> {

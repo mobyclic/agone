@@ -21,7 +21,7 @@
     <nav class="ml-4 hidden items-center lg:flex">
       <!-- Antichambre ▾ rubriques -->
       <div class="group/drop relative">
-        <a href="/antichambre" class="inline-flex items-center gap-1 px-3 py-2 font-display text-[15px] font-medium uppercase tracking-wide">
+        <a href="/antichambre" class="inline-flex items-center gap-1 px-3 py-2 font-display text-[17px] font-medium uppercase tracking-wide">
           <span class="text-link transition-opacity {isActive('/antichambre') || isActive('/article') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">[</span>Antichambre<span class="text-link transition-opacity {isActive('/antichambre') || isActive('/article') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">]</span>
           <CaretDown size={11} class="text-muted-foreground" />
         </a>
@@ -38,7 +38,7 @@
 
       <!-- Catalogue ▾ collections -->
       <div class="group/drop relative">
-        <a href="/catalogue" class="inline-flex items-center gap-1 px-3 py-2 font-display text-[15px] font-medium uppercase tracking-wide">
+        <a href="/catalogue" class="inline-flex items-center gap-1 px-3 py-2 font-display text-[17px] font-medium uppercase tracking-wide">
           <span class="text-link transition-opacity {isActive('/catalogue') || isActive('/livre') || isActive('/collections') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">[</span>Catalogue<span class="text-link transition-opacity {isActive('/catalogue') || isActive('/livre') || isActive('/collections') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">]</span>
           <CaretDown size={11} class="text-muted-foreground" />
         </a>
@@ -54,13 +54,13 @@
       </div>
 
       <!-- Simples -->
-      <a href="/auteurs" class="group/n inline-flex items-center px-3 py-2 font-display text-[15px] font-medium uppercase tracking-wide">
+      <a href="/auteurs" class="group/n inline-flex items-center px-3 py-2 font-display text-[17px] font-medium uppercase tracking-wide">
         <span class="text-link transition-opacity {isActive('/auteurs') || isActive('/auteur') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>Auteurs<span class="text-link transition-opacity {isActive('/auteurs') || isActive('/auteur') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
-      <a href="/rencontres" class="group/n inline-flex items-center px-3 py-2 font-display text-[15px] font-medium uppercase tracking-wide">
+      <a href="/rencontres" class="group/n inline-flex items-center px-3 py-2 font-display text-[17px] font-medium uppercase tracking-wide">
         <span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>Rencontres<span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
-      <a href="/a-propos" class="group/n inline-flex items-center px-3 py-2 font-display text-[15px] font-medium uppercase tracking-wide">
+      <a href="/a-propos" class="group/n inline-flex items-center px-3 py-2 font-display text-[17px] font-medium uppercase tracking-wide">
         <span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>La maison<span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
     </nav>

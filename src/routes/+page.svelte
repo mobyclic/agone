@@ -4,8 +4,8 @@
   import { MapPin } from 'phosphor-svelte';
 
   let { data } = $props();
-  const lead = $derived(data.articles[0]);
-  const secondary = $derived(data.articles.slice(1, 4));
+  const article = $derived(data.feature ?? data.articles[0]);
+  const books = $derived(data.recent.slice(0, 4));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const dayNum = (s?: string) => (s ? new Date(s).getDate() : '');
   const monShort = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { month: 'short' }) : '');
@@ -16,72 +16,97 @@
   <meta name="description" content="Éditions Agone — sciences sociales, histoire, littérature et critique du présent. Marseille." />
 </svelte:head>
 
-<!-- MIS EN AVANT -->
-{#if data.featured.length}
-  <section class="mx-auto max-w-7xl px-4 pb-14 pt-12 sm:px-6">
-    <SectionHead title="Mis en avant" href="/catalogue" more="Le catalogue" />
-    <div class="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
-      {#each data.featured as book (book.slug)}<BookCard {book} />{/each}
-    </div>
-  </section>
-{/if}
+<!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
+<section class="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
+  <div class="grid gap-x-12 gap-y-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
 
-<!-- DERNIERS PARUS -->
-<section class="mx-auto max-w-7xl px-4 pb-14 {data.featured.length ? '' : 'pt-12'} sm:px-6">
-  <SectionHead title="Derniers parus" href="/catalogue" more="Le catalogue" />
-  <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-6">
-    {#each data.recent as book (book.slug)}<BookCard {book} />{/each}
+    <!-- Manchette : le dernier article de L'Antichambre -->
+    {#if article}
+      <div class="flex flex-col lg:border-r lg:border-border lg:pr-12">
+        <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
+          <span class="eyebrow">L’Antichambre</span>
+          <a href="/antichambre" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le magazine →</a>
+        </div>
+
+        {#if article.rubrique_name}
+          <a href="/antichambre?rubrique={article.rubrique_slug}" class="tick-label w-fit hover:text-link">{article.rubrique_name}</a>
+        {/if}
+
+        <a href="/article/{article.slug}" class="group mt-5 block">
+          <h1 class="display-title break-words text-4xl leading-[0.9] group-hover:text-link sm:text-5xl lg:text-6xl xl:text-7xl">{article.title}</h1>
+        </a>
+
+        {#if article.author || article.published_at}
+          <p class="mt-5 font-display text-sm uppercase tracking-[0.14em] text-muted-foreground">
+            {#if article.author}<span class="text-foreground">{article.author}</span>{/if}{#if article.author && article.published_at} · {/if}{#if article.published_at}{fmt(article.published_at)}{/if}
+          </p>
+        {/if}
+
+        {#if article.excerpt}
+          <p class="mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-lg">{article.excerpt}</p>
+        {/if}
+
+        <a href="/article/{article.slug}" class="link mt-8 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider lg:mt-auto lg:pt-10">
+          Lire l’article <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    {/if}
+
+    <!-- Vitrine : les 4 derniers livres parus -->
+    {#if books.length}
+      <div class="flex flex-col {article ? '' : 'lg:col-span-2'}">
+        <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
+          <span class="eyebrow">Derniers parus</span>
+          <a href="/catalogue" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le catalogue →</a>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
+          {#each books as book (book.slug)}
+            <a href="/livre/{book.slug}" class="group flex min-w-0 flex-col">
+              <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">
+                {#if book.cover_url}
+                  <img src={book.cover_url} alt={book.title} loading="lazy" class="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                {:else}
+                  <div class="flex size-full items-end bg-ink p-2.5 text-white">
+                    <span class="line-clamp-5 font-display text-xs font-semibold uppercase leading-tight">{book.title}</span>
+                  </div>
+                {/if}
+                {#if book.status === 'forthcoming'}
+                  <span class="absolute left-0 top-0 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">À paraître</span>
+                {/if}
+              </div>
+              <div class="mt-3 text-center">
+                {#if book.authors?.length}
+                  <p class="line-clamp-1 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{book.authors.map((a) => a.name).join(', ')}</p>
+                {/if}
+                <h3 class="display-title mt-1 line-clamp-2 text-sm leading-[1.05] group-hover:text-link sm:text-base">{book.title}</h3>
+              </div>
+            </a>
+          {/each}
+        </div>
+      </div>
+    {/if}
   </div>
 </section>
 
-<!-- À PARAÎTRE -->
-{#if data.forthcoming.length}
+<!-- MIS EN AVANT -->
+{#if data.featured.length}
   <section class="border-y border-border bg-secondary/40">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-      <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
-      <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-6">
-        {#each data.forthcoming as book (book.slug)}<BookCard {book} />{/each}
+      <SectionHead title="Mis en avant" href="/catalogue" more="Le catalogue" />
+      <div class="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
+        {#each data.featured as book (book.slug)}<BookCard {book} />{/each}
       </div>
     </div>
   </section>
 {/if}
 
-<!-- L'ANTICHAMBRE (compact) -->
-{#if lead}
+<!-- À PARAÎTRE -->
+{#if data.forthcoming.length}
   <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-    <SectionHead title="L’Antichambre" href="/antichambre" more="Le magazine" />
-    <div class="grid gap-x-12 gap-y-8 lg:grid-cols-[1.35fr_1fr]">
-      <!-- Une compacte : couverture à gauche, texte à droite -->
-      <article class="flex flex-col gap-6 sm:flex-row">
-        {#if lead.cover_url}
-          <a href="/article/{lead.slug}" class="group block w-full flex-none sm:w-52">
-            <div class="aspect-[4/3] overflow-hidden border border-border bg-muted">
-              <img src={lead.cover_url} alt="" class="size-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0" />
-            </div>
-          </a>
-        {/if}
-        <div class="min-w-0">
-          {#if lead.rubrique_name}<span class="tick-label">{lead.rubrique_name}</span>{/if}
-          <a href="/article/{lead.slug}" class="group block">
-            <h3 class="display-title mt-2 text-3xl leading-[0.95] group-hover:text-link">{lead.title}</h3>
-          </a>
-          <p class="mt-2 text-xs text-muted-foreground">
-            {#if lead.author}<span class="text-foreground">{lead.author}</span> · {/if}{fmt(lead.published_at)}
-          </p>
-          {#if lead.excerpt}<p class="mt-3 line-clamp-4 text-sm leading-relaxed text-foreground/80">{lead.excerpt}</p>{/if}
-        </div>
-      </article>
-
-      <!-- Récents -->
-      <div class="flex flex-col border-t-2 border-foreground">
-        {#each secondary as a (a.slug)}
-          <a href="/article/{a.slug}" class="group border-b border-border py-4">
-            {#if a.rubrique_name}<span class="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{a.rubrique_name}</span>{/if}
-            <h4 class="display-title mt-0.5 text-xl leading-tight group-hover:text-link">{a.title}</h4>
-            <p class="mt-1 text-xs text-muted-foreground">{#if a.author}{a.author} · {/if}{fmt(a.published_at)}</p>
-          </a>
-        {/each}
-      </div>
+    <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
+    <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-6">
+      {#each data.forthcoming as book (book.slug)}<BookCard {book} />{/each}
     </div>
   </section>
 {/if}
