@@ -49,7 +49,7 @@
       <!-- Encart achat -->
       <div class="mt-4 rounded-lg border border-border bg-card p-4">
         {#if b.status === 'forthcoming'}
-          <p class="mb-2 inline-block rounded bg-accent px-2 py-0.5 text-xs font-semibold text-primary">À paraître{pubLabel ? ` · ${pubLabel}` : ''}</p>
+          <p class="mb-2 inline-block rounded bg-accent px-2 py-0.5 text-xs font-semibold text-link">À paraître{pubLabel ? ` · ${pubLabel}` : ''}</p>
         {/if}
         <div class="space-y-1.5 text-sm">
           {#if euros(b.price_paper)}
@@ -104,14 +104,14 @@
           {#each b.contributors as c (c.role)}
             <span>
               <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} :</span>
-              {#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="font-medium text-primary hover:underline">{p.name}</a>{#if i < c.people.length - 1}, {/if}{/each}
+              {#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="font-medium text-link hover:underline">{p.name}</a>{#if i < c.people.length - 1}, {/if}{/each}
             </span>
           {/each}
         </div>
       {/if}
 
       {#if b.description_html}
-        <div class="prose-agone mt-6 max-w-none text-[15px] leading-relaxed [&_a]:text-primary [&_a:hover]:underline [&_p]:mb-3">
+        <div class="prose-agone mt-6 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
           {@html b.description_html}
         </div>
       {/if}

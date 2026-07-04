@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Button } from '$lib/components/ui/button';
   import BookCard from '$lib/components/BookCard.svelte';
   import { ArrowRight } from 'phosphor-svelte';
 
   let { data } = $props();
-  const highlight = $derived(data.featured.length ? data.featured : data.recent.slice(0, 6));
+  const lead = $derived(data.articles[0]);
+  const moreArticles = $derived(data.articles.slice(1));
+  const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 </script>
 
 <svelte:head>
@@ -12,63 +13,65 @@
   <meta name="description" content="Éditions Agone — sciences sociales, histoire, littérature et critique du présent. Marseille." />
 </svelte:head>
 
-<!-- Hero -->
-<section class="relative overflow-hidden bg-sidebar text-sidebar-foreground">
-  <div class="bg-grid-fade absolute inset-0 opacity-[0.12]"></div>
-  <div class="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
-    <p class="eyebrow" style="color:var(--sidebar-primary)">Éditeur engagé — Marseille</p>
-    <h1 class="mt-4 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
-      Des livres pour comprendre&nbsp;— et transformer&nbsp;— le monde.
-    </h1>
-    <p class="mt-5 max-w-xl text-lg text-sidebar-foreground/70">
-      Sciences sociales, histoire, littérature et critique du présent.
-    </p>
-    <div class="mt-8 flex flex-wrap gap-3">
-      <Button href="/catalogue" variant="brand" size="lg">Explorer le catalogue <ArrowRight size={18} /></Button>
-      <Button href="/auteurs" variant="outline" size="lg" class="border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent">
-        Les auteurs
-      </Button>
-    </div>
+<!-- Derniers parus -->
+<section class="mx-auto max-w-7xl px-4 pb-14 pt-10 sm:px-6">
+  <div class="mb-6 flex items-end justify-between border-b-2 border-foreground pb-2">
+    <h2 class="display-title text-3xl sm:text-4xl">Derniers parus</h2>
+    <a href="/catalogue" class="link inline-flex items-center gap-1 pb-1 font-display text-sm font-medium uppercase tracking-wide">Tout le catalogue <ArrowRight size={15} /></a>
   </div>
-</section>
-
-<!-- À la une -->
-<section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-  <div class="flex items-end justify-between">
-    <h2 class="text-2xl font-bold tracking-tight">{data.featured.length ? 'À la une' : 'Derniers parus'}</h2>
-    <a href="/catalogue" class="text-sm font-medium text-primary hover:underline">Tout le catalogue →</a>
-  </div>
-  <div class="mt-6 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-    {#each highlight as book (book.slug)}
+  <div class="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    {#each data.recent.slice(0, 12) as book (book.slug)}
       <BookCard {book} />
     {/each}
   </div>
 </section>
 
-<!-- Collections -->
-{#if data.collections.length}
-  <section class="border-t border-border bg-secondary/40">
+<!-- L'Antichambre : dernier article -->
+{#if lead}
+  <section class="border-y border-border bg-secondary/40">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-      <h2 class="text-2xl font-bold tracking-tight">Les collections</h2>
-      <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {#each data.collections as c (c.slug)}
-          <a href="/collections/{c.slug}" class="group flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary">
-            <span class="font-semibold group-hover:text-primary">{c.name}</span>
-            <span class="text-sm text-muted-foreground">{c.book_count}</span>
-          </a>
-        {/each}
+      <div class="mb-6 flex items-end justify-between border-b-2 border-foreground pb-2">
+        <h2 class="display-title text-3xl sm:text-4xl">L’Antichambre</h2>
+        <a href="/antichambre" class="link inline-flex items-center gap-1 pb-1 font-display text-sm font-medium uppercase tracking-wide">Le magazine <ArrowRight size={15} /></a>
+      </div>
+      <div class="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
+        <!-- Article à la une -->
+        <a href="/article/{lead.slug}" class="group block">
+          {#if lead.cover_url}
+            <div class="mb-4 aspect-[16/9] overflow-hidden rounded-lg border border-border bg-muted">
+              <img src={lead.cover_url} alt="" class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+            </div>
+          {/if}
+          {#if lead.rubrique_name}<span class="eyebrow text-muted-foreground">{lead.rubrique_name}</span>{/if}
+          <h3 class="display-title mt-2 text-2xl leading-tight group-hover:text-link sm:text-3xl">{lead.title}</h3>
+          {#if lead.excerpt}<p class="mt-2 line-clamp-3 text-muted-foreground">{lead.excerpt}</p>{/if}
+          <span class="mt-2 block text-xs text-muted-foreground">{fmt(lead.published_at)}</span>
+        </a>
+        <!-- Articles récents -->
+        <div class="flex flex-col divide-y divide-border border-t border-border">
+          {#each moreArticles as a (a.slug)}
+            <a href="/article/{a.slug}" class="group py-4">
+              {#if a.rubrique_name}<span class="eyebrow text-muted-foreground">{a.rubrique_name}</span>{/if}
+              <h4 class="mt-1 font-display text-lg font-medium leading-snug group-hover:text-link">{a.title}</h4>
+              <span class="mt-1 block text-xs text-muted-foreground">{fmt(a.published_at)}</span>
+            </a>
+          {/each}
+        </div>
       </div>
     </div>
   </section>
 {/if}
 
-<!-- Derniers parus (si à la une existait) -->
-{#if data.featured.length}
+<!-- Collections -->
+{#if data.collections.length}
   <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-    <h2 class="text-2xl font-bold tracking-tight">Derniers parus</h2>
-    <div class="mt-6 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {#each data.recent as book (book.slug)}
-        <BookCard {book} />
+    <h2 class="display-title mb-6 border-b-2 border-foreground pb-2 text-3xl sm:text-4xl">Les collections</h2>
+    <div class="grid gap-x-8 gap-y-2 font-display sm:grid-cols-2 lg:grid-cols-3">
+      {#each data.collections as c (c.slug)}
+        <a href="/collections/{c.slug}" class="group flex items-baseline justify-between border-b border-border/70 py-2.5 hover:border-foreground">
+          <span class="text-lg font-medium uppercase tracking-wide group-hover:text-link">{c.name}</span>
+          <span class="text-sm text-muted-foreground">{c.book_count}</span>
+        </a>
       {/each}
     </div>
   </section>

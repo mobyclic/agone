@@ -19,6 +19,7 @@
     "seed": "bun run scripts/seed.ts"
   },
   "devDependencies": {
+    "@fontsource-variable/oswald": "^5.2.5",
     "@fontsource-variable/roboto": "^5.2.10",
     "@internationalized/date": "^3.12.1",
     "@lucide/svelte": "^1.16.0",

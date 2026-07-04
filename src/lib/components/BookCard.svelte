@@ -30,13 +30,13 @@
       </div>
     {/if}
     {#if book.status === 'forthcoming'}
-      <span class="absolute left-2 top-2 rounded bg-brand-red px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+      <span class="absolute left-2 top-2 rounded bg-ink px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
         À paraître
       </span>
     {/if}
   </div>
   <div class="mt-2">
-    <h3 class="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-primary">{book.title}</h3>
+    <h3 class="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-link">{book.title}</h3>
     {#if book.authors?.length}
       <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
         {book.authors.map((a) => a.name).join(', ')}

@@ -25,10 +25,10 @@
   {#each sections as s (s.href)}
     <a href={s.href} class="group rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary">
       <div class="flex items-center justify-between">
-        <span class="grid size-10 place-items-center rounded-lg bg-accent text-primary"><s.icon size={20} /></span>
+        <span class="grid size-10 place-items-center rounded-lg bg-accent text-link"><s.icon size={20} /></span>
         <span class="text-2xl font-bold">{s.n}</span>
       </div>
-      <h3 class="mt-3 font-semibold group-hover:text-primary">{s.title}</h3>
+      <h3 class="mt-3 font-semibold group-hover:text-link">{s.title}</h3>
       <p class="mt-1 text-sm text-muted-foreground">{s.desc}</p>
     </a>
   {/each}

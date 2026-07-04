@@ -63,7 +63,7 @@
         <td class="px-3 py-2" colspan="5">Total dû</td>
         <td class="px-3 py-2 text-right">{eur(s.gross_total)}</td>
         <td class="px-3 py-2 text-right">−{eur(s.advance_applied)}</td>
-        <td class="px-3 py-2 text-right text-primary">{eur(s.total_due)}</td>
+        <td class="px-3 py-2 text-right text-link">{eur(s.total_due)}</td>
       </tr>
     </tfoot>
   </table>

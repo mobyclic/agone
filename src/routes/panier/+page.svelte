@@ -26,7 +26,7 @@
             {#if l.cover_url}<img src={l.cover_url} alt="" class="size-full object-cover" />{/if}
           </a>
           <div class="min-w-0 flex-1">
-            <a href="/livre/{l.slug}" class="font-medium hover:text-primary">{l.title}</a>
+            <a href="/livre/{l.slug}" class="font-medium hover:text-link">{l.title}</a>
             <p class="text-xs text-muted-foreground">{FORMAT[l.format] ?? l.format} · {eur(l.unit_price)}</p>
           </div>
           <form method="POST" action="?/update" use:enhance class="flex items-center gap-1">

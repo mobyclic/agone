@@ -24,11 +24,11 @@
           {#if b.cover_url}<img src={b.cover_url} alt="" class="size-full object-cover" />{/if}
         </a>
         <div class="flex min-w-0 flex-col">
-          <a href="/livre/{b.slug}" class="line-clamp-2 font-medium leading-snug hover:text-primary">{b.title}</a>
+          <a href="/livre/{b.slug}" class="line-clamp-2 font-medium leading-snug hover:text-link">{b.title}</a>
           <span class="mt-0.5 text-xs uppercase text-muted-foreground">{b.format}</span>
           <div class="mt-auto pt-2">
             {#if b.status === 'available'}
-              <a href="/api/ebook/{assetId(b.asset_id)}/download" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-brand-red-dark">
+              <a href="/api/ebook/{assetId(b.asset_id)}/download" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-black">
                 <DownloadSimple size={14} /> Télécharger
               </a>
             {:else}

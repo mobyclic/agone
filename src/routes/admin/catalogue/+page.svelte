@@ -90,7 +90,7 @@
               <span class="h-12 w-9 shrink-0 overflow-hidden rounded border border-border bg-muted">
                 {#if b.cover_url}<img src={b.cover_url} alt="" class="size-full object-cover" />{/if}
               </span>
-              <span class="font-medium hover:text-primary">{b.title}</span>
+              <span class="font-medium hover:text-link">{b.title}</span>
             </a>
           </td>
           <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[b.status] ?? b.status}</span></td>

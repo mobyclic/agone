@@ -16,7 +16,7 @@
   <div class="w-full max-w-md text-center">
     <div class="mb-6 flex justify-center"><Logo size={34} /></div>
     <div class="rounded-2xl border border-border bg-card p-8">
-      <div class="text-5xl font-extrabold text-primary">{page.status}</div>
+      <div class="text-5xl font-extrabold text-link">{page.status}</div>
       <h1 class="mt-3 text-lg font-semibold">{title}</h1>
       {#if page.error?.message && !isDbDown}
         <p class="mt-2 text-sm text-muted-foreground">{page.error.message}</p>

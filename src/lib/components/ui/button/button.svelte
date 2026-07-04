@@ -3,15 +3,15 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 	import { type VariantProps, tv } from "tailwind-variants";
 
-	// Agone — coins arrondis, casse normale, primaire rouge de marque / texte blanc.
+	// Agone — Oswald majuscules, primaire NOIR / texte blanc (N&B ; rouge réservé aux liens).
 	export const buttonVariants = tv({
-		base: "focus-visible:ring-ring/40 aria-invalid:ring-destructive/30 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-md border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-4 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "focus-visible:ring-ring/40 aria-invalid:ring-destructive/30 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-md border border-transparent bg-clip-padding font-display text-sm font-medium uppercase tracking-wide focus-visible:ring-4 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
-				// Filled (par défaut) — aplat rouge de marque / texte blanc
-				default: "bg-brand-red text-white hover:bg-brand-red-dark aria-expanded:bg-brand-red-dark",
-				// Marque — rouge (CTA d'accent, alias explicite)
-				brand: "bg-brand-red text-white hover:bg-brand-red-dark aria-expanded:bg-brand-red-dark",
+				// Filled (par défaut) — aplat NOIR / texte blanc
+				default: "bg-primary text-primary-foreground hover:bg-black aria-expanded:bg-black",
+				// Marque — alias du primaire noir
+				brand: "bg-primary text-primary-foreground hover:bg-black aria-expanded:bg-black",
 				// Tonal — secondaire doux
 				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary/90",
 				// Outlined
@@ -21,7 +21,7 @@
 				// Destructive
 				destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
 				// Link
-				link: "text-primary underline-offset-4 hover:underline",
+				link: "text-link underline-offset-4 hover:underline",
 			},
 			size: {
 				default: "h-10 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",

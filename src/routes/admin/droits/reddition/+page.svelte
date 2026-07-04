@@ -45,7 +45,7 @@
       <tbody class="divide-y divide-border">
         {#each data.statements as s (s.id)}
           <tr class="hover:bg-muted/30">
-            <td class="px-3 py-2"><a href="/admin/droits/reddition/{String(s.id).replace('royalty_statement:', '')}" class="font-medium hover:text-primary">{s.author_name}</a></td>
+            <td class="px-3 py-2"><a href="/admin/droits/reddition/{String(s.id).replace('royalty_statement:', '')}" class="font-medium hover:text-link">{s.author_name}</a></td>
             <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[s.status] ?? s.status}</span></td>
             <td class="px-3 py-2 text-right text-muted-foreground">{eur(s.gross_total)}</td>
             <td class="px-3 py-2 text-right text-muted-foreground">−{eur(s.advance_applied)}</td>

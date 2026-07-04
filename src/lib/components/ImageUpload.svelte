@@ -69,7 +69,7 @@
       type="button"
       onclick={() => input.click()}
       disabled={busy}
-      class="flex h-20 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-60"
+      class="flex h-20 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-link disabled:opacity-60"
     >
       {#if busy}<Spinner size={18} class="animate-spin" /> Envoi…{:else}<UploadSimple size={18} /> {url ? 'Remplacer' : 'Choisir un fichier'}{/if}
     </button>

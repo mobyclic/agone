@@ -21,7 +21,7 @@
       <CheckCircle size={48} class="mx-auto text-success" weight="fill" />
       <h1 class="mt-3 text-2xl font-extrabold">Merci pour votre commande !</h1>
     {:else}
-      <Clock size={48} class="mx-auto text-primary" weight="fill" />
+      <Clock size={48} class="mx-auto text-link" weight="fill" />
       <h1 class="mt-3 text-2xl font-extrabold">Commande enregistrée</h1>
       <p class="mt-1 text-sm text-muted-foreground">Elle est en attente de paiement. Nous vous recontacterons pour la finaliser.</p>
     {/if}
@@ -32,7 +32,7 @@
     <ul class="divide-y divide-border">
       {#each o.lines as l (l.slug + l.format)}
         <li class="flex items-center justify-between gap-3 py-3 text-sm">
-          <span><a href="/livre/{l.slug}" class="font-medium hover:text-primary">{l.title}</a><span class="ml-2 text-xs text-muted-foreground">{FORMAT[l.format] ?? l.format} × {l.qty}</span></span>
+          <span><a href="/livre/{l.slug}" class="font-medium hover:text-link">{l.title}</a><span class="ml-2 text-xs text-muted-foreground">{FORMAT[l.format] ?? l.format} × {l.qty}</span></span>
           <span class="font-medium">{eur(l.line_total)}</span>
         </li>
       {/each}

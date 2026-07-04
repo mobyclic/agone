@@ -38,7 +38,7 @@
               <span class="text-[11px] uppercase">{e.start_at ? new Date(e.start_at).toLocaleDateString('fr-FR', { month: 'short' }) : ''}</span>
             </div>
             <div class="min-w-0">
-              <h3 class="font-semibold leading-snug group-hover:text-primary">{e.title}</h3>
+              <h3 class="font-semibold leading-snug group-hover:text-link">{e.title}</h3>
               <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span class="inline-flex items-center gap-1"><CalendarBlank size={14} /> {fmt(e.start_at)}{fmtTime(e.start_at) ? ` · ${fmtTime(e.start_at)}` : ''}</span>
                 {#if e.venue_name}<span class="inline-flex items-center gap-1"><MapPin size={14} /> {e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</span>{/if}
@@ -60,7 +60,7 @@
           <li>
             <a href="/rencontres/{e.slug}" class="group flex flex-wrap items-baseline gap-x-3 py-3 hover:bg-muted/40">
               <span class="w-28 shrink-0 text-sm text-muted-foreground">{fmtShort(e.start_at)}</span>
-              <span class="min-w-0 flex-1 font-medium group-hover:text-primary">{e.title}</span>
+              <span class="min-w-0 flex-1 font-medium group-hover:text-link">{e.title}</span>
               {#if e.venue_city}<span class="text-sm text-muted-foreground">{e.venue_city}</span>{/if}
             </a>
           </li>

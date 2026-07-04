@@ -40,7 +40,7 @@
             </div>
           {/if}
           {#if a.rubrique_name}<span class="eyebrow">{a.rubrique_name}</span>{/if}
-          <h2 class="mt-1 line-clamp-2 font-semibold leading-snug group-hover:text-primary">{a.title}</h2>
+          <h2 class="mt-1 line-clamp-2 font-semibold leading-snug group-hover:text-link">{a.title}</h2>
           {#if a.excerpt}<p class="mt-1 line-clamp-2 text-sm text-muted-foreground">{a.excerpt}</p>{/if}
           <span class="mt-2 text-xs text-muted-foreground">{fmt(a.published_at)}</span>
         </a>

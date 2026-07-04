@@ -75,7 +75,7 @@
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
         Déjà un compte ?
-        <a href="/connexion{page.url.search}" class="font-medium text-primary hover:underline">Se connecter</a>
+        <a href="/connexion{page.url.search}" class="font-medium text-link hover:underline">Se connecter</a>
       </p>
     </div>
   </div>

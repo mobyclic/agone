@@ -20,7 +20,7 @@
     <span>{fmt(a.published_at)}</span>
     {#if a.authors.length}
       <span>·</span>
-      <span>{#each a.authors as au, i (au.slug)}<a href="/auteur/{au.slug}" class="text-primary hover:underline">{au.full_name}</a>{#if i < a.authors.length - 1}, {/if}{/each}</span>
+      <span>{#each a.authors as au, i (au.slug)}<a href="/auteur/{au.slug}" class="text-link hover:underline">{au.full_name}</a>{#if i < a.authors.length - 1}, {/if}{/each}</span>
     {/if}
   </div>
 
@@ -29,7 +29,7 @@
   {/if}
 
   {#if a.body_html}
-    <div class="prose-agone mt-8 max-w-none text-[16px] leading-relaxed [&_a]:text-primary [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_img]:my-4 [&_img]:rounded-lg [&_p]:mb-4">
+    <div class="prose-agone mt-8 max-w-none text-[16px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_img]:my-4 [&_img]:rounded-lg [&_p]:mb-4">
       {@html a.body_html}
     </div>
   {/if}
@@ -38,7 +38,7 @@
     <div class="mt-10 rounded-lg border border-border bg-secondary/40 p-4">
       <h2 class="eyebrow mb-2">Livres liés</h2>
       <ul class="space-y-1">
-        {#each a.books as b (b.slug)}<li><a href="/livre/{b.slug}" class="font-medium text-primary hover:underline">{b.title}</a></li>{/each}
+        {#each a.books as b (b.slug)}<li><a href="/livre/{b.slug}" class="font-medium text-link hover:underline">{b.title}</a></li>{/each}
       </ul>
     </div>
   {/if}

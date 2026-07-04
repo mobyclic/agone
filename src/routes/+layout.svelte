@@ -22,7 +22,7 @@
   {@render children?.()}
 {:else}
   <div class="flex min-h-svh flex-col">
-    <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} />
+    <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} nav={data.nav} />
     <main class="flex-1">
       {@render children?.()}
     </main>

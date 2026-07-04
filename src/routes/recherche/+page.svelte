@@ -37,7 +37,7 @@
         <h2 class="text-lg font-bold">Auteurs</h2>
         <div class="mt-4 flex flex-wrap gap-2">
           {#each data.authors as a (a.slug)}
-            <a href="/auteur/{a.slug}" class="rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary">{a.full_name}</a>
+            <a href="/auteur/{a.slug}" class="rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-link">{a.full_name}</a>
           {/each}
         </div>
       </section>
@@ -48,7 +48,7 @@
         <h2 class="text-lg font-bold">L’Antichambre</h2>
         <ul class="mt-4 divide-y divide-border border-y border-border">
           {#each data.articles as a (a.slug)}
-            <li><a href="/article/{a.slug}" class="block py-3 font-medium hover:text-primary">{a.title}</a></li>
+            <li><a href="/article/{a.slug}" class="block py-3 font-medium hover:text-link">{a.title}</a></li>
           {/each}
         </ul>
       </section>

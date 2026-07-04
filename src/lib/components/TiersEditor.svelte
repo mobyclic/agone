@@ -30,6 +30,6 @@
       {/if}
     </div>
   {/each}
-  <button type="button" onclick={add} class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"><Plus size={12} /> Ajouter un palier</button>
+  <button type="button" onclick={add} class="inline-flex items-center gap-1 text-xs font-medium text-link hover:underline"><Plus size={12} /> Ajouter un palier</button>
   <p class="text-xs text-muted-foreground">Laissez le seuil vide sur le dernier palier (= au-delà, sans plafond).</p>
 </div>

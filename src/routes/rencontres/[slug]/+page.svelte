@@ -34,23 +34,23 @@
 
   <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
     {#if e.start_at}
-      <span class="inline-flex items-center gap-1.5 font-medium"><CalendarBlank size={16} class="text-primary" /> <span class="capitalize">{fmt(e.start_at)}</span></span>
-      {#if time(e.start_at)}<span class="inline-flex items-center gap-1.5"><Clock size={16} class="text-primary" /> {time(e.start_at)}</span>{/if}
+      <span class="inline-flex items-center gap-1.5 font-medium"><CalendarBlank size={16} class="text-link" /> <span class="capitalize">{fmt(e.start_at)}</span></span>
+      {#if time(e.start_at)}<span class="inline-flex items-center gap-1.5"><Clock size={16} class="text-link" /> {time(e.start_at)}</span>{/if}
     {/if}
     {#if e.venue?.name}
-      <span class="inline-flex items-center gap-1.5"><MapPin size={16} class="text-primary" /> {e.venue.name}{e.venue.city ? `, ${e.venue.city}` : ''}</span>
+      <span class="inline-flex items-center gap-1.5"><MapPin size={16} class="text-link" /> {e.venue.name}{e.venue.city ? `, ${e.venue.city}` : ''}</span>
     {/if}
   </div>
 
   {#if e.authors.length}
     <p class="mt-3 text-sm">
       <span class="text-muted-foreground">Avec </span>
-      {#each e.authors as a, i (a.slug)}<a href="/auteur/{a.slug}" class="font-medium text-primary hover:underline">{a.full_name}</a>{#if i < e.authors.length - 1}, {/if}{/each}
+      {#each e.authors as a, i (a.slug)}<a href="/auteur/{a.slug}" class="font-medium text-link hover:underline">{a.full_name}</a>{#if i < e.authors.length - 1}, {/if}{/each}
     </p>
   {/if}
 
   {#if e.body_html}
-    <div class="prose-agone mt-6 max-w-none text-[15px] leading-relaxed [&_a]:text-primary [&_a:hover]:underline [&_p]:mb-3">
+    <div class="prose-agone mt-6 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
       {@html e.body_html}
     </div>
   {/if}
@@ -71,7 +71,7 @@
           {/key}
         </div>
       {/if}
-      {#if mapsUrl}<a href={mapsUrl} target="_blank" rel="noopener" class="mt-2 inline-block text-sm font-medium text-primary hover:underline">Itinéraire →</a>{/if}
+      {#if mapsUrl}<a href={mapsUrl} target="_blank" rel="noopener" class="mt-2 inline-block text-sm font-medium text-link hover:underline">Itinéraire →</a>{/if}
     </section>
   {/if}
 
@@ -81,7 +81,7 @@
       <h2 class="eyebrow mb-3">À propos {e.books.length > 1 ? 'des livres' : 'du livre'}</h2>
       <ul class="space-y-1">
         {#each e.books as b (b.slug)}
-          <li><a href="/livre/{b.slug}" class="font-medium text-primary hover:underline">{b.title}</a></li>
+          <li><a href="/livre/{b.slug}" class="font-medium text-link hover:underline">{b.title}</a></li>
         {/each}
       </ul>
     </section>

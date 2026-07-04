@@ -24,7 +24,7 @@
     <tbody class="divide-y divide-border">
       {#each data.books as b (b.id)}
         <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2"><a href="/admin/droits/contrats/{String(b.id).replace('book:', '')}" class="font-medium hover:text-primary">{b.title}</a></td>
+          <td class="px-3 py-2"><a href="/admin/droits/contrats/{String(b.id).replace('book:', '')}" class="font-medium hover:text-link">{b.title}</a></td>
           <td class="px-3 py-2 text-right text-muted-foreground">{b.contributor_count}</td>
           <td class="px-3 py-2 text-right">
             {#if b.contract_count >= b.contributor_count}<span class="text-success">{b.contract_count}</span>

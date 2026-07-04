@@ -101,7 +101,7 @@
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
         Pas encore de compte ?
-        <a href="/inscription{page.url.search}" class="font-medium text-primary hover:underline">Créer un compte</a>
+        <a href="/inscription{page.url.search}" class="font-medium text-link hover:underline">Créer un compte</a>
       </p>
     </div>
   </div>

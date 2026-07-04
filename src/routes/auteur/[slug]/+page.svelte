@@ -32,12 +32,12 @@
         <p class="mt-1 text-sm text-muted-foreground">{[a.nationality, years].filter(Boolean).join(' · ')}</p>
       {/if}
       {#if a.bio_html}
-        <div class="prose-agone mt-4 max-w-2xl text-[15px] leading-relaxed text-foreground/90 [&_a]:text-primary [&_p]:mb-3">
+        <div class="prose-agone mt-4 max-w-2xl text-[15px] leading-relaxed text-foreground/90 [&_a]:text-link [&_p]:mb-3">
           {@html a.bio_html}
         </div>
       {/if}
       {#if a.website}
-        <a href={a.website} target="_blank" rel="noopener" class="mt-2 inline-block text-sm font-medium text-primary hover:underline">Site web →</a>
+        <a href={a.website} target="_blank" rel="noopener" class="mt-2 inline-block text-sm font-medium text-link hover:underline">Site web →</a>
       {/if}
     </div>
   </header>

@@ -23,7 +23,7 @@
       <Card.Root class="h-full transition-colors group-hover:border-primary">
         <Card.Header>
           <div class="flex items-center gap-3">
-            <span class="grid size-10 place-items-center rounded-lg bg-accent text-primary">
+            <span class="grid size-10 place-items-center rounded-lg bg-accent text-link">
               <Icon name={s.icon} size={20} />
             </span>
             <Card.Title class="text-base">{s.label}</Card.Title>

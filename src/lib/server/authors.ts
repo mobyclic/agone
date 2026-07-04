@@ -12,6 +12,7 @@ export interface AuthorCard {
   full_name: string;
   slug: string;
   last_name: string;
+  first_name: string;
   book_count: number;
 }
 
@@ -38,6 +39,7 @@ export async function listAuthors(opts: { q?: string; letter?: string } = {}): P
     full_name: r.full_name,
     slug: r.slug,
     last_name: r.last_name ?? '',
+    first_name: r.first_name ?? '',
     book_count: r.book_count ?? 0
   }));
 }

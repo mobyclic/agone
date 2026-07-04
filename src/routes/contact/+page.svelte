@@ -10,7 +10,7 @@
   <div class="mt-8 grid gap-4 sm:grid-cols-2">
     <div class="rounded-lg border border-border bg-card p-5">
       <div class="eyebrow">Écrire à la maison</div>
-      <a href="mailto:contact@agone.org" class="mt-2 inline-flex items-center gap-2 font-semibold text-primary hover:underline">
+      <a href="mailto:contact@agone.org" class="mt-2 inline-flex items-center gap-2 font-semibold text-link hover:underline">
         <EnvelopeSimple size={18} /> contact@agone.org
       </a>
     </div>

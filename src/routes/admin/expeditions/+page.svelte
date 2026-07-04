@@ -37,7 +37,7 @@
           <td class="px-3 py-2 text-right">{e.book_count}</td>
           <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[e.status] ?? e.status}</span></td>
           <td class="px-3 py-2 text-muted-foreground">{fmt(e.created_at)}</td>
-          <td class="px-3 py-2 text-right"><a href="/admin/expeditions/{String(e.id).replace('bl_export:', '')}/download" class="inline-flex items-center gap-1 text-primary hover:underline"><DownloadSimple size={14} /> EDI</a></td>
+          <td class="px-3 py-2 text-right"><a href="/admin/expeditions/{String(e.id).replace('bl_export:', '')}/download" class="inline-flex items-center gap-1 text-link hover:underline"><DownloadSimple size={14} /> EDI</a></td>
         </tr>
       {/each}
       {#if data.exports.length === 0}<tr><td colspan="6" class="px-3 py-8 text-center text-muted-foreground">Aucun export généré.</td></tr>{/if}

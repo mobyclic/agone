@@ -26,7 +26,7 @@
       <tbody class="divide-y divide-border">
         {#each data.orders as o (o.id)}
           <tr class="hover:bg-muted/30">
-            <td class="px-3 py-2"><a href="/commande/{o.number}" class="font-medium hover:text-primary">n°{o.number}</a></td>
+            <td class="px-3 py-2"><a href="/commande/{o.number}" class="font-medium hover:text-link">n°{o.number}</a></td>
             <td class="px-3 py-2 text-muted-foreground">{fmt(o.created_at)}</td>
             <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[o.status] ?? o.status}</span></td>
             <td class="px-3 py-2 text-right font-semibold">{eur(o.total)}</td>

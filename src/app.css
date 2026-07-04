@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
+@import '@fontsource-variable/oswald';
 @import '@fontsource-variable/roboto';
 @import 'leaflet/dist/leaflet.css';
 
@@ -8,49 +9,44 @@
 
 /* ============================================================
    AGONE — Design system
-   Éditeur engagé. Identité : ROUGE de marque + NOIR, accent BLEU.
-     • Rouge   #d4211c → aplats (boutons, bandeaux, états actifs)
-     • Rouge clair #dd4d49 (hover clair) · Rouge foncé #aa1a16 (hover aplat)
-     • Noir    #141414 → sections sombres, sidebar
-     • Bleu    #26425b → accent secondaire (liens éditoriaux, graphes)
-   Typo : Roboto (UI/texte) — pairing typographique éditorial à affiner (Phase 1).
+   NOIR & BLANC. Le ROUGE (#d4211c) est réservé aux LIENS.
+   Typo : Oswald (titres, nav, boutons — condensé, impactant) + Roboto (texte).
    ============================================================ */
 
 :root {
-  /* — Marque — */
+  /* — Encre & liens — */
+  --ink: #141414;
+  --link: #d4211c;
+  --link-hover: #a3140f;
+  /* Compat tokens de marque (désormais neutres/noirs) */
   --brand-red: #d4211c;
-  --brand-red-light: #dd4d49;
-  --brand-red-dark: #aa1a16;
-  --brand-blue: #26425b;
   --brand-ink: #141414;
-  /* Compat avec les composants shadcn copiés (bg-brand-gold / .btn-brand / brand-orange) */
-  --brand-gold: #d4211c;      /* aplat CTA */
-  --brand-powder: #aa1a16;    /* hover aplat */
-  --brand-mustard: #d4211c;   /* accent (eyebrow) */
+  --brand-gold: #141414;
+  --brand-powder: #000000;
+  --brand-mustard: #141414;
   --brand-navy: #141414;
-  --brand-orange: #d4211c;
+  --brand-orange: #141414;
+  --brand-blue: #2b2b2b;
 
   /* — Surfaces — */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #141414;
   --card: #ffffff;
-  --card-foreground: #171717;
-  --popover: #ffffff;
-  --popover-foreground: #171717;
+  --card-foreground: #141414;
+  --popover: #141414;               /* menus déroulants : fond noir */
+  --popover-foreground: #f5f5f4;
 
-  /* — Primary = rouge de marque — */
-  --primary: #d4211c;
+  /* — Primary = ENCRE (boutons, états actifs, focus) — */
+  --primary: #141414;
   --primary-foreground: #ffffff;
 
-  /* — Secondary / Muted (gris neutres) — */
-  --secondary: #f5f5f4;
+  /* — Neutres — */
+  --secondary: #f4f4f5;
   --secondary-foreground: #1c1917;
-  --muted: #f5f5f4;
-  --muted-foreground: #57534e;
-
-  /* — Accent (léger voile rouge pour les survols) — */
-  --accent: #fdeceb;
-  --accent-foreground: #171717;
+  --muted: #f4f4f5;
+  --muted-foreground: #6b6b6b;
+  --accent: #f4f4f5;
+  --accent-foreground: #141414;
 
   /* — Sémantiques — */
   --destructive: #b91c1c;
@@ -60,61 +56,51 @@
   --warning: #b45309;
   --warning-foreground: #ffffff;
 
-  /* — Outline & utilitaires — */
-  --border: #e7e5e4;
-  --input: #e7e5e4;
-  --ring: #d4211c;
+  /* — Outline & focus (noir) — */
+  --border: #e4e4e4;
+  --input: #e4e4e4;
+  --ring: #141414;
 
-  /* — Sidebar / surfaces sombres (noir + rouge) — */
+  /* — Sections sombres / sidebar (noir, accent blanc) — */
   --sidebar: #141414;
-  --sidebar-foreground: #e7e5e4;
-  --sidebar-primary: #d4211c;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-foreground: #f5f5f4;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #141414;
   --sidebar-accent: #262626;
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #2c2c2c;
-  --sidebar-ring: #d4211c;
+  --sidebar-ring: #ffffff;
 
-  /* — Charts (rouge + bleu + neutres) — */
-  --chart-1: #d4211c;
-  --chart-2: #26425b;
-  --chart-3: #dd4d49;
-  --chart-4: #57534e;
-  --chart-5: #141414;
+  /* — Charts (nuances de gris + rouge lien) — */
+  --chart-1: #141414;
+  --chart-2: #6b6b6b;
+  --chart-3: #a3a3a3;
+  --chart-4: #d4d4d4;
+  --chart-5: #d4211c;
 
-  --radius: 0.5rem;
+  --radius: 0.4rem;
 }
 
 .dark {
   --background: #0d0d0d;
   --foreground: #f5f5f4;
-  --card: #171717;
+  --card: #141414;
   --card-foreground: #f5f5f4;
-  --popover: #171717;
+  --popover: #0a0a0a;
   --popover-foreground: #f5f5f4;
-
-  --primary: #dd4d49;
-  --primary-foreground: #171717;
-
-  --secondary: #262626;
+  --primary: #f5f5f4;
+  --primary-foreground: #141414;
+  --secondary: #1f1f1f;
   --secondary-foreground: #f5f5f4;
-  --muted: #262626;
-  --muted-foreground: #a8a29e;
-  --accent: #2a1413;
+  --muted: #1f1f1f;
+  --muted-foreground: #a3a3a3;
+  --accent: #1f1f1f;
   --accent-foreground: #f5f5f4;
-
-  --border: #2c2c2c;
-  --input: #2c2c2c;
-  --ring: #dd4d49;
-
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #e7e5e4;
-  --sidebar-primary: #dd4d49;
-  --sidebar-primary-foreground: #171717;
-  --sidebar-accent: #1f1f1f;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #242424;
-  --sidebar-ring: #dd4d49;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #f5f5f4;
+  --link: #ff6b5e;
+  --link-hover: #ff8a80;
 }
 
 @theme inline {
@@ -142,11 +128,12 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-ink: var(--ink);
   --color-brand-red: var(--brand-red);
-  --color-brand-red-light: var(--brand-red-light);
-  --color-brand-red-dark: var(--brand-red-dark);
-  --color-brand-blue: var(--brand-blue);
   --color-brand-ink: var(--brand-ink);
+  --color-brand-blue: var(--brand-blue);
   --color-brand-gold: var(--brand-gold);
   --color-brand-powder: var(--brand-powder);
   --color-brand-mustard: var(--brand-mustard);
@@ -174,13 +161,13 @@
   --radius-xl: calc(var(--radius) + 6px);
 
   --font-sans: 'Roboto Variable', 'Roboto', ui-sans-serif, system-ui, Arial, sans-serif;
-  --font-display: 'Roboto Variable', 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Oswald Variable', 'Oswald', 'Roboto Variable', ui-sans-serif, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/40;
   }
   body {
     @apply bg-background text-foreground antialiased;
@@ -190,40 +177,54 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
+    font-weight: 600;
     letter-spacing: -0.01em;
+    line-height: 1.02;
+  }
+  /* Les liens sont ROUGES (seule couleur non-neutre du site). */
+  a.link, .prose-agone a {
+    color: var(--link);
+  }
+  a.link:hover, .prose-agone a:hover {
+    color: var(--link-hover);
+    text-decoration: underline;
   }
   input::placeholder,
   textarea::placeholder {
     color: var(--muted-foreground);
-    opacity: 0.5;
+    opacity: 0.6;
   }
 }
 
-/* — Petits labels capitales espacés (pictos/eyebrows) — */
+/* — Petit label capitales (Oswald, noir) — */
 .eyebrow {
+  font-family: var(--font-display);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 11px;
-  font-weight: 700;
-  @apply text-brand-red;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 600;
+  @apply text-foreground;
 }
 
-/* — Bouton / puce accent rouge (CTA de marque) — */
+/* — Titre d'affichage impactant (Oswald) — */
+.display-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+/* — CTA de marque : aplat NOIR / texte blanc — */
 .btn-brand {
-  background-color: var(--brand-red);
+  background-color: var(--ink);
   color: #ffffff;
 }
 .btn-brand:hover {
-  background-color: var(--brand-red-dark);
+  background-color: #000000;
 }
 
-/* — Trames de fond du hero — */
-.bg-grid {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, #ffffff 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, #ffffff 12%, transparent) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
+/* — Trames de fond — */
 .bg-grid-fade {
   background-image:
     linear-gradient(to right, color-mix(in srgb, #ffffff 10%, transparent) 1px, transparent 1px),
@@ -233,11 +234,11 @@
   -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 78%);
 }
 
-/* — Leaflet (carte des rencontres, Phase 3) — */
+/* — Leaflet — */
 .leaflet-container { font: inherit; z-index: 0; }
 .ag-map-gray .leaflet-tile { filter: grayscale(1) contrast(0.9) brightness(1.05); }
 
-/* — Bandeaux d'en-tête sombres (bg-sidebar) : lisibilité du texte secondaire. — */
+/* — Bandeaux sombres : lisibilité — */
 .page-head .eyebrow { color: var(--sidebar-primary); }
 .page-head :is(p, a, span).text-muted-foreground {
   color: color-mix(in oklch, var(--sidebar-foreground) 72%, transparent);
