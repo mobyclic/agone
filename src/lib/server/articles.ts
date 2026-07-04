@@ -80,14 +80,20 @@ export async function recentArticles(limit = 6): Promise<ArticleCard[]> {
   return rows.map(toCard);
 }
 
-/** Dernier article éditorial (hors lettres d'info) — pour la manchette de l'accueil. */
+/**
+ * Article de la manchette d'accueil : le dernier article SIGNÉ (auteur présent),
+ * lettres d'info comprises — elles sont signées et souvent les plus récentes.
+ * Repli sur le dernier article publié si aucun n'est signé. Le suffixe
+ * « [LettrInfo NN] » est retiré du titre pour un hero propre.
+ */
 export async function latestArticle(): Promise<ArticleCard | null> {
-  const rows = await query<any>(
-    `SELECT ${CARD}, body_html FROM article WHERE status = 'published' AND is_newsletter_issue != true ORDER BY published_at DESC LIMIT 1`
-  );
+  const base = `SELECT ${CARD}, body_html FROM article WHERE status = 'published'`;
+  let rows = await query<any>(`${base} AND array::len(authors) > 0 ORDER BY published_at DESC LIMIT 1`);
+  if (!rows[0]) rows = await query<any>(`${base} ORDER BY published_at DESC LIMIT 1`);
   if (!rows[0]) return null;
   const card = toCard(rows[0]);
-  card.summary = plainSummary(rows[0].body_html) ?? card.excerpt;
+  card.title = card.title.replace(/\s*\[LettrInfos?\b[^\]]*\]\s*$/i, '').trim();
+  card.summary = plainSummary(rows[0].body_html, 720) ?? card.excerpt;
   return card;
 }
 

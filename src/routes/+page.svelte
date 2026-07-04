@@ -6,7 +6,7 @@
   let { data } = $props();
   const article = $derived(data.feature ?? data.articles[0]);
   const lede = $derived(article?.summary ?? article?.excerpt);
-  const books = $derived(data.recent.slice(0, 4));
+  const books = $derived(data.recent.slice(0, 5));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const dayNum = (s?: string) => (s ? new Date(s).getDate() : '');
   const monShort = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { month: 'short' }) : '');
@@ -61,9 +61,9 @@
           <a href="/catalogue" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le catalogue →</a>
         </div>
 
-        <div class="grid grid-cols-2 gap-x-8 gap-y-10">
-          {#each books as book (book.slug)}
-            <a href="/livre/{book.slug}" class="group flex min-w-0 flex-col">
+        <div class="grid grid-cols-6 gap-x-8 gap-y-10">
+          {#each books as book, i (book.slug)}
+            <a href="/livre/{book.slug}" class="group flex min-w-0 flex-col {i < 2 ? 'col-span-3' : 'col-span-2'}">
               <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">
                 {#if book.cover_url}
                   <img src={book.cover_url} alt={book.title} loading="lazy" class="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
