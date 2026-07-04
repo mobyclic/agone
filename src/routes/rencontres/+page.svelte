@@ -1,5 +1,6 @@
 <script lang="ts">
   import { MapPin, CalendarBlank } from 'phosphor-svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
 
   const fmt = (s?: string) =>
@@ -15,13 +16,7 @@
 
 <svelte:head><title>Rencontres · Agone</title></svelte:head>
 
-<section class="border-b border-border bg-secondary/40">
-  <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-    <p class="eyebrow">L’agenda</p>
-    <h1 class="mt-1 text-3xl font-extrabold tracking-tight">Rencontres</h1>
-    <p class="mt-2 text-muted-foreground">Débats, tables rondes et présentations autour des livres et des auteurs.</p>
-  </div>
-</section>
+<PageHead eyebrow="L’agenda" title="Rencontres" subtitle="Débats, tables rondes et présentations autour des livres et des auteurs." />
 
 <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
   <!-- À venir -->

@@ -78,7 +78,8 @@
   --chart-4: #d4d4d4;
   --chart-5: #d4211c;
 
-  --radius: 0.4rem;
+  /* Angles DROITS partout (charte éditoriale, filets & géométrie). */
+  --radius: 0;
 }
 
 .dark {
@@ -155,10 +156,10 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
-  --radius-xl: calc(var(--radius) + 6px);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
 
   --font-sans: 'Roboto Variable', 'Roboto', ui-sans-serif, system-ui, Arial, sans-serif;
   --font-display: 'Oswald Variable', 'Oswald', 'Roboto Variable', ui-sans-serif, sans-serif;
@@ -211,8 +212,28 @@
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 0.98;
+  line-height: 0.95;
   text-transform: uppercase;
+}
+
+/* — Label avec filet rouge (│ LABEL) — */
+.tick-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--foreground);
+}
+.tick-label::before {
+  content: '';
+  width: 4px;
+  height: 1.1em;
+  background: var(--link);
+  flex: none;
 }
 
 /* — CTA de marque : aplat NOIR / texte blanc — */

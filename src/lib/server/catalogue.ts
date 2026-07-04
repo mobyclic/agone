@@ -108,6 +108,28 @@ export async function recentBooks(limit = 8): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
+/** Autres livres du même auteur (par slug d'auteur). */
+export async function booksByAuthorSlug(authorSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS} FROM book
+       WHERE status = 'published' AND id != $ex AND ->contributed_by->author.slug CONTAINS $a
+       ORDER BY published_at DESC LIMIT $limit`,
+    { a: authorSlug, ex: recId('book', excludeBookId), limit }
+  );
+  return rows.map(toCard);
+}
+
+/** Autres livres de la même collection. */
+export async function booksInCollectionSlug(collSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS} FROM book
+       WHERE status = 'published' AND id != $ex AND (primary_collection.slug = $c OR collections.slug CONTAINS $c)
+       ORDER BY published_at DESC LIMIT $limit`,
+    { c: collSlug, ex: recId('book', excludeBookId), limit }
+  );
+  return rows.map(toCard);
+}
+
 export interface BookDetail extends BookCard {
   description_html?: string;
   extra_info_html?: string;

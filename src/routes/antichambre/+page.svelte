@@ -1,6 +1,8 @@
 <script lang="ts">
+  import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
+  const active = $derived(data.rubriques.find((r) => r.slug === data.rubrique));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   function qs(p: Record<string, string | number | undefined>) {
     const sp = new URLSearchParams();
@@ -13,15 +15,14 @@
 
 <svelte:head><title>L’Antichambre · Agone</title></svelte:head>
 
-<section class="border-b border-border bg-sidebar text-sidebar-foreground">
-  <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-    <p class="eyebrow" style="color:var(--sidebar-primary)">Le magazine</p>
-    <h1 class="mt-1 text-4xl font-extrabold tracking-tight">L’Antichambre</h1>
-    <p class="mt-2 max-w-xl text-sidebar-foreground/70">Textes, inactualités et critiques — au-delà des livres.</p>
-    <div class="mt-6 flex flex-wrap gap-2">
-      <a href="/antichambre" class="rounded-full border px-3 py-1 text-xs font-medium {!data.rubrique ? 'border-sidebar-primary bg-sidebar-primary text-sidebar-primary-foreground' : 'border-sidebar-border text-sidebar-foreground/70 hover:bg-sidebar-accent'}">Tout</a>
+<PageHead eyebrow="Le magazine" title={active?.name ?? 'L’Antichambre'} subtitle={active ? undefined : 'Textes, inactualités et critiques — au-delà des livres.'} />
+
+<section class="border-b border-border bg-secondary/40">
+  <div class="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+    <div class="flex flex-wrap gap-1.5 font-display">
+      <a href="/antichambre" class="border px-3 py-1 text-xs font-medium uppercase tracking-wide {!data.rubrique ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'}">Tout</a>
       {#each data.rubriques as r (r.slug)}
-        <a href="/antichambre{qs({ rubrique: r.slug, page: undefined })}" class="rounded-full border px-3 py-1 text-xs font-medium {data.rubrique === r.slug ? 'border-sidebar-primary bg-sidebar-primary text-sidebar-primary-foreground' : 'border-sidebar-border text-sidebar-foreground/70 hover:bg-sidebar-accent'}">{r.name} <span class="opacity-60">{r.count}</span></a>
+        <a href="/antichambre{qs({ rubrique: r.slug, page: undefined })}" class="border px-3 py-1 text-xs font-medium uppercase tracking-wide {data.rubrique === r.slug ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'}">{r.name} <span class="opacity-60">{r.count}</span></a>
       {/each}
     </div>
   </div>

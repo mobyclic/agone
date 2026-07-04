@@ -1,13 +1,14 @@
 import type { PageServerLoad } from './$types';
-import { recentBooks, featuredBooks, listCollections } from '$lib/server/catalogue';
+import { recentBooks, listCollections } from '$lib/server/catalogue';
 import { recentArticles } from '$lib/server/articles';
+import { listUpcoming } from '$lib/server/events';
 
 export const load: PageServerLoad = async () => {
-  const [recent, featured, collections, articles] = await Promise.all([
-    recentBooks(18),
-    featuredBooks(6),
-    listCollections(),
-    recentArticles(4)
+  const [recent, articles, upcoming, collections] = await Promise.all([
+    recentBooks(8),
+    recentArticles(5),
+    listUpcoming(),
+    listCollections()
   ]);
-  return { recent, featured, collections, articles };
+  return { recent, articles, events: upcoming.slice(0, 4), collections };
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
 
   const groups = $derived.by(() => {
@@ -16,13 +17,11 @@
 
 <svelte:head><title>Auteurs · Agone</title></svelte:head>
 
-<section class="border-b border-border bg-secondary/50">
-  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-    <p class="eyebrow">Les auteurs</p>
-    <h1 class="display-title mt-1 text-5xl sm:text-6xl">Autrices &amp; auteurs</h1>
-    <p class="mt-2 text-muted-foreground">{data.authors.length} contributrices &amp; contributeurs au catalogue.</p>
+<PageHead eyebrow="Les auteurs" title="Autrices & auteurs" meta="{data.authors.length} contributrices & contributeurs au catalogue" />
 
-    <form method="GET" class="mt-6 max-w-md">
+<section class="border-b border-border bg-secondary/40">
+  <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <form method="GET" class="max-w-md">
       <input name="q" value={data.q ?? ''} placeholder="Rechercher un auteur…"
         class="h-11 w-full rounded-md border border-border bg-background px-3.5 text-sm outline-none focus:border-primary" />
     </form>

@@ -11,12 +11,14 @@ export interface ArticleCard {
   cover_url?: string;
   rubrique_name?: string;
   rubrique_slug?: string;
+  author?: string;
   is_newsletter_issue: boolean;
 }
 
 const CARD = `
   title, slug, excerpt, published_at, cover.url AS cover_url,
-  rubrique.name AS rubrique_name, rubrique.slug AS rubrique_slug, is_newsletter_issue
+  rubrique.name AS rubrique_name, rubrique.slug AS rubrique_slug,
+  authors.full_name AS author_names, is_newsletter_issue
 `;
 
 function toCard(r: any): ArticleCard {
@@ -28,6 +30,7 @@ function toCard(r: any): ArticleCard {
     cover_url: r.cover_url ?? undefined,
     rubrique_name: r.rubrique_name ?? undefined,
     rubrique_slug: r.rubrique_slug ?? undefined,
+    author: (r.author_names ?? [])[0] ?? undefined,
     is_newsletter_issue: r.is_newsletter_issue ?? false
   };
 }
