@@ -34,9 +34,6 @@
       <a href="/recherche" class="hidden size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground sm:grid" aria-label="Rechercher">
         <MagnifyingGlass size={18} />
       </a>
-      <a href="/panier" class="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex">
-        Panier
-      </a>
       {#if user}
         <UserMenu {user} />
       {:else}
@@ -67,7 +64,7 @@
             {item.label}
           </a>
         {/each}
-        <a href="/panier" onclick={() => (open = false)} class="block rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Panier</a>
+        <a href="/recherche" onclick={() => (open = false)} class="block rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted">Rechercher</a>
         {#if !user}
           <div class="mt-3 flex gap-2 border-t border-border pt-3">
             <Button href="/connexion" variant="outline" size="sm">Connexion</Button>

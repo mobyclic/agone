@@ -67,7 +67,6 @@
       <p>© {year} Agone éditeur — Marseille. Tous droits réservés.</p>
       <div class="flex gap-4">
         <a class="hover:text-foreground" href="/mentions-legales">Mentions légales</a>
-        <a class="hover:text-foreground" href="/confidentialite">Confidentialité</a>
         <a class="hover:text-foreground" href="/cgv">CGV</a>
       </div>
     </div>

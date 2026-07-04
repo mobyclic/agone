@@ -50,7 +50,22 @@ await query(`RELATE $b->contributed_by->$a SET role='translator', share=100`, { 
 Notes : `FROM ONLY` renvoie un objet (ne pas déstructurer `const [x]=`). `time::now()` pour l'horodatage ; `updated_at` s'auto-met à jour. `FLEXIBLE` se met APRÈS `TYPE`. FTS : `WHERE title @@ $q` (index BM25 `ft_book_title`, `ft_author_name`).
 
 ## Modèle de données — `src/lib/server/schema.surql`
-Posé (Phase 0) : cœur auth (`media`, `user`, `session`, `magic_link`, `email_otp`, `password_reset`, `site_setting`) + ébauche catalogue (`collection`, `author`, `book`, arête `book->contributed_by->author {role, share, position}`). **L'ISBN-13 (`book.isbn_paper`) est la colonne vertébrale.** À venir par phase : `order`/`contains`, `ebook_asset`/`owns`, `stock_movement`, `bl_export`, `royalty_contract`/`sales_report`/`royalty_statement`, `event`/`article`/`page`. Chaque nœud migré porte `legacy_wp_id`.
+Cœur auth (`media`, `user`, `session`, `magic_link`, `email_otp`, `password_reset`, `site_setting`).
+Catalogue & contenu (Phase 1, **migrés depuis WordPress**) : `collection`, `rubrique`, `book`,
+`author` + arête `book->contributed_by->author {role, share, position}` ; `venue` (lieux
+**réutilisables & géolocalisés**, `geometry<point>`), `event` (→ venue), `article` (Antichambre),
+`page`. **L'ISBN-13 (`book.isbn_paper`) est la colonne vertébrale.** Chaque nœud migré porte `legacy_wp_id`.
+À venir : `order`/`contains`, `ebook_asset`/`owns`, `stock_movement`, `bl_export`,
+`royalty_contract`/`sales_report`/`royalty_statement`.
+
+Modules serveur Phase 1 : `catalogue.ts`, `authors.ts`, `events.ts`, `articles.ts`, `pages.ts`
+(+ `$lib/labels.ts` client-safe). Migration : `scripts/migrate-catalogue.ts`, `migrate-covers.ts`,
+`migrate-rencontres.ts`, `migrate-content.ts` (dumps JSON depuis MySQL prod → Surreal, clés `legacy_wp_id`).
+Pages publiques : `/`, `/catalogue`, `/livre/[slug]`, `/auteurs`, `/auteur/[slug]`, `/collections/[slug]`,
+`/rencontres` (+`[slug]` carte Leaflet), `/antichambre` (+`/article/[slug]`), `/recherche`, `/a-paraitre`,
+pages statiques via `/[slug]` (a-propos, cgv, mentions-legales…) + `/contact`.
+Volumes migrés : 432 livres, 986 auteurs, 14 collections, 342 couvertures (R2), 289 rencontres /
+205 lieux, 1022 articles, 6 pages.
 
 ## Intégration Belles Lettres (distributeur) — Phase 3
 Deux jobs à porter depuis le PHP : **import stock** (scrape extranet BLDD → `book.stock_qty`) et **export commandes** (fichier EDI largeur fixe A/B/C → FTP, 2×/jour).

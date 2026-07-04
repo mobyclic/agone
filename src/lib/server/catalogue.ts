@@ -90,6 +90,14 @@ export async function featuredBooks(limit = 8): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
+/** À paraître (souscription / drafts) — les plus proches d'abord. */
+export async function forthcomingBooks(): Promise<BookCard[]> {
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS} FROM book WHERE status = 'forthcoming' ORDER BY published_at ASC`
+  );
+  return rows.map(toCard);
+}
+
 /** Derniers parus. */
 export async function recentBooks(limit = 8): Promise<BookCard[]> {
   const rows = await query<any>(
