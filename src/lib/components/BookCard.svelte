@@ -15,7 +15,7 @@
 </script>
 
 <a href="/livre/{book.slug}" class="group block">
-  <div class="relative aspect-[2/3] overflow-hidden rounded-md border border-border bg-muted shadow-sm">
+  <div class="relative aspect-[2/3] overflow-hidden border border-border bg-muted">
     {#if book.cover_url}
       <img
         src={book.cover_url}
@@ -30,7 +30,7 @@
       </div>
     {/if}
     {#if book.status === 'forthcoming'}
-      <span class="absolute left-2 top-2 rounded bg-ink px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+      <span class="absolute left-0 top-2 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">
         À paraître
       </span>
     {/if}
