@@ -93,7 +93,7 @@ export async function latestArticle(): Promise<ArticleCard | null> {
   if (!rows[0]) return null;
   const card = toCard(rows[0]);
   card.title = card.title.replace(/\s*\[LettrInfos?\b[^\]]*\]\s*$/i, '').trim();
-  card.summary = plainSummary(rows[0].body_html, 720) ?? card.excerpt;
+  card.summary = plainSummary(rows[0].body_html, 1600) ?? card.excerpt;
   return card;
 }
 

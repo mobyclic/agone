@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { authorList } from '$lib/labels';
   interface Book {
     title: string;
     subtitle?: string;
@@ -6,9 +7,10 @@
     price_paper?: number;
     cover_url?: string;
     status?: string;
-    authors?: { name: string; slug: string }[];
+    authors?: { name: string; slug: string; first_name?: string; last_name?: string }[];
   }
   let { book }: { book: Book } = $props();
+  const authors = $derived(authorList(book.authors));
   const price = $derived(
     book.price_paper != null ? `${book.price_paper.toFixed(2).replace('.', ',')} €` : ''
   );
@@ -35,13 +37,10 @@
       </span>
     {/if}
   </div>
-  <div class="mt-2">
-    <h3 class="line-clamp-2 text-sm font-semibold leading-snug group-hover:text-link">{book.title}</h3>
-    {#if book.authors?.length}
-      <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-        {book.authors.map((a) => a.name).join(', ')}
-      </p>
-    {/if}
+  <div class="mt-2.5">
+    <h3 class="line-clamp-2 font-sans text-sm font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
+    {#if book.subtitle}<p class="mt-0.5 line-clamp-1 text-xs leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
+    {#if authors}<p class="mt-1 line-clamp-1 text-xs text-link">{authors}</p>{/if}
     {#if price}<p class="mt-1 text-xs font-medium text-foreground">{price}</p>{/if}
   </div>
 </a>

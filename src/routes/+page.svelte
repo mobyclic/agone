@@ -1,6 +1,7 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
   import SectionHead from '$lib/components/SectionHead.svelte';
+  import { authorList } from '$lib/labels';
   import { MapPin } from 'phosphor-svelte';
 
   let { data } = $props();
@@ -44,10 +45,10 @@
         {/if}
 
         {#if lede}
-          <p class="mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-[1.0625rem]">{lede}</p>
+          <p class="ag-lede mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-[1.0625rem]">{lede}</p>
         {/if}
 
-        <a href="/article/{article.slug}" class="link mt-8 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider lg:mt-auto lg:pt-10">
+        <a href="/article/{article.slug}" class="link mt-7 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider">
           Lire l’article <span aria-hidden="true">→</span>
         </a>
       </div>
@@ -76,11 +77,10 @@
                   <span class="absolute left-0 top-0 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">À paraître</span>
                 {/if}
               </div>
-              <div class="mt-3 text-center">
-                {#if book.authors?.length}
-                  <p class="line-clamp-1 font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{book.authors.map((a) => a.name).join(', ')}</p>
-                {/if}
-                <h3 class="display-title mt-1 line-clamp-2 text-sm leading-[1.05] group-hover:text-link sm:text-base">{book.title}</h3>
+              <div class="mt-3">
+                <h3 class="line-clamp-2 font-sans text-[15px] font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
+                {#if book.subtitle}<p class="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
+                {#if book.authors?.length}<p class="mt-1 line-clamp-1 text-sm text-link">{authorList(book.authors)}</p>{/if}
               </div>
             </a>
           {/each}

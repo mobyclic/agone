@@ -16,3 +16,16 @@ export const ROLE_LABEL: Record<string, string> = {
 export function euros(n?: number | null): string | null {
   return n != null ? `${n.toFixed(2).replace('.', ',')} €` : null;
 }
+
+/** « Prénom NOM » — nom de famille en majuscules (repli sur le nom complet). */
+export function authorLabel(a: { name?: string; first_name?: string; last_name?: string }): string {
+  const last = (a.last_name ?? '').trim();
+  const first = (a.first_name ?? '').trim();
+  if (last) return `${first ? first + ' ' : ''}${last.toUpperCase()}`;
+  return a.name ?? '';
+}
+
+/** Liste d'auteurs formatée « Prénom NOM, Prénom NOM ». */
+export function authorList(authors?: { name?: string; first_name?: string; last_name?: string }[]): string {
+  return (authors ?? []).map(authorLabel).filter(Boolean).join(', ');
+}

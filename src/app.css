@@ -259,6 +259,27 @@
 .leaflet-container { font: inherit; z-index: 0; }
 .ag-map-gray .leaflet-tile { filter: grayscale(1) contrast(0.9) brightness(1.05); }
 
+/* — Accroche de la manchette d'accueil : s'adapte à l'espace laissé par le titre —
+   Mobile : clamp à 7 lignes. Desktop (lg) : remplit la hauteur de la colonne
+   (alignée sur la vitrine de livres) et fond en bas si le texte déborde. */
+.ag-lede {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 7;
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .ag-lede {
+    display: block;
+    -webkit-line-clamp: unset;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 85%, transparent);
+    mask-image: linear-gradient(to bottom, #000 85%, transparent);
+  }
+}
+
 /* — Bandeaux sombres : lisibilité — */
 .page-head .eyebrow { color: var(--sidebar-primary); }
 .page-head :is(p, a, span).text-muted-foreground {

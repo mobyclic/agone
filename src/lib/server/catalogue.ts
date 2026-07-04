@@ -17,12 +17,14 @@ export interface BookCard {
   status: string;
   featured: boolean;
   cover_url?: string;
-  authors: { name: string; slug: string }[];
+  authors: { name: string; slug: string; first_name?: string; last_name?: string }[];
 }
 
 function toCard(r: any): BookCard {
   const names: string[] = r.a_names ?? [];
   const slugs: string[] = r.a_slugs ?? [];
+  const firsts: string[] = r.a_first ?? [];
+  const lasts: string[] = r.a_last ?? [];
   return {
     id: r.id,
     title: r.title,
@@ -33,7 +35,9 @@ function toCard(r: any): BookCard {
     status: r.status,
     featured: r.featured ?? false,
     cover_url: r.cover_url ?? undefined,
-    authors: names.map((name, i) => ({ name, slug: slugs[i] ?? '' })).filter((a) => a.name)
+    authors: names
+      .map((name, i) => ({ name, slug: slugs[i] ?? '', first_name: firsts[i] ?? undefined, last_name: lasts[i] ?? undefined }))
+      .filter((a) => a.name)
   };
 }
 
@@ -41,7 +45,9 @@ const CARD_FIELDS = `
   id, title, subtitle, slug, price_paper, price_ebook, status, featured, published_at,
   cover.url AS cover_url,
   ->contributed_by[WHERE role = 'author']->author.full_name AS a_names,
-  ->contributed_by[WHERE role = 'author']->author.slug AS a_slugs
+  ->contributed_by[WHERE role = 'author']->author.slug AS a_slugs,
+  ->contributed_by[WHERE role = 'author']->author.first_name AS a_first,
+  ->contributed_by[WHERE role = 'author']->author.last_name AS a_last
 `;
 
 export interface ListBooksOpts {
