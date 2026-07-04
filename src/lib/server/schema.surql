@@ -215,3 +215,94 @@ DEFINE FIELD OVERWRITE share    ON contributed_by TYPE number DEFAULT 100;  -- %
 DEFINE FIELD OVERWRITE position ON contributed_by TYPE int DEFAULT 0;       -- ordre des co-auteurs
 DEFINE FIELD OVERWRITE created_at ON contributed_by TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_contrib_uniq ON contributed_by FIELDS in, out, role UNIQUE;
+
+-- BOOK — champs complémentaires (Phase 1)
+DEFINE FIELD OVERWRITE title_alt        ON book TYPE option<string>;
+DEFINE FIELD OVERWRITE extra_info_html  ON book TYPE option<string>;   -- infos_additionnelles
+DEFINE FIELD OVERWRITE rubriques        ON book TYPE option<array<record<rubrique>>>;
+DEFINE FIELD OVERWRITE primary_collection ON book TYPE option<record<collection>>;
+
+-- RUBRIQUE (thèmes/rayons — taxonomie partagée livres & blog)
+DEFINE TABLE OVERWRITE rubrique SCHEMAFULL;
+DEFINE FIELD OVERWRITE name        ON rubrique TYPE string;
+DEFINE FIELD OVERWRITE slug        ON rubrique TYPE string;
+DEFINE FIELD OVERWRITE kind        ON rubrique TYPE string
+  ASSERT $value IN ['book','blog','both'] DEFAULT 'both';
+DEFINE FIELD OVERWRITE sort        ON rubrique TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE legacy_term_id ON rubrique TYPE option<int>;
+DEFINE FIELD OVERWRITE created_at  ON rubrique TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_rubrique_slug ON rubrique FIELDS slug UNIQUE;
+
+-- VENUE (lieux de rencontres — RÉUTILISABLES & GÉOLOCALISÉS ; dédup par place_id/slug)
+DEFINE TABLE OVERWRITE venue SCHEMAFULL;
+DEFINE FIELD OVERWRITE name         ON venue TYPE string;
+DEFINE FIELD OVERWRITE slug         ON venue TYPE string;
+DEFINE FIELD OVERWRITE address      ON venue TYPE option<string>;      -- adresse complète formatée
+DEFINE FIELD OVERWRITE street       ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE city         ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE post_code    ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE state        ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE country      ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE country_short ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE lat          ON venue TYPE option<number>;
+DEFINE FIELD OVERWRITE lng          ON venue TYPE option<number>;
+DEFINE FIELD OVERWRITE geo          ON venue TYPE option<geometry<point>>;
+DEFINE FIELD OVERWRITE place_id     ON venue TYPE option<string>;      -- Google Place ID (clé de dédup)
+DEFINE FIELD OVERWRITE event_count  ON venue TYPE int DEFAULT 0;       -- nb de rencontres (dénormalisé)
+DEFINE FIELD OVERWRITE created_at   ON venue TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON venue TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_venue_slug  ON venue FIELDS slug UNIQUE;
+DEFINE INDEX OVERWRITE idx_venue_place ON venue FIELDS place_id;
+DEFINE INDEX OVERWRITE ft_venue_name   ON venue FIELDS name FULLTEXT ANALYZER ana_text BM25;
+
+-- EVENT (rencontres) — pointe vers un venue réutilisable
+DEFINE TABLE OVERWRITE event SCHEMAFULL;
+DEFINE FIELD OVERWRITE title       ON event TYPE string;
+DEFINE FIELD OVERWRITE slug        ON event TYPE string;
+DEFINE FIELD OVERWRITE body_html   ON event TYPE option<string>;      -- description = post_content
+DEFINE FIELD OVERWRITE cover       ON event TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE start_at    ON event TYPE option<datetime>;
+DEFINE FIELD OVERWRITE end_at      ON event TYPE option<datetime>;
+DEFINE FIELD OVERWRITE venue       ON event TYPE option<record<venue>>;
+DEFINE FIELD OVERWRITE authors     ON event TYPE option<array<record<author>>>;
+DEFINE FIELD OVERWRITE books       ON event TYPE option<array<record<book>>>;
+DEFINE FIELD OVERWRITE legacy_wp_id ON event TYPE option<int>;
+DEFINE FIELD OVERWRITE created_at  ON event TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at  ON event TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_event_slug   ON event FIELDS slug UNIQUE;
+DEFINE INDEX OVERWRITE idx_event_start  ON event FIELDS start_at;
+DEFINE INDEX OVERWRITE idx_event_legacy ON event FIELDS legacy_wp_id;
+
+-- ARTICLE (blog / L'Antichambre)
+DEFINE TABLE OVERWRITE article SCHEMAFULL;
+DEFINE FIELD OVERWRITE title        ON article TYPE string;
+DEFINE FIELD OVERWRITE slug         ON article TYPE string;
+DEFINE FIELD OVERWRITE body_html    ON article TYPE option<string>;
+DEFINE FIELD OVERWRITE excerpt      ON article TYPE option<string>;
+DEFINE FIELD OVERWRITE cover        ON article TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE published_at ON article TYPE option<datetime>;
+DEFINE FIELD OVERWRITE rubrique     ON article TYPE option<record<rubrique>>;
+DEFINE FIELD OVERWRITE is_newsletter_issue ON article TYPE bool DEFAULT false;  -- [LettrInfo NN]
+DEFINE FIELD OVERWRITE authors      ON article TYPE option<array<record<author>>>;
+DEFINE FIELD OVERWRITE books        ON article TYPE option<array<record<book>>>;
+DEFINE FIELD OVERWRITE status       ON article TYPE string
+  ASSERT $value IN ['draft','published'] DEFAULT 'published';
+DEFINE FIELD OVERWRITE legacy_wp_id ON article TYPE option<int>;
+DEFINE FIELD OVERWRITE created_at   ON article TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON article TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_article_slug   ON article FIELDS slug UNIQUE;
+DEFINE INDEX OVERWRITE idx_article_pub    ON article FIELDS published_at;
+DEFINE INDEX OVERWRITE idx_article_legacy ON article FIELDS legacy_wp_id;
+DEFINE INDEX OVERWRITE ft_article_title   ON article FIELDS title FULLTEXT ANALYZER ana_text BM25;
+
+-- PAGE (pages éditoriales statiques : à propos, contact, CGV, mentions, à paraître…)
+DEFINE TABLE OVERWRITE page SCHEMAFULL;
+DEFINE FIELD OVERWRITE title        ON page TYPE string;
+DEFINE FIELD OVERWRITE slug         ON page TYPE string;
+DEFINE FIELD OVERWRITE body_html    ON page TYPE option<string>;
+DEFINE FIELD OVERWRITE status       ON page TYPE string
+  ASSERT $value IN ['draft','published'] DEFAULT 'published';
+DEFINE FIELD OVERWRITE legacy_wp_id ON page TYPE option<int>;
+DEFINE FIELD OVERWRITE created_at   ON page TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON page TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_page_slug ON page FIELDS slug UNIQUE;

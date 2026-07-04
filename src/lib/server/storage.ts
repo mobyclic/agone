@@ -1,11 +1,13 @@
 /**
- * Cloudflare R2 storage helper.
+ * Cloudflare R2 storage helper (AGONE).
  *
  * Structure des dossiers dans le bucket :
- *   site/filmographie/<film-slug>/<size>.webp     — affiches de films
- *   site/projets/<project-slug>/<size>.webp       — visuels des projets
- *   site/director/<name>.webp                     — portraits, etc.
- *   talents/<user-id>/<media-id>-<size>.webp      — médias d'un talent
+ *   livres/couvertures/<isbn>.webp   — couvertures (public)
+ *   livres/ebooks/<isbn>.epub        — ebooks (PRIVÉ : servi via endpoint authentifié)
+ *   auteurs/<slug>.webp              — portraits d'auteurs
+ *   blog/<slug>/<variant>.webp       — visuels des articles (Antichambre)
+ *   rencontres/<slug>/<variant>.webp — visuels des rencontres
+ *   media/<dossier>/<id>             — uploads génériques (admin)
  *
  * Vars d'environnement attendues (Cloudflare R2) :
  *   CLOUDFLARE_ACCOUNT_ID
@@ -266,45 +268,35 @@ export async function deletePrefix(prefix: string): Promise<number> {
 // Conventions de clés (helpers)
 // ─────────────────────────────────────────────────────────────
 
-import { randomBytes } from 'node:crypto';
+/** Dossiers logiques du bucket AGONE. */
+export const R2_FOLDERS = ['livres', 'auteurs', 'blog', 'rencontres', 'media'] as const;
 
-/** Clé pour un média uploadé par un talent dans le cadre d'une candidature. */
-export function talentMediaKey(opts: {
-  userId: string;
-  kind: 'portrait' | 'silhouette' | 'video' | 'cv' | 'misc';
-  slug?: string; // suffixe optionnel
-}): string {
-  const id = randomBytes(6).toString('hex');
-  return `talents/${opts.userId}/${opts.kind}-${id}${opts.slug ? `-${opts.slug}` : ''}`;
+/** Clé (base, sans extension) d'une couverture de livre — publique, indexée par ISBN. */
+export function bookCoverKey(isbn: string): string {
+  return `livres/couvertures/${String(isbn).replace(/[^0-9Xx]/g, '')}`;
 }
 
-/** Préfixe du dossier d'un talent (pour suppression bulk). */
-export function talentFolderPrefix(userId: string): string {
-  return `talents/${userId}`;
+/** Clé d'un fichier ebook — bucket PRIVÉ (servi via endpoint authentifié + URL signée). */
+export function bookEbookKey(isbn: string, ext: string = 'epub'): string {
+  return `livres/ebooks/${String(isbn).replace(/[^0-9Xx]/g, '')}.${ext}`;
 }
 
-/** Clé pour un visuel de projet (affiche / hero). */
-export function projectImageKey(projectSlug: string, variant: string = 'hero'): string {
-  return `site/projets/${projectSlug}/${variant}`;
+/** Clé (base, sans extension) du portrait d'un auteur. */
+export function authorPortraitKey(slug: string): string {
+  return `auteurs/${slug}`;
 }
 
-/** Clé pour une affiche de filmographie. */
-export function filmographyImageKey(filmSlug: string, variant: string = 'poster'): string {
-  return `site/filmographie/${filmSlug}/${variant}`;
+/** Clé (base, sans extension) d'un visuel d'article (Antichambre). */
+export function blogImageKey(slug: string, variant: string = 'cover'): string {
+  return `blog/${slug}/${variant}`;
 }
 
-/** Clé pour les portraits / illustrations du site (équipe, etc.). */
-export function siteImageKey(name: string): string {
-  return `site/director/${name}`;
+/** Clé (base, sans extension) d'un visuel de rencontre. */
+export function rencontreImageKey(slug: string, variant: string = 'cover'): string {
+  return `rencontres/${slug}/${variant}`;
 }
 
-/** Clé (privée) pour une pièce jointe d'email. */
-export function emailAttachmentKey(messageId: string, attId: string, filename?: string | null): string {
-  const safe = (filename || 'piece-jointe').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80);
-  return `email/${messageId.replace(/^email_message:/, '')}/${attId.replace(/^email_attachment:/, '')}-${safe}`;
-}
-
-/** Clé (privée) de la vignette webp d'une pièce jointe image. */
-export function emailThumbKey(messageId: string, attId: string): string {
-  return `email/${messageId.replace(/^email_message:/, '')}/${attId.replace(/^email_attachment:/, '')}-thumb.webp`;
+/** Clé générique pour un upload admin (dossier logique + id). */
+export function mediaKey(folder: string, id: string): string {
+  return `media/${folder.replace(/^\/+|\/+$/g, '')}/${id}`;
 }
