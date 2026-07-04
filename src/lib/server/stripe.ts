@@ -48,6 +48,35 @@ export async function createCheckoutSession(opts: {
   return session.url;
 }
 
+/**
+ * Crée une session Checkout en mode PAIEMENT (achat ponctuel de livres).
+ * `lineItems.amount` = montant unitaire en CENTIMES. Renvoie { id, url } ou null si Stripe non configuré.
+ */
+export async function createPaymentCheckout(opts: {
+  lineItems: { name: string; amount: number; qty: number }[];
+  customerEmail?: string;
+  clientReferenceId?: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata?: Record<string, string>;
+}): Promise<{ id: string; url: string | null } | null> {
+  const stripe = getStripe();
+  if (!stripe) return null;
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    line_items: opts.lineItems.map((li) => ({
+      price_data: { currency: 'eur', unit_amount: Math.round(li.amount), product_data: { name: li.name } },
+      quantity: li.qty
+    })),
+    customer_email: opts.customerEmail,
+    client_reference_id: opts.clientReferenceId,
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl,
+    metadata: opts.metadata
+  });
+  return { id: session.id, url: session.url };
+}
+
 /** Portail de gestion d'abonnement (facturation, résiliation). */
 export async function createBillingPortalSession(
   customerId: string,

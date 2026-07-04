@@ -72,8 +72,8 @@ DEFINE FIELD OVERWRITE avatar         ON user TYPE option<record<media>>;
 DEFINE FIELD OVERWRITE role           ON user TYPE string
   ASSERT $value IN ['admin','editor','customer','pending'] DEFAULT 'pending';
 -- Adresses (facturation / livraison) — objets libres pour la boutique (Phase 2).
-DEFINE FIELD OVERWRITE billing        ON user TYPE option<object>;
-DEFINE FIELD OVERWRITE shipping       ON user TYPE option<object>;
+DEFINE FIELD OVERWRITE billing        ON user TYPE option<object> FLEXIBLE;
+DEFINE FIELD OVERWRITE shipping       ON user TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE stripe_customer_id ON user TYPE option<string>;
 DEFINE FIELD OVERWRITE is_active      ON user TYPE bool DEFAULT true;
 DEFINE FIELD OVERWRITE email_verified ON user TYPE bool DEFAULT false;
@@ -408,3 +408,75 @@ DEFINE FIELD OVERWRITE created_at   ON royalty_statement TYPE datetime DEFAULT t
 DEFINE FIELD OVERWRITE updated_at   ON royalty_statement TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_statement_author ON royalty_statement FIELDS author;
 DEFINE INDEX OVERWRITE idx_statement_period ON royalty_statement FIELDS period_start, period_end;
+
+-- ══════════════════════════════════════════════════════════════
+-- COMMERCE (Phase 2) — commandes, lignes, ebooks, bibliothèque
+-- ══════════════════════════════════════════════════════════════
+
+-- COMMANDE
+DEFINE TABLE OVERWRITE order SCHEMAFULL;
+DEFINE FIELD OVERWRITE number       ON order TYPE int;                 -- séquentiel (compteur site_setting)
+DEFINE FIELD OVERWRITE customer     ON order TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE email        ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE status       ON order TYPE string
+  ASSERT $value IN ['pending','paid','processing','sent_to_bl','completed','cancelled','refunded','failed'] DEFAULT 'pending';
+DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR';
+DEFINE FIELD OVERWRITE billing      ON order TYPE option<object> FLEXIBLE;
+DEFINE FIELD OVERWRITE shipping     ON order TYPE option<object> FLEXIBLE;
+DEFINE FIELD OVERWRITE item_count   ON order TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE subtotal     ON order TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE shipping_total ON order TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE tax_total    ON order TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE total        ON order TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE has_ebook    ON order TYPE bool DEFAULT false;
+DEFINE FIELD OVERWRITE has_physical ON order TYPE bool DEFAULT false;
+DEFINE FIELD OVERWRITE stripe_session        ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE stripe_payment_intent ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE invoice_number ON order TYPE option<int>;
+DEFINE FIELD OVERWRITE bl_exported_at ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE paid_at      ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE completed_at ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE created_at   ON order TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON order TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE FIELD OVERWRITE legacy_wp_id ON order TYPE option<int>;
+DEFINE INDEX OVERWRITE idx_order_number  ON order FIELDS number UNIQUE;
+DEFINE INDEX OVERWRITE idx_order_customer ON order FIELDS customer;
+DEFINE INDEX OVERWRITE idx_order_status  ON order FIELDS status;
+DEFINE INDEX OVERWRITE idx_order_legacy  ON order FIELDS legacy_wp_id;
+
+-- ARÊTE — une ligne de commande (order -> book)
+DEFINE TABLE OVERWRITE contains TYPE RELATION IN order OUT book SCHEMAFULL;
+DEFINE FIELD OVERWRITE format         ON contains TYPE string
+  ASSERT $value IN ['papier','epub','souscription'] DEFAULT 'papier';
+DEFINE FIELD OVERWRITE qty            ON contains TYPE int DEFAULT 1;
+DEFINE FIELD OVERWRITE unit_price     ON contains TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE line_total     ON contains TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE title_snapshot ON contains TYPE option<string>;
+DEFINE FIELD OVERWRITE isbn_snapshot  ON contains TYPE option<string>;
+
+-- EBOOK (fichier .epub/.pdf hébergé sur R2 PRIVÉ)
+DEFINE TABLE OVERWRITE ebook_asset SCHEMAFULL;
+DEFINE FIELD OVERWRITE book         ON ebook_asset TYPE record<book>;
+DEFINE FIELD OVERWRITE format       ON ebook_asset TYPE string ASSERT $value IN ['epub','pdf'] DEFAULT 'epub';
+DEFINE FIELD OVERWRITE r2_key       ON ebook_asset TYPE string;
+DEFINE FIELD OVERWRITE filename     ON ebook_asset TYPE option<string>;
+DEFINE FIELD OVERWRITE size         ON ebook_asset TYPE option<int>;
+DEFINE FIELD OVERWRITE content_type ON ebook_asset TYPE option<string>;
+DEFINE FIELD OVERWRITE status       ON ebook_asset TYPE string
+  ASSERT $value IN ['available','announced_no_file'] DEFAULT 'available';
+DEFINE FIELD OVERWRITE legacy_attachment_id ON ebook_asset TYPE option<int>;
+DEFINE FIELD OVERWRITE created_at   ON ebook_asset TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_ebook_book ON ebook_asset FIELDS book;
+
+-- ARÊTE — droit d'accès (bibliothèque) : user possède un ebook
+DEFINE TABLE OVERWRITE owns TYPE RELATION IN user OUT ebook_asset SCHEMAFULL;
+DEFINE FIELD OVERWRITE order       ON owns TYPE option<record<order>>;
+DEFINE FIELD OVERWRITE acquired_at ON owns TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_owns_uniq ON owns FIELDS in, out UNIQUE;
+
+-- JOURNAL DE TÉLÉCHARGEMENT
+DEFINE TABLE OVERWRITE download_log SCHEMAFULL;
+DEFINE FIELD OVERWRITE user        ON download_log TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE ebook_asset ON download_log TYPE record<ebook_asset>;
+DEFINE FIELD OVERWRITE at          ON download_log TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE ip          ON download_log TYPE option<string>;

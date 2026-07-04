@@ -8,9 +8,9 @@
 
   let { data, children } = $props();
 
-  // Les espaces /app et /admin ont leur propre shell (sidebar) → pas de header/footer public.
+  // Les espaces /admin et /compte ont leur propre shell (sidebar) → pas de header/footer public.
   const standalone = $derived(
-    page.url.pathname.startsWith('/app') || page.url.pathname.startsWith('/admin')
+    page.url.pathname.startsWith('/admin') || page.url.pathname.startsWith('/compte')
   );
 
   $effect(() => {
@@ -22,7 +22,7 @@
   {@render children?.()}
 {:else}
   <div class="flex min-h-svh flex-col">
-    <PublicHeader user={data.user} />
+    <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} />
     <main class="flex-1">
       {@render children?.()}
     </main>

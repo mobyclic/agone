@@ -1,9 +1,22 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import { ROLE_LABEL, euros } from '$lib/labels';
-  import { ArrowLeft } from 'phosphor-svelte';
+  import { ArrowLeft, ShoppingCart } from 'phosphor-svelte';
 
   let { data } = $props();
   const b = $derived(data.book);
+
+  const formats = $derived(
+    [
+      b.price_paper != null ? { key: 'papier', label: 'Papier', price: b.price_paper } : null,
+      b.price_ebook != null ? { key: 'epub', label: 'Numérique (ePub)', price: b.price_ebook } : null,
+      b.subscription_price != null && b.status === 'forthcoming'
+        ? { key: 'souscription', label: 'Souscription', price: b.subscription_price }
+        : null
+    ].filter((x): x is { key: string; label: string; price: number } => x !== null)
+  );
+  let selectedFormat = $state('');
+  $effect(() => { if (!selectedFormat && formats.length) selectedFormat = formats[0].key; });
   const pubLabel = $derived(
     b.published_at
       ? new Date(b.published_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
@@ -52,15 +65,29 @@
             </div>
           {/if}
         </div>
-        <button
-          type="button"
-          disabled
-          class="btn-brand mt-4 h-11 w-full rounded-md text-sm font-semibold opacity-60"
-          title="La vente en ligne sera activée prochainement"
-        >
-          Ajouter au panier
-        </button>
-        <p class="mt-2 text-center text-xs text-muted-foreground">Boutique en cours d’activation.</p>
+        {#if formats.length}
+          <form method="POST" action="/panier?/add" use:enhance class="mt-4 space-y-3">
+            <input type="hidden" name="id" value={b.id} />
+            {#if formats.length > 1}
+              <div class="flex gap-2">
+                {#each formats as f (f.key)}
+                  <label class="flex flex-1 cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm {selectedFormat === f.key ? 'border-primary bg-accent' : 'border-border'}">
+                    <input type="radio" name="format" value={f.key} bind:group={selectedFormat} class="sr-only" />
+                    <span>{f.label}</span><span class="font-semibold">{euros(f.price)}</span>
+                  </label>
+                {/each}
+              </div>
+            {:else}
+              <input type="hidden" name="format" value={formats[0].key} />
+            {/if}
+            <input type="hidden" name="qty" value="1" />
+            <button type="submit" class="btn-brand flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-semibold">
+              <ShoppingCart size={17} /> Ajouter au panier
+            </button>
+          </form>
+        {:else}
+          <button type="button" disabled class="btn-brand mt-4 h-11 w-full rounded-md text-sm font-semibold opacity-60">Bientôt disponible</button>
+        {/if}
       </div>
     </div>
 

@@ -4,9 +4,9 @@
   import UserMenu from './UserMenu.svelte';
   import { Button } from '$lib/components/ui/button';
   import { PUBLIC_NAV } from '$lib/nav';
-  import { List, X, MagnifyingGlass } from 'phosphor-svelte';
+  import { List, X, MagnifyingGlass, ShoppingCart } from 'phosphor-svelte';
 
-  let { user }: { user: App.Locals['user'] } = $props();
+  let { user, cartCount = 0 }: { user: App.Locals['user']; cartCount?: number } = $props();
   let open = $state(false);
 
   const isActive = (href: string) =>
@@ -33,6 +33,10 @@
     <div class="ml-auto flex items-center gap-2">
       <a href="/recherche" class="hidden size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground sm:grid" aria-label="Rechercher">
         <MagnifyingGlass size={18} />
+      </a>
+      <a href="/panier" class="relative grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Panier">
+        <ShoppingCart size={18} />
+        {#if cartCount > 0}<span class="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{cartCount}</span>{/if}
       </a>
       {#if user}
         <UserMenu {user} />
