@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Eye } from 'phosphor-svelte';
+  import { page } from '$app/state';
+  import { ArrowLeft, Eye, PencilSimple } from 'phosphor-svelte';
   let { data } = $props();
   const a = $derived(data.article);
+  const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 
   // Comptage d'une vue (une fois, côté client).
@@ -14,9 +16,16 @@
 <svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
 
 <article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-  <a href="/antichambre" class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-    <ArrowLeft size={16} /> L’Antichambre
-  </a>
+  <div class="mb-6 flex items-center justify-between gap-3">
+    <a href="/antichambre" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <ArrowLeft size={16} /> L’Antichambre
+    </a>
+    {#if isStaff}
+      <a href="/admin/contenu/{a.id}" class="inline-flex items-center gap-1.5 border border-border px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:border-foreground hover:text-foreground">
+        <PencilSimple size={14} /> Éditer
+      </a>
+    {/if}
+  </div>
 
   {#if a.rubrique_name}
     <a href="/antichambre?rubrique={a.rubrique_slug}" class="eyebrow hover:underline">{a.rubrique_name}</a>

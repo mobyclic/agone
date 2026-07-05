@@ -3,10 +3,11 @@
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const a = $derived(data.article);
+  let dirty = $state(false);
 
   let coverId = $state<string | null>(null);
   let coverUrl = $state<string | null>(null);
@@ -27,11 +28,8 @@
   <ArrowLeft size={16} /> Contenu
 </a>
 
-<form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4 flex items-center justify-between gap-3">
-    <h2 class="text-xl font-bold">{data.isNew ? 'Nouvel article' : a?.title}</h2>
-    <Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button>
-  </div>
+<form method="POST" action="?/save" use:enhance oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+  <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvel article' : a?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -75,13 +73,8 @@
     </label>
 
     <div>
-      <label class={label} for="excerpt">Accroche</label>
-      <textarea id="excerpt" name="excerpt" rows="2" class="{input} h-auto py-2">{a?.excerpt ?? ''}</textarea>
-    </div>
-
-    <div>
       <span class={label}>Corps de l'article</span>
-      {#key a?.id}<RichEditor name="body_html" value={a?.body_html ?? ''} minHeight="22rem" />{/key}
+      {#key a?.id}<RichEditor name="body_html" value={a?.body_html ?? ''} minHeight="22rem" onchange={() => (dirty = true)} />{/key}
     </div>
 
     <div>
@@ -89,6 +82,15 @@
       <ImageUpload bind:mediaId={coverId} bind:url={coverUrl} folder="blog/couvertures" kind="cover" label="" accept="image/*" />
       <input type="hidden" name="coverId" value={coverId ?? ''} />
     </div>
+  </div>
+
+  <!-- Bouton flottant : Voir ↔ Enregistrer selon l'état de modification -->
+  <div class="fixed bottom-6 right-6 z-40">
+    {#if data.isNew || dirty}
+      <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {:else}
+      <Button href="/article/{a?.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir l'article</Button>
+    {/if}
   </div>
 </form>
 

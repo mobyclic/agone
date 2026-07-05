@@ -4,10 +4,11 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const b = $derived(data.book);
+  let dirty = $state(false);
 
   let coverId = $state<string | null>(null);
   let coverUrl = $state<string | null>(null);
@@ -31,11 +32,8 @@
   <ArrowLeft size={16} /> Catalogue
 </a>
 
-<form method="POST" action="?/save" use:enhance class="max-w-4xl">
-  <div class="mb-4 flex items-center justify-between gap-3">
-    <h2 class="text-xl font-bold">{data.isNew ? 'Nouveau livre' : b?.title}</h2>
-    <Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button>
-  </div>
+<form method="POST" action="?/save" use:enhance oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-4xl pb-24">
+  <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouveau livre' : b?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -50,9 +48,9 @@
           <input name="subtitle" value={b?.subtitle ?? ''} class={input} />
         </label>
         <span class="{label} mt-3">Présentation</span>
-        {#key b?.id}<RichEditor name="description_html" value={b?.description_html ?? ''} minHeight="12rem" />{/key}
+        {#key b?.id}<RichEditor name="description_html" value={b?.description_html ?? ''} minHeight="12rem" onchange={() => (dirty = true)} />{/key}
         <span class="{label} mt-3 block">Informations complémentaires</span>
-        {#key b?.id}<RichEditor name="extra_info_html" value={b?.extra_info_html ?? ''} minHeight="6rem" />{/key}
+        {#key b?.id}<RichEditor name="extra_info_html" value={b?.extra_info_html ?? ''} minHeight="6rem" onchange={() => (dirty = true)} />{/key}
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">
@@ -121,6 +119,15 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Bouton flottant : Voir ↔ Enregistrer -->
+  <div class="fixed bottom-6 right-6 z-40">
+    {#if data.isNew || dirty}
+      <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {:else}
+      <Button href="/livre/{b?.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir le livre</Button>
+    {/if}
   </div>
 </form>
 

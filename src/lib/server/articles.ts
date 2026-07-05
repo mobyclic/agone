@@ -118,6 +118,7 @@ export async function listBlogRubriques(): Promise<RubriqueInfo[]> {
 }
 
 export interface ArticleDetail extends ArticleCard {
+  id: string;
   body_html?: string;
   authors: { full_name: string; slug: string }[];
   books: { title: string; slug: string }[];
@@ -125,7 +126,7 @@ export interface ArticleDetail extends ArticleCard {
 
 export async function getArticleBySlug(slug: string): Promise<ArticleDetail | null> {
   const rows = await query<any>(
-    `SELECT ${CARD}, body_html,
+    `SELECT ${CARD}, meta::id(id) AS pid, body_html,
         authors.{ full_name: full_name, slug: slug } AS authors,
         books.{ title: title, slug: slug } AS books
       FROM article WHERE slug = $slug LIMIT 1`,
@@ -135,6 +136,7 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
   if (!a) return null;
   return {
     ...toCard(a),
+    id: a.pid,
     body_html: a.body_html ?? undefined,
     authors: (a.authors ?? []).filter((x: any) => x?.slug),
     books: (a.books ?? []).filter((x: any) => x?.slug)
@@ -210,7 +212,7 @@ export async function getArticleForEdit(id: string): Promise<ArticleEdit | null>
 }
 
 export interface ArticleInput {
-  title: string; slug?: string; status?: string; excerpt?: string; body_html?: string;
+  title: string; slug?: string; status?: string; body_html?: string;
   is_newsletter_issue?: boolean; published_at?: string; rubriqueId?: string; coverId?: string;
 }
 
@@ -218,7 +220,7 @@ export async function saveArticle(id: string | null, d: ArticleInput): Promise<s
   const { sql, vars } = buildSet({
     title: d.title,
     status: d.status || 'draft',
-    excerpt: d.excerpt,
+    excerpt: plainSummary(d.body_html, 240) ?? undefined, // accroche auto-dérivée du corps
     body_html: d.body_html,
     is_newsletter_issue: !!d.is_newsletter_issue,
     published_at: d.published_at ? new Date(d.published_at) : undefined,

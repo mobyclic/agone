@@ -24,7 +24,6 @@ export const actions: Actions = {
       title,
       slug: S('slug') || undefined,
       status: S('status') || 'draft',
-      excerpt: S('excerpt') || undefined,
       body_html: S('body_html') || undefined,
       is_newsletter_issue: fd.get('is_newsletter_issue') === 'on',
       published_at: S('published_at') || undefined,

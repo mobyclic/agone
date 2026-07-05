@@ -7,7 +7,7 @@
     LinkSimple, ArrowUUpLeft, ArrowUUpRight
   } from 'phosphor-svelte';
 
-  let { name, value = '', minHeight = '12rem' }: { name: string; value?: string; minHeight?: string } = $props();
+  let { name, value = '', minHeight = '12rem', onchange }: { name: string; value?: string; minHeight?: string; onchange?: () => void } = $props();
 
   let element = $state<HTMLDivElement>();
   let editor: Editor | null = null;
@@ -21,7 +21,7 @@
       element,
       extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, HTMLAttributes: { rel: 'noopener' } } })],
       content: value || '',
-      onUpdate: ({ editor }) => { html = editor.isEmpty ? '' : editor.getHTML(); },
+      onUpdate: ({ editor }) => { html = editor.isEmpty ? '' : editor.getHTML(); onchange?.(); },
       onSelectionUpdate: () => (tick++),
       onTransaction: () => (tick++)
     });
@@ -80,13 +80,14 @@
 </div>
 
 <style>
-  :global(.rich-content .ProseMirror) { min-height: var(--min, 12rem); padding: 0.75rem 0.85rem; outline: none; font-size: 0.9rem; line-height: 1.6; }
-  :global(.rich-content .ProseMirror > * + *) { margin-top: 0.6rem; }
-  :global(.rich-content .ProseMirror p) { margin: 0; }
-  :global(.rich-content .ProseMirror h2) { font-size: 1.25rem; font-weight: 700; }
-  :global(.rich-content .ProseMirror h3) { font-size: 1.05rem; font-weight: 700; }
+  :global(.rich-content .ProseMirror) { min-height: var(--min, 12rem); padding: 0.85rem; outline: none; font-size: 0.9rem; line-height: 1.65; }
+  :global(.rich-content .ProseMirror > *) { margin: 0 0 0.9rem; }
+  :global(.rich-content .ProseMirror > *:last-child) { margin-bottom: 0; }
+  :global(.rich-content .ProseMirror h2) { font-size: 1.25rem; font-weight: 700; margin-top: 1.2rem; }
+  :global(.rich-content .ProseMirror h3) { font-size: 1.05rem; font-weight: 700; margin-top: 1rem; }
   :global(.rich-content .ProseMirror ul) { list-style: disc; padding-left: 1.25rem; }
   :global(.rich-content .ProseMirror ol) { list-style: decimal; padding-left: 1.25rem; }
+  :global(.rich-content .ProseMirror li) { margin-bottom: 0.25rem; }
   :global(.rich-content .ProseMirror blockquote) { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted-foreground); font-style: italic; }
   :global(.rich-content .ProseMirror a) { color: var(--link); text-decoration: underline; }
   :global(.rich-content .ProseMirror:focus) { outline: none; }
