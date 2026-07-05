@@ -37,9 +37,9 @@
       <span>·</span>
       <span>{#each a.authors as au, i (au.slug)}<a href="/auteur/{au.slug}" class="text-link hover:underline">{au.full_name}</a>{#if i < a.authors.length - 1}, {/if}{/each}</span>
     {/if}
-    {#if a.views > 0}
+    {#if isStaff && a.views > 0}
       <span>·</span>
-      <span class="inline-flex items-center gap-1"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
+      <span class="inline-flex items-center gap-1" title="Nombre de vues (visible admin uniquement)"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
     {/if}
   </div>
 
