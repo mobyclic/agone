@@ -29,9 +29,19 @@ function buildSet(fields: Record<string, unknown>): { sql: string; vars: Record<
   const parts: string[] = [];
   const vars: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) {
-    const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
-    if (empty) parts.push(`${k} = NONE`);
-    else { vars[k] = v; parts.push(`${k} = $${k}`); }
+    // '' est une valeur valide pour les champs string requis (first_name/last_name…) :
+    // seuls undefined/null/NaN deviennent NONE (pour les champs option<>).
+    const empty = v === undefined || v === null || (typeof v === 'number' && Number.isNaN(v));
+    if (empty) {
+      parts.push(`${k} = NONE`);
+    } else if (v instanceof Date) {
+      // Le SDK ne sérialise pas un Date JS en datetime : on passe l'ISO et on caste.
+      vars[k] = v.toISOString();
+      parts.push(`${k} = type::datetime($${k})`);
+    } else {
+      vars[k] = v;
+      parts.push(`${k} = $${k}`);
+    }
   }
   return { sql: parts.join(', '), vars };
 }
@@ -130,19 +140,27 @@ export async function importUsers(opts: { limit?: number; dryRun?: boolean } = {
     const existing = await findUserId(wpId, email);
     if (dryRun) { existing ? updated++ : created++; continue; }
 
-    if (existing) {
-      const { sql, vars } = buildSet({ legacy_wp_id: wpId, first_name: first, last_name: last, full_name: full, phone, billing, shipping });
-      await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('user', existing) });
-      updated++;
-    } else {
-      const slug = await uniqueSlug('user', full || email);
-      const { sql, vars } = buildSet({
-        email, first_name: first, last_name: last, full_name: full, slug,
-        role: 'customer', email_verified: true, is_active: true, legacy_wp_id: wpId,
-        phone, billing, shipping, created_at: createdAt
-      });
-      await query(`CREATE user SET ${sql}`, vars);
-      created++;
+    // full_name est calculé (VALUE) côté schéma → on ne le pose pas.
+    try {
+      if (existing) {
+        const fields: Record<string, unknown> = { legacy_wp_id: wpId, first_name: first, last_name: last, phone, billing, shipping };
+        if (createdAt) fields.created_at = createdAt; // backfill de la vraie date d'inscription
+        const { sql, vars } = buildSet(fields);
+        await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('user', existing) });
+        updated++;
+      } else {
+        const slug = await uniqueSlug('user', full || email);
+        const { sql, vars } = buildSet({
+          email, first_name: first, last_name: last, slug,
+          role: 'customer', email_verified: true, is_active: true, legacy_wp_id: wpId,
+          phone, billing, shipping, created_at: createdAt
+        });
+        await query(`CREATE user SET ${sql}`, vars);
+        created++;
+      }
+    } catch (e) {
+      skipped++;
+      warnings.push(`Utilisateur WP #${wpId} (${email}) ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
   }
 
@@ -292,15 +310,20 @@ export async function importOrders(opts: { limit?: number; dryRun?: boolean } = 
       invoice_number: invoiceNumber(m._wcpdf_invoice_number_data),
       created_at: createdAt, paid_at: paidAt, completed_at: completedAt
     });
-    const rows = await query<any>(`CREATE order SET ${sql}`, vars);
-    const orderPid = String(rows[0].id).replace(/^order:/, '');
-    for (const rel of toRelate) {
-      await query(
-        `RELATE $o->contains->$b SET format = $format, qty = $qty, unit_price = $unit, line_total = $total, title_snapshot = $title`,
-        { o: recId('order', orderPid), b: recId('book', rel.bookPid), format: rel.format, qty: rel.qty, unit: rel.unit, total: rel.total, title: rel.title }
-      );
+    try {
+      const rows = await query<any>(`CREATE order SET ${sql}`, vars);
+      const orderPid = String(rows[0].id).replace(/^order:/, '');
+      for (const rel of toRelate) {
+        await query(
+          `RELATE $o->contains->$b SET format = $format, qty = $qty, unit_price = $unit, line_total = $total, title_snapshot = $title`,
+          { o: recId('order', orderPid), b: recId('book', rel.bookPid), format: rel.format, qty: rel.qty, unit: rel.unit, total: rel.total, title: rel.title }
+        );
+      }
+      created++;
+    } catch (e) {
+      skipped++;
+      warnings.push(`Commande #${wpId} ignorée : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
-    created++;
   }
 
   // Remonte le compteur de n° de commande au-dessus du max importé (évite les collisions).
