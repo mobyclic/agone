@@ -163,6 +163,7 @@
 
   --font-sans: 'Roboto Variable', 'Roboto', ui-sans-serif, system-ui, Arial, sans-serif;
   --font-display: 'Oswald Variable', 'Oswald', 'Roboto Variable', ui-sans-serif, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', 'Times', serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 }
 
