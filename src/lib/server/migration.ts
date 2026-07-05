@@ -462,16 +462,23 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
   );
   const ids = posts.map((x) => Number(x.ID));
   const meta = ids.length ? metaIndex(await wpQuery<any>(
-    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key = 'auteurs_associes'`,
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key IN ('auteurs_associes','livres_associes')`,
     [...ids]
   ), 'post_id') : new Map();
   const catByPost = await firstTermByPost(p, ids, 'category');
-  const [authMap, rubMap] = await Promise.all([legacyMap('author'), legacyMap('rubrique', 'legacy_term_id')]);
+  // Vues totales (plugin Post Views Counter : type=4, period='total').
+  const viewsMap = new Map<number, number>();
+  if (ids.length) {
+    const vr = await wpQuery<any>(`SELECT id, count FROM ${p}post_views WHERE type = 4 AND period = 'total' AND id IN (${ids.map(() => '?').join(',')})`, [...ids]);
+    for (const r of vr) viewsMap.set(Number(r.id), Number(r.count) || 0);
+  }
+  const [authMap, rubMap, bookMap] = await Promise.all([legacyMap('author'), legacyMap('rubrique', 'legacy_term_id'), legacyMap('book')]);
 
   for (const a of posts) {
     const wpId = Number(a.ID);
     const m = meta.get(wpId) ?? {};
     const authorIds = parseWpIds(m.auteurs_associes).map((x) => authMap.get(x)).filter(Boolean) as string[];
+    const bookIds = parseWpIds(m.livres_associes).map((x) => bookMap.get(x)).filter(Boolean) as string[];
     const rubPid = rubMap.get(catByPost.get(wpId) ?? -1);
     const excerpt = stripHtml(a.post_excerpt) || stripHtml(a.post_content).slice(0, 220) || undefined;
     try {
@@ -485,7 +492,9 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
         is_newsletter_issue: /\[\s*lettrinfo/i.test(String(a.post_title || '')),
         published_at: mysqlDate(a.post_date_gmt),
         rubrique: rubPid ? recId('rubrique', rubPid) : undefined,
-        authors: authorIds.length ? authorIds.map((id) => recId('author', id)) : undefined
+        authors: authorIds.length ? authorIds.map((id) => recId('author', id)) : undefined,
+        books: bookIds.length ? bookIds.map((id) => recId('book', id)) : undefined,
+        views: viewsMap.get(wpId)
       };
       if (ex[0]?.pid) {
         const { sql, vars } = buildSet(fields);

@@ -14,6 +14,7 @@ export interface ArticleCard {
   rubrique_slug?: string;
   author?: string;
   is_newsletter_issue: boolean;
+  views: number;
   /** Résumé texte plus long, coupé en fin de mot (manchette d'accueil). */
   summary?: string;
 }
@@ -45,7 +46,7 @@ function plainSummary(html?: string, maxLen = 360): string | undefined {
 const CARD = `
   title, slug, excerpt, published_at, cover.url AS cover_url,
   rubrique.name AS rubrique_name, rubrique.slug AS rubrique_slug,
-  authors.full_name AS author_names, is_newsletter_issue
+  authors.full_name AS author_names, is_newsletter_issue, views
 `;
 
 function toCard(r: any): ArticleCard {
@@ -58,7 +59,8 @@ function toCard(r: any): ArticleCard {
     rubrique_name: r.rubrique_name ?? undefined,
     rubrique_slug: r.rubrique_slug ?? undefined,
     author: (r.author_names ?? [])[0] ?? undefined,
-    is_newsletter_issue: r.is_newsletter_issue ?? false
+    is_newsletter_issue: r.is_newsletter_issue ?? false,
+    views: r.views ?? 0
   };
 }
 
@@ -79,6 +81,11 @@ export async function listArticles(opts: { rubrique?: string; q?: string; limit?
 export async function recentArticles(limit = 6): Promise<ArticleCard[]> {
   const rows = await query<any>(`SELECT ${CARD} FROM article WHERE status = 'published' ORDER BY published_at DESC LIMIT $limit`, { limit });
   return rows.map(toCard);
+}
+
+/** Incrémente le compteur de vues d'un article (appelé côté client à l'affichage). */
+export async function incrementArticleViews(slug: string): Promise<void> {
+  await query(`UPDATE article SET views += 1 WHERE slug = $s`, { s: slug });
 }
 
 /**
@@ -152,7 +159,7 @@ const plainId = (v: unknown, table: string) => String(v ?? '').replace(new RegEx
 
 export interface AdminArticleRow {
   id: string; title: string; slug: string; status: string;
-  published_at?: string; is_newsletter_issue: boolean; rubrique_name?: string; author?: string;
+  published_at?: string; is_newsletter_issue: boolean; rubrique_name?: string; author?: string; views: number;
 }
 
 /** Liste paginée des articles (tous statuts) pour le back-office. */
@@ -164,7 +171,7 @@ export async function listArticlesAdmin(opts: { q?: string; rubrique?: string; s
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const rows = await query<any>(
-    `SELECT id, title, slug, status, published_at, is_newsletter_issue,
+    `SELECT id, title, slug, status, published_at, is_newsletter_issue, views,
         rubrique.name AS rubrique_name, authors.full_name AS author_names
       FROM article ${whereSql} ORDER BY published_at DESC LIMIT $limit START $start`,
     vars
@@ -173,7 +180,7 @@ export async function listArticlesAdmin(opts: { q?: string; rubrique?: string; s
   const articles = rows.map((r) => ({
     id: plainId(r.id, 'article'), title: r.title, slug: r.slug, status: r.status,
     published_at: r.published_at ?? undefined, is_newsletter_issue: r.is_newsletter_issue ?? false,
-    rubrique_name: r.rubrique_name ?? undefined, author: (r.author_names ?? [])[0] ?? undefined
+    rubrique_name: r.rubrique_name ?? undefined, author: (r.author_names ?? [])[0] ?? undefined, views: r.views ?? 0
   }));
   return { articles, total: count[0]?.n ?? 0 };
 }

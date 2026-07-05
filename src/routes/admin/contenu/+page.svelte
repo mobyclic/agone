@@ -69,6 +69,7 @@
             <th class="px-3 py-2 font-medium">Titre</th>
             <th class="px-3 py-2 font-medium">Rubrique</th>
             <th class="px-3 py-2 font-medium">Statut</th>
+            <th class="px-3 py-2 text-right font-medium">Vues</th>
             <th class="px-3 py-2 text-right font-medium">Date</th>
           </tr>
         </thead>
@@ -84,11 +85,12 @@
               <td class="px-3 py-2">
                 <span class="rounded px-2 py-0.5 text-xs font-medium {a.status === 'published' ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}">{CONTENT_STATUS_LABEL[a.status] ?? a.status}</span>
               </td>
+              <td class="px-3 py-2 text-right tabular-nums text-muted-foreground">{a.views ? a.views.toLocaleString('fr-FR') : '—'}</td>
               <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(a.published_at)}</td>
             </tr>
           {/each}
           {#if data.articles.length === 0}
-            <tr><td colspan="4" class="px-3 py-10 text-center text-muted-foreground">Aucun article.</td></tr>
+            <tr><td colspan="5" class="px-3 py-10 text-center text-muted-foreground">Aucun article.</td></tr>
           {/if}
         </tbody>
       </table>

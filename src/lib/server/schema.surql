@@ -285,6 +285,7 @@ DEFINE FIELD OVERWRITE rubrique     ON article TYPE option<record<rubrique>>;
 DEFINE FIELD OVERWRITE is_newsletter_issue ON article TYPE bool DEFAULT false;  -- [LettrInfo NN]
 DEFINE FIELD OVERWRITE authors      ON article TYPE option<array<record<author>>>;
 DEFINE FIELD OVERWRITE books        ON article TYPE option<array<record<book>>>;
+DEFINE FIELD OVERWRITE views        ON article TYPE int DEFAULT 0;   -- compteur de vues (importé de WP puis incrémenté)
 DEFINE FIELD OVERWRITE status       ON article TYPE string
   ASSERT $value IN ['draft','published'] DEFAULT 'published';
 DEFINE FIELD OVERWRITE legacy_wp_id ON article TYPE option<int>;
