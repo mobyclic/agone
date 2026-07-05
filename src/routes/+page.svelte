@@ -79,8 +79,8 @@
               </div>
               <div class="mt-3">
                 <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground group-hover:text-link sm:text-[17px]">{book.title}</h3>
-                {#if book.subtitle}<p class="mt-0.5 line-clamp-2 text-[13px] leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
-                {#if book.authors?.length}<p class="mt-0.5 line-clamp-1 text-sm font-semibold uppercase tracking-wide text-link">{authorList(book.authors)}</p>{/if}
+                {#if book.subtitle}<p class="mt-px line-clamp-2 text-[13px] leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
+                {#if book.authors?.length}<p class="mt-px line-clamp-1 text-sm font-semibold uppercase tracking-wide text-link">{authorList(book.authors)}</p>{/if}
               </div>
             </a>
           {/each}
