@@ -510,3 +510,28 @@ DEFINE FIELD OVERWRITE dry_run     ON bl_export TYPE bool DEFAULT true;
 DEFINE FIELD OVERWRITE created_at  ON bl_export TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE uploaded_at ON bl_export TYPE option<datetime>;
 DEFINE INDEX OVERWRITE idx_blexport_at ON bl_export FIELDS created_at;
+
+-- ============================================================================
+-- NEWSLETTER — liste d'abonnés DISTINCTE des comptes `user`.
+-- Un invité peut s'abonner ; un `user` peut s'abonner/se désabonner (le champ
+-- `user.accepts_newsletter` reste synchronisé). Source de vérité locale, pouvant
+-- être poussée vers Brevo (`brevo_id`).
+-- ============================================================================
+DEFINE TABLE OVERWRITE newsletter_subscriber SCHEMAFULL;
+DEFINE FIELD OVERWRITE email        ON newsletter_subscriber TYPE string;   -- stocké en minuscules
+DEFINE FIELD OVERWRITE status       ON newsletter_subscriber TYPE string
+  ASSERT $value IN ['subscribed','unsubscribed'] DEFAULT 'subscribed';
+DEFINE FIELD OVERWRITE user         ON newsletter_subscriber TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE first_name   ON newsletter_subscriber TYPE option<string>;
+DEFINE FIELD OVERWRITE last_name    ON newsletter_subscriber TYPE option<string>;
+DEFINE FIELD OVERWRITE source       ON newsletter_subscriber TYPE string DEFAULT 'site';  -- site|checkout|compte|admin|import
+DEFINE FIELD OVERWRITE token        ON newsletter_subscriber TYPE string;   -- jeton de désabonnement
+DEFINE FIELD OVERWRITE brevo_id     ON newsletter_subscriber TYPE option<string>;
+DEFINE FIELD OVERWRITE legacy_wp_id ON newsletter_subscriber TYPE option<int>;
+DEFINE FIELD OVERWRITE subscribed_at   ON newsletter_subscriber TYPE option<datetime>;
+DEFINE FIELD OVERWRITE unsubscribed_at ON newsletter_subscriber TYPE option<datetime>;
+DEFINE FIELD OVERWRITE created_at   ON newsletter_subscriber TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON newsletter_subscriber TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_nl_email  ON newsletter_subscriber FIELDS email UNIQUE;
+DEFINE INDEX OVERWRITE idx_nl_token  ON newsletter_subscriber FIELDS token;
+DEFINE INDEX OVERWRITE idx_nl_status ON newsletter_subscriber FIELDS status;

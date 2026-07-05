@@ -32,5 +32,6 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Expéditions BL', href: '/admin/expeditions', icon: 'Truck' },
   { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
   { label: 'Contenu', href: '/admin/contenu', icon: 'Article' },
+  { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
   { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
 ];

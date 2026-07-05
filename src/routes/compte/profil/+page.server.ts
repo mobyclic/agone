@@ -2,6 +2,7 @@ import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/access';
 import { setPassword } from '$lib/server/account';
+import { subscribe, unsubscribeByEmail } from '$lib/server/newsletter';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
 
@@ -19,9 +20,15 @@ export const actions: Actions = {
     const u = requireUser(locals);
     const fd = await request.formData();
     const g = (k: string) => String(fd.get(k) || '').trim();
+    const wantsNewsletter = fd.get('newsletter') === 'on';
     await query(`UPDATE $id SET first_name = $f, last_name = $l, phone = $p, accepts_newsletter = $n`, {
-      id: recId('user', u.id), f: g('first_name'), l: g('last_name'), p: g('phone'), n: fd.get('newsletter') === 'on'
+      id: recId('user', u.id), f: g('first_name'), l: g('last_name'), p: g('phone'), n: wantsNewsletter
     });
+    // Synchronise la liste d'abonnés (distincte des comptes).
+    if (u.email) {
+      if (wantsNewsletter) await subscribe({ email: u.email, userId: u.id, first_name: g('first_name'), last_name: g('last_name'), source: 'compte' });
+      else await unsubscribeByEmail(u.email);
+    }
     throw redirect(303, withFlash('/compte/profil', 'Profil mis à jour.', 'success'));
   },
   password: async ({ request, locals }) => {
