@@ -46,7 +46,7 @@
           <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each rubriques as r (r.slug)}
-                <a href="/antichambre?rubrique={r.slug}" class="block px-4 py-2 font-display text-[17px] font-medium uppercase tracking-wide text-white hover:bg-white/10">{r.name}</a>
+                <a href="/antichambre?rubrique={r.slug}" class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{r.name}</a>
               {/each}
             </div>
           </div>
@@ -63,7 +63,7 @@
           <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each collections as c (c.slug)}
-                <a href="/collections/{c.slug}" class="block px-4 py-2 font-display text-[17px] font-medium uppercase tracking-wide text-white hover:bg-white/10">{c.name}</a>
+                <a href="/collections/{c.slug}" class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{c.name}</a>
               {/each}
             </div>
           </div>
