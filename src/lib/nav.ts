@@ -26,12 +26,11 @@ export const ACCOUNT_NAV: NavItem[] = [
 /** Back-office (/admin). */
 export const ADMIN_NAV: NavItem[] = [
   { label: 'Tableau de bord', href: '/admin', icon: 'SquaresFour' },
+  { label: 'Antichambre', href: '/admin/contenu', icon: 'Article' },
   { label: 'Catalogue', href: '/admin/catalogue', icon: 'BookOpen' },
-  { label: 'Auteurs', href: '/admin/auteurs', icon: 'Users' },
+  { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
   { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
-  { label: 'Expéditions BL', href: '/admin/expeditions', icon: 'Truck' },
-  { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
-  { label: 'Contenu', href: '/admin/contenu', icon: 'Article' },
   { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
+  { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
   { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
 ];

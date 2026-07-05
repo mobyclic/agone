@@ -34,7 +34,7 @@
 
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">Contenu — L'Antichambre</h2>
+    <h2 class="text-xl font-bold">L'Antichambre</h2>
     <p class="text-sm text-muted-foreground">{data.total} article{data.total > 1 ? 's' : ''}</p>
   </div>
   <Button href="/admin/contenu/nouveau"><Plus size={16} /> Nouvel article</Button>
