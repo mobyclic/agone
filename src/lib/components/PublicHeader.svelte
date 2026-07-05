@@ -23,16 +23,17 @@
   ];
 </script>
 
-<header class="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-  <div class="flex h-16 items-center gap-3 pr-3 sm:pr-5">
-    <!-- Logo : barre noire depuis le bord gauche jusqu'au logo -->
-    <a href="/" class="flex h-full shrink-0 items-center gap-3" aria-label="Agone — accueil">
-      <span class="h-6 w-12 shrink-0 bg-foreground sm:h-7 sm:w-20 lg:w-28"></span>
-      <span class="font-serif text-xl font-bold uppercase leading-none tracking-tight text-foreground">
+<header class="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: calc((100vw - min(100vw, 80rem)) / 2 + 1.5rem)">
+  <div class="flex h-16 items-stretch">
+    <!-- Logo : bande noire pleine du bord gauche, englobant le logo (aligné au contenu) -->
+    <a href="/" class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: var(--gutter)" aria-label="Agone — accueil">
+      <span class="font-serif text-xl font-bold uppercase leading-none tracking-tight">
         <span class="italic text-[1.4em]">A</span>GON<span class="text-[1.4em]">E</span>
       </span>
     </a>
 
+    <!-- Reste de la barre (aligné au contenu à droite) -->
+    <div class="flex min-w-0 flex-1 items-center gap-3" style="padding-right: var(--gutter)">
     <!-- Navigation principale -->
     <nav class="ml-2 hidden items-center xl:flex">
       <!-- Antichambre ▾ -->
@@ -101,6 +102,7 @@
       <button class="grid size-9 place-items-center hover:bg-muted xl:hidden" onclick={() => (open = !open)} aria-label="Menu">
         {#if open}<X size={22} />{:else}<List size={22} />{/if}
       </button>
+    </div>
     </div>
   </div>
 
