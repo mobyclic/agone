@@ -9,7 +9,7 @@ export const load: PageServerLoad = async () => {
     forthcomingBooks(),
     featuredBooks(6),
     latestArticle(),
-    recentArticles(4),
+    recentArticles(6),
     listUpcoming(),
     listCollections()
   ]);

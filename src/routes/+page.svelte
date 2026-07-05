@@ -7,6 +7,7 @@
   let { data } = $props();
   const article = $derived(data.feature ?? data.articles[0]);
   const lede = $derived(article?.summary ?? article?.excerpt);
+  const secondary = $derived((data.articles ?? []).filter((a) => a.slug !== article?.slug).slice(0, 3));
   const books = $derived(data.recent.slice(0, 6));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const dayNum = (s?: string) => (s ? new Date(s).getDate() : '');
@@ -45,12 +46,28 @@
         {/if}
 
         {#if lede}
-          <p class="ag-lede mt-6 max-w-prose text-base leading-relaxed text-foreground/80 sm:text-[1.0625rem]">{lede}</p>
+          <p class="mt-5 line-clamp-5 max-w-prose text-base leading-relaxed text-foreground/80">{lede}</p>
         {/if}
 
-        <a href="/article/{article.slug}" class="link mt-7 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider">
+        <a href="/article/{article.slug}" class="link mt-5 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider">
           Lire l’article <span aria-hidden="true">→</span>
         </a>
+
+        <!-- 3 articles récents (thème · date, titre, auteur) -->
+        {#if secondary.length}
+          <div class="mt-8 divide-y divide-border border-t-2 border-foreground">
+            {#each secondary as a (a.slug)}
+              <a href="/article/{a.slug}" class="group block py-3.5">
+                <div class="flex flex-wrap items-center gap-x-2 font-display text-[11px] uppercase tracking-wide">
+                  {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
+                  <span class="text-muted-foreground">{fmt(a.published_at)}</span>
+                </div>
+                <h3 class="display-title mt-1 text-xl leading-tight group-hover:text-link">{a.title}</h3>
+                {#if a.author}<p class="mt-0.5 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
+              </a>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -90,24 +107,26 @@
   </div>
 </section>
 
-<!-- MIS EN AVANT -->
-{#if data.featured.length}
-  <section class="border-y border-border bg-secondary/40">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-      <SectionHead title="Mis en avant" href="/catalogue" more="Le catalogue" />
-      <div class="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
-        {#each data.featured as book (book.slug)}<BookCard {book} />{/each}
-      </div>
-    </div>
-  </section>
-{/if}
-
-<!-- À PARAÎTRE -->
-{#if data.forthcoming.length}
+<!-- À PARAÎTRE + FOCUS -->
+{#if data.forthcoming.length || data.featured.length}
   <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-    <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
-    <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-6">
-      {#each data.forthcoming as book (book.slug)}<BookCard {book} />{/each}
+    <div class="grid gap-x-10 gap-y-12 lg:grid-cols-2">
+      {#if data.forthcoming.length}
+        <div>
+          <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
+          <div class="grid grid-cols-3 gap-x-5 gap-y-8">
+            {#each data.forthcoming.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
+          </div>
+        </div>
+      {/if}
+      {#if data.featured.length}
+        <div>
+          <SectionHead title="Focus" href="/catalogue" more="Le catalogue" />
+          <div class="grid grid-cols-3 gap-x-5 gap-y-8">
+            {#each data.featured.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
+          </div>
+        </div>
+      {/if}
     </div>
   </section>
 {/if}
