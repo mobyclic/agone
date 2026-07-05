@@ -8,8 +8,9 @@
  * Ne fait QUE des SELECT côté WordPress (via wp-db.ts). N'écrit que dans Surreal.
  * Un mode `dryRun` calcule ce qui serait créé/mis à jour sans rien écrire.
  */
+import { GeometryPoint } from 'surrealdb';
 import { query, recId } from './surreal';
-import { uniqueSlug } from './slug';
+import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
 
 export interface ImportResult {
@@ -339,4 +340,350 @@ export async function importOrders(opts: { limit?: number; dryRun?: boolean } = 
   }
 
   return { type: 'orders', fetched: orders.length, created, updated, skipped, warnings: warnings.slice(0, 30), dryRun };
+}
+
+/* ═════════════════════ Contenu : auteurs / articles / livres / rencontres ═════════════════════
+   Reprend fidèlement les mappings des scripts de migration (scripts/migrate-*.ts) pour rester
+   cohérent avec le catalogue déjà migré. Appariement par legacy_wp_id (idempotent). */
+
+/** IDs de posts dans un tableau PHP sérialisé (`a:1:{i:0;s:4:"8889";}`). */
+function parseWpIds(serialized: unknown): number[] {
+  const s = String(serialized ?? '');
+  const out: number[] = [];
+  const re = /s:\d+:"(\d+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) out.push(Number(m[1]));
+  return out;
+}
+
+/** Valeur d'un champ dans un blob PHP sérialisé (champ ACF google_map `lieu`). */
+function phpField(blob: string, key: string): string | undefined {
+  const idx = blob.indexOf(`"${key}";`);
+  if (idx < 0) return undefined;
+  const rest = blob.slice(idx + key.length + 3);
+  let m = rest.match(/^s:\d+:"([^"]*)"/); if (m) return m[1] || undefined;
+  m = rest.match(/^d:([-0-9.eE]+)/); if (m) return m[1];
+  m = rest.match(/^i:(-?\d+)/); if (m) return m[1];
+  return undefined;
+}
+
+/** Date ACF `YYYYMMDD` → Date. */
+function wpDate8(v: unknown): Date | undefined {
+  const s = String(v ?? '').trim();
+  if (!/^\d{8}$/.test(s)) return undefined;
+  const dt = new Date(`${s.slice(0, 4)}-${s.slice(4, 6) === '00' ? '01' : s.slice(4, 6)}-${s.slice(6, 8) === '00' ? '01' : s.slice(6, 8)}T00:00:00Z`);
+  return isNaN(+dt) ? undefined : dt;
+}
+
+function stripHtml(s: unknown): string {
+  return String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+}
+
+/** Map legacy → id Surreal (plain) pour une table. */
+async function legacyMap(table: string, field = 'legacy_wp_id'): Promise<Map<number, string>> {
+  const rows = await query<any>(`SELECT meta::id(id) AS pid, ${field} AS k FROM ${table} WHERE ${field} != NONE`);
+  const m = new Map<number, string>();
+  for (const r of rows) m.set(Number(r.k), r.pid);
+  return m;
+}
+
+/** Charge les catégories WP (première par post) pour une liste de posts. */
+async function firstTermByPost(p: string, postIds: number[], taxonomy: string): Promise<Map<number, number>> {
+  if (!postIds.length) return new Map();
+  const rows = await wpQuery<any>(
+    `SELECT tr.object_id AS oid, tt.term_id AS term FROM ${p}term_relationships tr
+       JOIN ${p}term_taxonomy tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+      WHERE tt.taxonomy = ? AND tr.object_id IN (${postIds.map(() => '?').join(',')})`,
+    [taxonomy, ...postIds]
+  );
+  const m = new Map<number, number>();
+  for (const r of rows) if (!m.has(Number(r.oid))) m.set(Number(r.oid), Number(r.term)); // 1re catégorie
+  return m;
+}
+
+/* ————————————————————— Auteurs ————————————————————— */
+
+export async function importAuthors(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
+  const dryRun = !!opts.dryRun;
+  const p = wpPrefix();
+  const warnings: string[] = [];
+  let created = 0, updated = 0, skipped = 0;
+
+  const posts = await wpQuery<any>(
+    `SELECT ID, post_title, post_name FROM ${p}posts WHERE post_type = 'auteurs' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
+    [limit]
+  );
+  const ids = posts.map((x) => Number(x.ID));
+  const meta = ids.length ? metaIndex(await wpQuery<any>(
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key IN ('prenom','nom')`,
+    [...ids]
+  ), 'post_id') : new Map();
+
+  for (const a of posts) {
+    const wpId = Number(a.ID);
+    const m = meta.get(wpId) ?? {};
+    // Cohérent avec migrate-catalogue : first_name = prenom, last_name = nom (sinon titre).
+    const first = (m.prenom || '').trim();
+    const last = (m.nom || '').trim() || String(a.post_title || '').trim();
+    try {
+      const ex = await query<any>(`SELECT meta::id(id) AS pid FROM author WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
+      if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
+      if (ex[0]?.pid) {
+        await query(`UPDATE $id SET first_name = $f, last_name = $l`, { id: recId('author', ex[0].pid), f: first, l: last });
+        updated++;
+      } else {
+        const slug = await uniqueSlug('author', a.post_name || `${first} ${last}`);
+        const { sql, vars } = buildSet({ first_name: first, last_name: last, slug, legacy_wp_id: wpId });
+        await query(`CREATE author SET ${sql}`, vars);
+        created++;
+      }
+    } catch (e) {
+      skipped++;
+      warnings.push(`Auteur WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
+    }
+  }
+  return { type: 'authors', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+}
+
+/* ————————————————————— Articles (L'Antichambre) ————————————————————— */
+
+export async function importArticles(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
+  const dryRun = !!opts.dryRun;
+  const p = wpPrefix();
+  const warnings: string[] = [];
+  let created = 0, updated = 0, skipped = 0;
+
+  const posts = await wpQuery<any>(
+    `SELECT ID, post_title, post_name, post_content, post_excerpt, post_status, post_date_gmt
+       FROM ${p}posts WHERE post_type = 'post' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
+    [limit]
+  );
+  const ids = posts.map((x) => Number(x.ID));
+  const meta = ids.length ? metaIndex(await wpQuery<any>(
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key = 'auteurs_associes'`,
+    [...ids]
+  ), 'post_id') : new Map();
+  const catByPost = await firstTermByPost(p, ids, 'category');
+  const [authMap, rubMap] = await Promise.all([legacyMap('author'), legacyMap('rubrique', 'legacy_term_id')]);
+
+  for (const a of posts) {
+    const wpId = Number(a.ID);
+    const m = meta.get(wpId) ?? {};
+    const authorIds = parseWpIds(m.auteurs_associes).map((x) => authMap.get(x)).filter(Boolean) as string[];
+    const rubPid = rubMap.get(catByPost.get(wpId) ?? -1);
+    const excerpt = stripHtml(a.post_excerpt) || stripHtml(a.post_content).slice(0, 220) || undefined;
+    try {
+      const ex = await query<any>(`SELECT meta::id(id) AS pid FROM article WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
+      if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
+      const fields = {
+        title: String(a.post_title || '').trim() || '(sans titre)',
+        body_html: a.post_content || undefined,
+        excerpt,
+        status: a.post_status === 'draft' ? 'draft' : 'published',
+        is_newsletter_issue: /\[\s*lettrinfo/i.test(String(a.post_title || '')),
+        published_at: mysqlDate(a.post_date_gmt),
+        rubrique: rubPid ? recId('rubrique', rubPid) : undefined,
+        authors: authorIds.length ? authorIds.map((id) => recId('author', id)) : undefined
+      };
+      if (ex[0]?.pid) {
+        const { sql, vars } = buildSet(fields);
+        await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('article', ex[0].pid) });
+        updated++;
+      } else {
+        const slug = await uniqueSlug('article', a.post_name || String(a.post_title || 'article'));
+        const { sql, vars } = buildSet({ ...fields, slug, legacy_wp_id: wpId });
+        await query(`CREATE article SET ${sql}`, vars);
+        created++;
+      }
+    } catch (e) {
+      skipped++;
+      warnings.push(`Article WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
+    }
+  }
+  return { type: 'articles', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+}
+
+/* ————————————————————— Livres (+ contributions) ————————————————————— */
+
+const BOOK_META = [
+  'sous_titre', 'infos_additionnelles', 'titre_originale', 'langue_originale',
+  'isbn_papier', 'isbn_digital', 'prix_papier', 'prix_digital', 'tarif_souscription',
+  'nombre_de_pages', 'date_de_publication', 'qte_stock', 'focus',
+  'livre_auteurs', 'livre_traducteurs', 'livre_auteurs_preface', 'livre_auteurs_postface', 'livre_auteurs_divers'
+];
+const ROLE_FIELDS: [string, string][] = [
+  ['livre_auteurs', 'author'], ['livre_traducteurs', 'translator'],
+  ['livre_auteurs_preface', 'preface'], ['livre_auteurs_postface', 'postface'], ['livre_auteurs_divers', 'other']
+];
+
+export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
+  const dryRun = !!opts.dryRun;
+  const p = wpPrefix();
+  const warnings: string[] = [];
+  let created = 0, updated = 0, skipped = 0;
+
+  const posts = await wpQuery<any>(
+    `SELECT ID, post_title, post_name, post_content, post_status FROM ${p}posts
+       WHERE post_type = 'livres' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
+    [limit]
+  );
+  const ids = posts.map((x) => Number(x.ID));
+  const meta = ids.length ? metaIndex(await wpQuery<any>(
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key IN (${BOOK_META.map(() => '?').join(',')})`,
+    [...ids, ...BOOK_META]
+  ), 'post_id') : new Map();
+  const authMap = await legacyMap('author');
+
+  for (const b of posts) {
+    const wpId = Number(b.ID);
+    const m = meta.get(wpId) ?? {};
+    const fields = {
+      title: String(b.post_title || '').trim() || '(sans titre)',
+      subtitle: (m.sous_titre || '').trim() || undefined,
+      description_html: b.post_content || undefined,
+      extra_info_html: (m.infos_additionnelles || '').trim() || undefined,
+      title_original: (m.titre_originale || '').trim() || undefined,
+      language_original: (m.langue_originale || '').trim() || undefined,
+      status: b.post_status === 'draft' ? 'forthcoming' : 'published',
+      isbn_paper: (m.isbn_papier || '').trim() || undefined,
+      isbn_ebook: (m.isbn_digital || '').trim() || undefined,
+      price_paper: num(m.prix_papier),
+      price_ebook: num(m.prix_digital),
+      subscription_price: num(m.tarif_souscription),
+      published_at: wpDate8(m.date_de_publication),
+      page_count: num(m.nombre_de_pages) != null ? Math.round(num(m.nombre_de_pages)!) : undefined,
+      stock_qty: num(m.qte_stock) != null ? Math.round(num(m.qte_stock)!) : 0,
+      featured: ['1', 'true', 'yes', 'on'].includes(String(m.focus ?? '').toLowerCase())
+    };
+    try {
+      const ex = await query<any>(`SELECT meta::id(id) AS pid FROM book WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
+      if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
+      let bookPid: string;
+      if (ex[0]?.pid) {
+        bookPid = ex[0].pid;
+        const { sql, vars } = buildSet(fields);
+        await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('book', bookPid) });
+        updated++;
+      } else {
+        const slug = await uniqueSlug('book', b.post_name || fields.title);
+        const { sql, vars } = buildSet({ ...fields, slug, legacy_wp_id: wpId });
+        const rows = await query<any>(`CREATE book SET ${sql}`, vars);
+        bookPid = String(rows[0].id).replace(/^book:/, '');
+        created++;
+      }
+      // Contributions (arêtes typées) : on resynchronise.
+      await query(`DELETE contributed_by WHERE in = $b`, { b: recId('book', bookPid) });
+      for (const [field, role] of ROLE_FIELDS) {
+        const aids = parseWpIds(m[field]);
+        for (let i = 0; i < aids.length; i++) {
+          const aPid = authMap.get(aids[i]);
+          if (!aPid) continue;
+          await query(`RELATE $b->contributed_by->$a SET role = $role, position = $pos, share = 100`,
+            { b: recId('book', bookPid), a: recId('author', aPid), role, pos: i });
+        }
+      }
+    } catch (e) {
+      skipped++;
+      warnings.push(`Livre WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
+    }
+  }
+  return { type: 'books', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+}
+
+/* ————————————————————— Rencontres (+ lieux) ————————————————————— */
+
+async function ensureVenue(lieu: string | undefined, cache: Map<string, string>): Promise<string | undefined> {
+  if (!lieu || !lieu.includes('name')) return undefined;
+  const name = phpField(lieu, 'name');
+  if (!name) return undefined;
+  const city = phpField(lieu, 'city');
+  const placeId = phpField(lieu, 'place_id');
+  const key = placeId || slugify(`${name}-${city ?? ''}`) || slugify(name);
+  if (cache.has(key)) return cache.get(key);
+
+  // Cherche un lieu existant (dédup par place_id, sinon par slug).
+  let existing: any[] = [];
+  if (placeId) existing = await query<any>(`SELECT meta::id(id) AS pid FROM venue WHERE place_id = $p LIMIT 1`, { p: placeId });
+  const slug = await (async () => {
+    const base = slugify(`${name}-${city ?? ''}`) || slugify(name) || 'lieu';
+    return existing[0]?.pid ? base : uniqueSlug('venue', base);
+  })();
+  if (!existing[0]?.pid) existing = await query<any>(`SELECT meta::id(id) AS pid FROM venue WHERE slug = $s LIMIT 1`, { s: slug });
+
+  if (existing[0]?.pid) { cache.set(key, existing[0].pid); return existing[0].pid; }
+
+  const lat = num(phpField(lieu, 'lat'));
+  const lng = num(phpField(lieu, 'lng'));
+  const street = [phpField(lieu, 'street_number'), phpField(lieu, 'street_name')].filter(Boolean).join(' ') || undefined;
+  const content: Record<string, unknown> = {
+    name, slug, address: phpField(lieu, 'address'), street, city,
+    post_code: phpField(lieu, 'post_code'), state: phpField(lieu, 'state'),
+    country: phpField(lieu, 'country'), country_short: phpField(lieu, 'country_short'),
+    lat, lng, place_id: placeId
+  };
+  if (lat != null && lng != null) content.geo = new GeometryPoint([lng, lat]);
+  for (const k of Object.keys(content)) if (content[k] === undefined) delete content[k];
+  const rows = await query<any>(`CREATE venue CONTENT $c`, { c: content });
+  const pid = String(rows[0].id).replace(/^venue:/, '');
+  cache.set(key, pid);
+  return pid;
+}
+
+export async function importEvents(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
+  const dryRun = !!opts.dryRun;
+  const p = wpPrefix();
+  const warnings: string[] = [];
+  let created = 0, updated = 0, skipped = 0;
+
+  const posts = await wpQuery<any>(
+    `SELECT ID, post_title, post_name, post_content FROM ${p}posts
+       WHERE post_type = 'rencontres' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
+    [limit]
+  );
+  const ids = posts.map((x) => Number(x.ID));
+  const meta = ids.length ? metaIndex(await wpQuery<any>(
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key IN ('date_de_debut','date_de_fin','lieu','auteurs_associes','livres_associes')`,
+    [...ids]
+  ), 'post_id') : new Map();
+  const [authMap, bookMap] = await Promise.all([legacyMap('author'), legacyMap('book')]);
+  const venueCache = new Map<string, string>();
+
+  for (const e of posts) {
+    const wpId = Number(e.ID);
+    const m = meta.get(wpId) ?? {};
+    try {
+      const authors = parseWpIds(m.auteurs_associes).map((x) => authMap.get(x)).filter(Boolean).map((id) => recId('author', id as string));
+      const books = parseWpIds(m.livres_associes).map((x) => bookMap.get(x)).filter(Boolean).map((id) => recId('book', id as string));
+      const venuePid = dryRun ? undefined : await ensureVenue(m.lieu, venueCache);
+      const fields = {
+        title: String(e.post_title || '').trim() || '(sans titre)',
+        body_html: e.post_content || undefined,
+        start_at: mysqlDate(m.date_de_debut),
+        end_at: mysqlDate(m.date_de_fin),
+        venue: venuePid ? recId('venue', venuePid) : undefined,
+        authors: authors.length ? authors : undefined,
+        books: books.length ? books : undefined
+      };
+      const ex = await query<any>(`SELECT meta::id(id) AS pid FROM event WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
+      if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
+      if (ex[0]?.pid) {
+        const { sql, vars } = buildSet(fields);
+        await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('event', ex[0].pid) });
+        updated++;
+      } else {
+        const slug = await uniqueSlug('event', e.post_name || fields.title);
+        const { sql, vars } = buildSet({ ...fields, slug, legacy_wp_id: wpId });
+        await query(`CREATE event SET ${sql}`, vars);
+        created++;
+      }
+    } catch (err) {
+      skipped++;
+      warnings.push(`Rencontre WP #${wpId} ignorée : ${err instanceof Error ? err.message.split('\n')[0] : 'erreur'}`);
+    }
+  }
+  return { type: 'events', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
 }

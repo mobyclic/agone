@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { FloppyDisk, Users, Receipt, DownloadSimple, Warning } from 'phosphor-svelte';
+  import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -9,7 +9,11 @@
 
   const syncTypes = [
     { action: 'syncUsers', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes (par e-mail / legacy_wp_id).' },
-    { action: 'syncOrders', icon: Receipt, title: 'Commandes', desc: 'Commandes WooCommerce + lignes (appariées aux livres par ISBN/legacy).' }
+    { action: 'syncOrders', icon: Receipt, title: 'Commandes', desc: 'Commandes WooCommerce + lignes (livres par legacy, clients rattachés).' },
+    { action: 'syncBooks', icon: BookOpen, title: 'Livres', desc: 'Fiches livres (ISBN, prix, dates, stock) + contributions auteur/traducteur/préface.' },
+    { action: 'syncAuthors', icon: UsersThree, title: 'Auteurs', desc: 'Auteurs (prénom / nom / slug).' },
+    { action: 'syncArticles', icon: Article, title: 'Articles', desc: "Articles de L'Antichambre (corps, rubrique, auteurs, LettrInfo)." },
+    { action: 'syncEvents', icon: CalendarDots, title: 'Rencontres', desc: 'Rencontres + lieux géolocalisés (dédupliqués), auteurs & livres liés.' }
   ];
 </script>
 
@@ -125,6 +129,6 @@
         </form>
       {/each}
     </div>
-    <p class="mt-3 text-xs text-muted-foreground">Livres &amp; auteurs, articles et rencontres : importeurs à venir (le catalogue est déjà migré).</p>
+    <p class="mt-3 text-xs text-muted-foreground">Ordre conseillé pour un import complet : Auteurs → Livres → Articles → Rencontres (les liens s'appuient sur les auteurs/livres déjà présents).</p>
   {/if}
 </div>

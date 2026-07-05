@@ -3,7 +3,10 @@ import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import { getSetting, setSetting } from '$lib/server/site';
 import { wpConfigured } from '$lib/server/wp-db';
-import { importUsers, importOrders, type ImportResult } from '$lib/server/migration';
+import {
+  importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents,
+  type ImportResult
+} from '$lib/server/migration';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
@@ -59,13 +62,10 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/parametres', 'Bannière enregistrée.', 'success'));
   },
 
-  syncUsers: async ({ request, locals }) => {
-    requireStaff(locals);
-    return runSync(importUsers, await request.formData());
-  },
-
-  syncOrders: async ({ request, locals }) => {
-    requireStaff(locals);
-    return runSync(importOrders, await request.formData());
-  }
+  syncUsers: async ({ request, locals }) => { requireStaff(locals); return runSync(importUsers, await request.formData()); },
+  syncOrders: async ({ request, locals }) => { requireStaff(locals); return runSync(importOrders, await request.formData()); },
+  syncAuthors: async ({ request, locals }) => { requireStaff(locals); return runSync(importAuthors, await request.formData()); },
+  syncArticles: async ({ request, locals }) => { requireStaff(locals); return runSync(importArticles, await request.formData()); },
+  syncBooks: async ({ request, locals }) => { requireStaff(locals); return runSync(importBooks, await request.formData()); },
+  syncEvents: async ({ request, locals }) => { requireStaff(locals); return runSync(importEvents, await request.formData()); }
 };
