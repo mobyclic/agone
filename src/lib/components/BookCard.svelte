@@ -40,7 +40,7 @@
   <div class="mt-2.5">
     <h3 class="line-clamp-2 font-sans text-sm font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
     {#if book.subtitle}<p class="mt-0.5 line-clamp-1 text-xs leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
-    {#if authors}<p class="mt-1 line-clamp-1 text-xs text-link">{authors}</p>{/if}
+    {#if authors}<p class="mt-0.5 line-clamp-1 text-xs text-link">{authors}</p>{/if}
     {#if price}<p class="mt-1 text-xs font-medium text-foreground">{price}</p>{/if}
   </div>
 </a>
