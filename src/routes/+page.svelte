@@ -27,8 +27,8 @@
     {#if article}
       <div class="flex flex-col">
         <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
-          <span class="eyebrow">L’Antichambre</span>
-          <a href="/antichambre" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le magazine →</a>
+          <span class="display-title text-2xl leading-none sm:text-3xl">Antichambre</span>
+          <a href="/antichambre" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le magazine →</a>
         </div>
 
         {#if article.rubrique_name}
@@ -75,8 +75,8 @@
     {#if books.length}
       <div class="flex flex-col {article ? '' : 'lg:col-span-2'}">
         <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
-          <span class="eyebrow">Derniers parus</span>
-          <a href="/catalogue" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le catalogue →</a>
+          <span class="display-title text-2xl leading-none sm:text-3xl">Nouveautés</span>
+          <a href="/catalogue" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le catalogue →</a>
         </div>
 
         <div class="grid grid-cols-3 gap-x-6 gap-y-10">
