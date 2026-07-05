@@ -1,3 +1,4 @@
+import { RecordId } from 'surrealdb';
 import { query } from './surreal';
 
 /** Slug ASCII : minuscules, tirets, sans accents. */
@@ -27,8 +28,8 @@ export async function uniqueSlug(
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const rows = await query<any>(
-      `SELECT id FROM type::table($table) WHERE ${field} = $slug ${opts.excludeId ? 'AND id != type::thing($table, $ex)' : ''} LIMIT 1`,
-      { table, slug: candidate, ex: opts.excludeId }
+      `SELECT id FROM type::table($table) WHERE ${field} = $slug ${opts.excludeId ? 'AND id != $exclude' : ''} LIMIT 1`,
+      { table, slug: candidate, ...(opts.excludeId ? { exclude: new RecordId(table, opts.excludeId) } : {}) }
     );
     if (!rows.length) return candidate;
     n += 1;

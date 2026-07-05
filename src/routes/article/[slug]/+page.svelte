@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, Eye, PencilSimple } from 'phosphor-svelte';
   let { data } = $props();
   const a = $derived(data.article);
@@ -16,16 +17,15 @@
 <svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
 
 <article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-  <div class="mb-6 flex items-center justify-between gap-3">
-    <a href="/antichambre" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-      <ArrowLeft size={16} /> L’Antichambre
-    </a>
-    {#if isStaff}
-      <a href="/admin/contenu/{a.id}" class="inline-flex items-center gap-1.5 border border-border px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:border-foreground hover:text-foreground">
-        <PencilSimple size={14} /> Éditer
-      </a>
-    {/if}
-  </div>
+  <a href="/antichambre" class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    <ArrowLeft size={16} /> L’Antichambre
+  </a>
+
+  {#if isStaff}
+    <div class="fixed bottom-6 right-6 z-40">
+      <Button href="/admin/contenu/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
+    </div>
+  {/if}
 
   {#if a.rubrique_name}
     <a href="/antichambre?rubrique={a.rubrique_slug}" class="eyebrow hover:underline">{a.rubrique_name}</a>

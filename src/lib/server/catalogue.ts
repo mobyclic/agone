@@ -114,6 +114,15 @@ export async function recentBooks(limit = 8): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
+/** Recherche de livres pour un sélecteur (back-office). */
+export async function searchBooksForPicker(q: string): Promise<{ id: string; title: string }[]> {
+  if (!q || !q.trim()) return [];
+  return query<any>(
+    `SELECT id, title FROM book WHERE string::lowercase(title) CONTAINS $q ORDER BY title ASC LIMIT 12`,
+    { q: q.trim().toLowerCase() }
+  );
+}
+
 /** Autres livres du même auteur (par slug d'auteur). */
 export async function booksByAuthorSlug(authorSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
   const rows = await query<any>(

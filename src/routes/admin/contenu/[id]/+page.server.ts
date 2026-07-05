@@ -17,6 +17,7 @@ export const actions: Actions = {
     requireStaff(locals);
     const fd = await request.formData();
     const S = (k: string) => (fd.get(k) ? String(fd.get(k)).trim() : '');
+    const ids = (k: string) => { try { const v = JSON.parse(S(k) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch { return []; } };
     const title = S('title');
     if (!title) return fail(400, { error: 'Le titre est requis.' });
 
@@ -28,7 +29,9 @@ export const actions: Actions = {
       is_newsletter_issue: fd.get('is_newsletter_issue') === 'on',
       published_at: S('published_at') || undefined,
       rubriqueId: S('rubrique') || undefined,
-      coverId: S('coverId') || undefined
+      coverId: S('coverId') || undefined,
+      authorIds: ids('authorIds'),
+      bookIds: ids('bookIds')
     };
 
     const editId = params.id && params.id !== 'nouveau' ? params.id : null;

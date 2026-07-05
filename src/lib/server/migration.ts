@@ -494,7 +494,7 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
         rubrique: rubPid ? recId('rubrique', rubPid) : undefined,
         authors: authorIds.length ? authorIds.map((id) => recId('author', id)) : undefined,
         books: bookIds.length ? bookIds.map((id) => recId('book', id)) : undefined,
-        views: viewsMap.get(wpId)
+        views: viewsMap.get(wpId) ?? 0
       };
       if (ex[0]?.pid) {
         const { sql, vars } = buildSet(fields);

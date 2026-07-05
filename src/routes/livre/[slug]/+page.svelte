@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
+  import { Button } from '$lib/components/ui/button';
   import { ROLE_LABEL, euros } from '$lib/labels';
   import { ArrowLeft, ShoppingCart, PencilSimple } from 'phosphor-svelte';
 
@@ -30,16 +31,15 @@
 <svelte:head><title>{b.title} · Agone</title></svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-  <div class="mb-6 flex items-center justify-between gap-3">
-    <a href="/catalogue" class="inline-flex items-center gap-1.5 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground">
-      <ArrowLeft size={14} /> Catalogue
-    </a>
-    {#if isStaff}
-      <a href="/admin/catalogue/{bookId}" class="inline-flex items-center gap-1.5 border border-border px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:border-foreground hover:text-foreground">
-        <PencilSimple size={14} /> Éditer
-      </a>
-    {/if}
-  </div>
+  <a href="/catalogue" class="mb-6 inline-flex items-center gap-1.5 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground">
+    <ArrowLeft size={14} /> Catalogue
+  </a>
+
+  {#if isStaff}
+    <div class="fixed bottom-6 right-6 z-40">
+      <Button href="/admin/catalogue/{bookId}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
+    </div>
+  {/if}
 
   <div class="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)_240px] lg:gap-10">
     <!-- Couverture + achat -->

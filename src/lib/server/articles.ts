@@ -191,12 +191,16 @@ export interface ArticleEdit {
   id: string; title: string; slug: string; status: string;
   excerpt?: string; body_html?: string; is_newsletter_issue: boolean;
   published_at?: string; rubrique_id?: string; cover_url?: string; cover_id?: string;
+  authors: { id: string; label: string }[];
+  books: { id: string; label: string }[];
 }
 
 export async function getArticleForEdit(id: string): Promise<ArticleEdit | null> {
   const rows = await query<any>(
     `SELECT id, title, slug, status, excerpt, body_html, is_newsletter_issue, published_at,
-        rubrique AS rubrique_id, cover.url AS cover_url, cover AS cover_id
+        rubrique AS rubrique_id, cover.url AS cover_url, cover AS cover_id,
+        authors.{ id: id, label: full_name } AS authors,
+        books.{ id: id, label: title } AS books
       FROM article WHERE id = $id LIMIT 1`,
     { id: recId('article', id) }
   );
@@ -207,13 +211,16 @@ export async function getArticleForEdit(id: string): Promise<ArticleEdit | null>
     excerpt: a.excerpt ?? undefined, body_html: a.body_html ?? undefined,
     is_newsletter_issue: a.is_newsletter_issue ?? false, published_at: a.published_at ?? undefined,
     rubrique_id: a.rubrique_id ? plainId(a.rubrique_id, 'rubrique') : undefined,
-    cover_url: a.cover_url ?? undefined, cover_id: a.cover_id ? plainId(a.cover_id, 'media') : undefined
+    cover_url: a.cover_url ?? undefined, cover_id: a.cover_id ? plainId(a.cover_id, 'media') : undefined,
+    authors: (a.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' })),
+    books: (a.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' }))
   };
 }
 
 export interface ArticleInput {
   title: string; slug?: string; status?: string; body_html?: string;
   is_newsletter_issue?: boolean; published_at?: string; rubriqueId?: string; coverId?: string;
+  authorIds?: string[]; bookIds?: string[];
 }
 
 export async function saveArticle(id: string | null, d: ArticleInput): Promise<string> {
@@ -225,7 +232,9 @@ export async function saveArticle(id: string | null, d: ArticleInput): Promise<s
     is_newsletter_issue: !!d.is_newsletter_issue,
     published_at: d.published_at ? new Date(d.published_at) : undefined,
     rubrique: d.rubriqueId ? recId('rubrique', d.rubriqueId) : undefined,
-    cover: d.coverId ? recId('media', d.coverId) : undefined
+    cover: d.coverId ? recId('media', d.coverId) : undefined,
+    authors: d.authorIds ? d.authorIds.map((x) => recId('author', x)) : undefined,
+    books: d.bookIds ? d.bookIds.map((x) => recId('book', x)) : undefined
   });
   if (id) {
     if (d.slug) {

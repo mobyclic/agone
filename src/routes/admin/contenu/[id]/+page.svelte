@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
+  import EntityPicker from '$lib/components/EntityPicker.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Eye } from 'phosphor-svelte';
 
@@ -71,6 +72,17 @@
       <input type="checkbox" name="is_newsletter_issue" checked={a?.is_newsletter_issue ?? false} class="size-4 rounded border-border" />
       Numéro de lettre d'information (LettrInfo)
     </label>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <span class={label}>Auteur(s)</span>
+        {#key a?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" initial={a?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
+      </div>
+      <div>
+        <span class={label}>Livres associés</span>
+        {#key a?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" initial={a?.books ?? []} placeholder="Associer un livre…" onchange={() => (dirty = true)} />{/key}
+      </div>
+    </div>
 
     <div>
       <span class={label}>Corps de l'article</span>
