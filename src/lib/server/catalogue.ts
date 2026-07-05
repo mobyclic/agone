@@ -105,10 +105,12 @@ export async function forthcomingBooks(): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
-/** Derniers parus. */
+/** Derniers parus : publiés ET déjà sortis (date de parution passée ou absente). */
 export async function recentBooks(limit = 8): Promise<BookCard[]> {
   const rows = await query<any>(
-    `SELECT ${CARD_FIELDS} FROM book WHERE status = 'published' ORDER BY published_at DESC LIMIT $limit`,
+    `SELECT ${CARD_FIELDS} FROM book
+       WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now())
+       ORDER BY published_at DESC LIMIT $limit`,
     { limit }
   );
   return rows.map(toCard);

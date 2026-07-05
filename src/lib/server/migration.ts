@@ -550,6 +550,8 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
   for (const b of posts) {
     const wpId = Number(b.ID);
     const m = meta.get(wpId) ?? {};
+    const pubDate = wpDate8(m.date_de_publication);
+    const isFuture = !!pubDate && pubDate.getTime() > Date.now();
     const fields = {
       title: String(b.post_title || '').trim() || '(sans titre)',
       subtitle: (m.sous_titre || '').trim() || undefined,
@@ -557,13 +559,14 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
       extra_info_html: wpautop((m.infos_additionnelles || '').trim()) || undefined,
       title_original: (m.titre_originale || '').trim() || undefined,
       language_original: (m.langue_originale || '').trim() || undefined,
-      status: b.post_status === 'draft' ? 'forthcoming' : 'published',
+      // Draft OU date de parution future → à paraître.
+      status: b.post_status === 'draft' || isFuture ? 'forthcoming' : 'published',
       isbn_paper: (m.isbn_papier || '').trim() || undefined,
       isbn_ebook: (m.isbn_digital || '').trim() || undefined,
       price_paper: num(m.prix_papier),
       price_ebook: num(m.prix_digital),
       subscription_price: num(m.tarif_souscription),
-      published_at: wpDate8(m.date_de_publication),
+      published_at: pubDate,
       page_count: num(m.nombre_de_pages) != null ? Math.round(num(m.nombre_de_pages)!) : undefined,
       stock_qty: num(m.qte_stock) != null ? Math.round(num(m.qte_stock)!) : 0,
       featured: ['1', 'true', 'yes', 'on'].includes(String(m.focus ?? '').toLowerCase())
