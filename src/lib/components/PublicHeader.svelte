@@ -32,18 +32,18 @@
       </span>
     </a>
 
-    <!-- Reste de la barre (aligné au contenu à droite) -->
-    <div class="flex min-w-0 flex-1 items-center gap-3" style="padding-right: var(--gutter)">
+    <!-- Reste de la barre (aligné au contenu à droite). relative = repère du menu Antichambre. -->
+    <div class="relative flex min-w-0 flex-1 items-stretch gap-3" style="padding-right: var(--gutter)">
     <!-- Navigation principale -->
-    <nav class="ml-2 hidden items-center xl:flex">
-      <!-- Antichambre ▾ -->
-      <div class="group/drop relative">
+    <nav class="ml-2 hidden items-stretch xl:flex">
+      <!-- Antichambre ▾ (menu ancré au coin bas-droit de la bande noire) -->
+      <div class="group/drop flex items-center">
         <a href="/antichambre" class="inline-flex items-center gap-1 px-2.5 py-2 font-display text-xl font-medium uppercase tracking-wide">
           <span class="text-link transition-opacity {isActive('/antichambre') || isActive('/article') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">[</span>Antichambre<span class="text-link transition-opacity {isActive('/antichambre') || isActive('/article') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">]</span>
           <CaretDown size={12} class="text-muted-foreground" />
         </a>
         {#if rubriques.length}
-          <div class="invisible absolute left-0 top-full z-50 -translate-y-1 pt-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
+          <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each rubriques as r (r.slug)}
                 <a href="/antichambre?rubrique={r.slug}" class="block px-4 py-2 font-display text-[17px] font-medium uppercase tracking-wide text-white hover:bg-white/10">{r.name}</a>
@@ -53,14 +53,14 @@
         {/if}
       </div>
 
-      <!-- Catalogue ▾ -->
-      <div class="group/drop relative">
+      <!-- Catalogue ▾ (menu sous son déclencheur) -->
+      <div class="group/drop relative flex items-center">
         <a href="/catalogue" class="inline-flex items-center gap-1 px-2.5 py-2 font-display text-xl font-medium uppercase tracking-wide">
           <span class="text-link transition-opacity {isActive('/catalogue') || isActive('/livre') || isActive('/collections') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">[</span>Catalogue<span class="text-link transition-opacity {isActive('/catalogue') || isActive('/livre') || isActive('/collections') ? 'opacity-100' : 'opacity-0 group-hover/drop:opacity-100'}">]</span>
           <CaretDown size={12} class="text-muted-foreground" />
         </a>
         {#if collections.length}
-          <div class="invisible absolute left-0 top-full z-50 -translate-y-1 pt-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
+          <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each collections as c (c.slug)}
                 <a href="/collections/{c.slug}" class="block px-4 py-2 font-display text-[17px] font-medium uppercase tracking-wide text-white hover:bg-white/10">{c.name}</a>
@@ -77,7 +77,7 @@
         <span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>Rencontres<span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
       <a href="/a-propos" class="group/n inline-flex items-center px-2.5 py-2 font-display text-xl font-medium uppercase tracking-wide">
-        <span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>La maison<span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
+        <span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>À propos<span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
     </nav>
 
@@ -115,7 +115,7 @@
         {#each collections as c (c.slug)}<a href="/collections/{c.slug}" onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{c.name}</a>{/each}
         <a href="/auteurs" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Auteurs</a>
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
-        <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">La maison</a>
+        <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>
         <a href={user ? '/compte' : '/connexion'} onclick={() => (open = false)} class="mt-2 block border-t border-border py-2 pt-3 font-medium text-link">Mon compte</a>
         <div class="mt-3 flex items-center gap-3 border-t border-border pt-3">
           {#each socials as s (s.name)}

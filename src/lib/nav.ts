@@ -13,7 +13,7 @@ export const PUBLIC_NAV: NavItem[] = [
   { label: 'Auteurs', href: '/auteurs', icon: 'Users' },
   { label: 'Rencontres', href: '/rencontres', icon: 'CalendarDots' },
   { label: 'L’Antichambre', href: '/antichambre', icon: 'Article' },
-  { label: 'La maison', href: '/a-propos', icon: 'Info' }
+  { label: 'À propos', href: '/a-propos', icon: 'Info' }
 ];
 
 /** Espace client connecté (/compte). */
