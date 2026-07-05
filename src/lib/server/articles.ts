@@ -96,7 +96,7 @@ export async function incrementArticleViews(slug: string): Promise<void> {
  */
 export async function latestArticle(): Promise<ArticleCard | null> {
   const base = `SELECT ${CARD}, body_html FROM article WHERE status = 'published'`;
-  let rows = await query<any>(`${base} AND array::len(authors) > 0 ORDER BY published_at DESC LIMIT 1`);
+  let rows = await query<any>(`${base} AND array::len(authors ?? []) > 0 ORDER BY published_at DESC LIMIT 1`);
   if (!rows[0]) rows = await query<any>(`${base} ORDER BY published_at DESC LIMIT 1`);
   if (!rows[0]) return null;
   const card = toCard(rows[0]);

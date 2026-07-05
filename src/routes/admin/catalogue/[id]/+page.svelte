@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
+  import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
@@ -48,12 +49,10 @@
         <label class="{label} mt-3">Sous-titre
           <input name="subtitle" value={b?.subtitle ?? ''} class={input} />
         </label>
-        <label class="{label} mt-3">Présentation (HTML)
-          <textarea name="description_html" rows="8" class="{input} h-auto py-2 font-mono text-xs">{b?.description_html ?? ''}</textarea>
-        </label>
-        <label class="{label} mt-3">Informations complémentaires (HTML)
-          <textarea name="extra_info_html" rows="3" class="{input} h-auto py-2 font-mono text-xs">{b?.extra_info_html ?? ''}</textarea>
-        </label>
+        <span class="{label} mt-3">Présentation</span>
+        {#key b?.id}<RichEditor name="description_html" value={b?.description_html ?? ''} minHeight="12rem" />{/key}
+        <span class="{label} mt-3 block">Informations complémentaires</span>
+        {#key b?.id}<RichEditor name="extra_info_html" value={b?.extra_info_html ?? ''} minHeight="6rem" />{/key}
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">

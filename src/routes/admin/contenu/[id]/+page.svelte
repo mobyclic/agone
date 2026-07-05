@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
+  import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
 
@@ -79,8 +80,8 @@
     </div>
 
     <div>
-      <label class={label} for="body_html">Corps de l'article (HTML)</label>
-      <textarea id="body_html" name="body_html" rows="16" class="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary">{a?.body_html ?? ''}</textarea>
+      <span class={label}>Corps de l'article</span>
+      {#key a?.id}<RichEditor name="body_html" value={a?.body_html ?? ''} minHeight="22rem" />{/key}
     </div>
 
     <div>

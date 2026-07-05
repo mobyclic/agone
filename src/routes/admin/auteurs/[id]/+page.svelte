@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
+  import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
 
@@ -44,9 +45,8 @@
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">
-        <label class={label}>Biographie (HTML)
-          <textarea name="bio_html" rows="8" class="{input} h-auto py-2 font-mono text-xs">{a?.bio_html ?? ''}</textarea>
-        </label>
+        <span class={label}>Biographie</span>
+        {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="10rem" />{/key}
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">
