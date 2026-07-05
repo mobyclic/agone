@@ -12,6 +12,26 @@ export const ROLE_LABEL: Record<string, string> = {
   other: 'Contribution'
 };
 
+/** Statuts de commande (libellés FR). */
+export const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: 'En attente',
+  paid: 'Payée',
+  processing: 'En préparation',
+  sent_to_bl: 'Transmise BL',
+  completed: 'Terminée',
+  cancelled: 'Annulée',
+  refunded: 'Remboursée',
+  failed: 'Échec'
+};
+
+/** Statuts d'article/livre (libellés FR). */
+export const CONTENT_STATUS_LABEL: Record<string, string> = {
+  published: 'Publié',
+  draft: 'Brouillon',
+  forthcoming: 'À paraître',
+  out_of_print: 'Épuisé'
+};
+
 /** Formate un prix en euros (fr). */
 export function euros(n?: number | null): string | null {
   return n != null ? `${n.toFixed(2).replace('.', ',')} €` : null;

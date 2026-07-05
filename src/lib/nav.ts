@@ -29,7 +29,6 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Catalogue', href: '/admin/catalogue', icon: 'BookOpen' },
   { label: 'Auteurs', href: '/admin/auteurs', icon: 'Users' },
   { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
-  { label: 'Stock', href: '/admin/stock', icon: 'Package' },
   { label: 'Expéditions BL', href: '/admin/expeditions', icon: 'Truck' },
   { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
   { label: 'Contenu', href: '/admin/contenu', icon: 'Article' },

@@ -1,7 +1,8 @@
 /**
  * L'Antichambre — articles éditoriaux + rubriques.
  */
-import { query } from './surreal';
+import { query, recId } from './surreal';
+import { uniqueSlug } from './slug';
 
 export interface ArticleCard {
   title: string;
@@ -131,4 +132,142 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
     authors: (a.authors ?? []).filter((x: any) => x?.slug),
     books: (a.books ?? []).filter((x: any) => x?.slug)
   };
+}
+
+/* ————————————————————— Back-office : contenu ————————————————————— */
+
+/** SET dynamique : valeur vide → NONE (efface le champ optionnel). */
+function buildSet(fields: Record<string, unknown>): { sql: string; vars: Record<string, unknown> } {
+  const parts: string[] = [];
+  const vars: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+    if (empty) parts.push(`${k} = NONE`);
+    else { vars[k] = v; parts.push(`${k} = $${k}`); }
+  }
+  return { sql: parts.join(', '), vars };
+}
+
+const plainId = (v: unknown, table: string) => String(v ?? '').replace(new RegExp(`^${table}:`), '');
+
+export interface AdminArticleRow {
+  id: string; title: string; slug: string; status: string;
+  published_at?: string; is_newsletter_issue: boolean; rubrique_name?: string; author?: string;
+}
+
+/** Liste paginée des articles (tous statuts) pour le back-office. */
+export async function listArticlesAdmin(opts: { q?: string; rubrique?: string; status?: string; limit?: number; offset?: number } = {}): Promise<{ articles: AdminArticleRow[]; total: number }> {
+  const where: string[] = [];
+  const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
+  if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  if (opts.rubrique) { where.push('rubrique.slug = $rub'); vars.rub = opts.rubrique; }
+  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await query<any>(
+    `SELECT id, title, slug, status, published_at, is_newsletter_issue,
+        rubrique.name AS rubrique_name, authors.full_name AS author_names
+      FROM article ${whereSql} ORDER BY published_at DESC LIMIT $limit START $start`,
+    vars
+  );
+  const count = await query<any>(`SELECT count() AS n FROM article ${whereSql} GROUP ALL`, vars);
+  const articles = rows.map((r) => ({
+    id: plainId(r.id, 'article'), title: r.title, slug: r.slug, status: r.status,
+    published_at: r.published_at ?? undefined, is_newsletter_issue: r.is_newsletter_issue ?? false,
+    rubrique_name: r.rubrique_name ?? undefined, author: (r.author_names ?? [])[0] ?? undefined
+  }));
+  return { articles, total: count[0]?.n ?? 0 };
+}
+
+export interface ArticleEdit {
+  id: string; title: string; slug: string; status: string;
+  excerpt?: string; body_html?: string; is_newsletter_issue: boolean;
+  published_at?: string; rubrique_id?: string; cover_url?: string; cover_id?: string;
+}
+
+export async function getArticleForEdit(id: string): Promise<ArticleEdit | null> {
+  const rows = await query<any>(
+    `SELECT id, title, slug, status, excerpt, body_html, is_newsletter_issue, published_at,
+        rubrique AS rubrique_id, cover.url AS cover_url, cover AS cover_id
+      FROM article WHERE id = $id LIMIT 1`,
+    { id: recId('article', id) }
+  );
+  const a = rows[0];
+  if (!a) return null;
+  return {
+    id: plainId(a.id, 'article'), title: a.title, slug: a.slug, status: a.status,
+    excerpt: a.excerpt ?? undefined, body_html: a.body_html ?? undefined,
+    is_newsletter_issue: a.is_newsletter_issue ?? false, published_at: a.published_at ?? undefined,
+    rubrique_id: a.rubrique_id ? plainId(a.rubrique_id, 'rubrique') : undefined,
+    cover_url: a.cover_url ?? undefined, cover_id: a.cover_id ? plainId(a.cover_id, 'media') : undefined
+  };
+}
+
+export interface ArticleInput {
+  title: string; slug?: string; status?: string; excerpt?: string; body_html?: string;
+  is_newsletter_issue?: boolean; published_at?: string; rubriqueId?: string; coverId?: string;
+}
+
+export async function saveArticle(id: string | null, d: ArticleInput): Promise<string> {
+  const { sql, vars } = buildSet({
+    title: d.title,
+    status: d.status || 'draft',
+    excerpt: d.excerpt,
+    body_html: d.body_html,
+    is_newsletter_issue: !!d.is_newsletter_issue,
+    published_at: d.published_at ? new Date(d.published_at) : undefined,
+    rubrique: d.rubriqueId ? recId('rubrique', d.rubriqueId) : undefined,
+    cover: d.coverId ? recId('media', d.coverId) : undefined
+  });
+  if (id) {
+    if (d.slug) {
+      const slug = await uniqueSlug('article', d.slug, { excludeId: id });
+      await query(`UPDATE $id SET ${sql}, slug = $slug`, { ...vars, id: recId('article', id), slug });
+    } else {
+      await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('article', id) });
+    }
+    return id;
+  }
+  const slug = await uniqueSlug('article', d.slug || d.title);
+  const rows = await query<any>(`CREATE article SET ${sql}, slug = $slug`, { ...vars, slug });
+  return plainId(rows[0].id, 'article');
+}
+
+export async function deleteArticle(id: string): Promise<void> {
+  await query(`DELETE $id`, { id: recId('article', id) });
+}
+
+/* ————————————————————— Rubriques (édition) ————————————————————— */
+
+export interface AdminRubrique { id: string; name: string; slug: string; kind: string; sort: number; count: number }
+
+export async function listAllRubriques(): Promise<AdminRubrique[]> {
+  const rubs = await query<any>(`SELECT id, name, slug, kind, sort FROM rubrique ORDER BY sort ASC, name ASC`);
+  const counts = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE GROUP BY rubrique`);
+  const byR = new Map<string, number>();
+  for (const c of counts) if (c.r) byR.set(String(c.r), c.n ?? 0);
+  return rubs.map((r) => ({
+    id: plainId(r.id, 'rubrique'), name: r.name, slug: r.slug, kind: r.kind ?? 'both',
+    sort: r.sort ?? 0, count: byR.get(String(r.id)) ?? 0
+  }));
+}
+
+export async function saveRubrique(id: string | null, d: { name: string; slug?: string; kind?: string; sort?: number }): Promise<string> {
+  const { sql, vars } = buildSet({ name: d.name, kind: d.kind || 'blog', sort: d.sort ?? 0 });
+  if (id) {
+    if (d.slug) {
+      const slug = await uniqueSlug('rubrique', d.slug, { excludeId: id });
+      await query(`UPDATE $id SET ${sql}, slug = $slug`, { ...vars, id: recId('rubrique', id), slug });
+    } else {
+      await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('rubrique', id) });
+    }
+    return id;
+  }
+  const slug = await uniqueSlug('rubrique', d.slug || d.name);
+  const rows = await query<any>(`CREATE rubrique SET ${sql}, slug = $slug`, { ...vars, slug });
+  return plainId(rows[0].id, 'rubrique');
+}
+
+export async function deleteRubrique(id: string): Promise<void> {
+  await query(`UPDATE article SET rubrique = NONE WHERE rubrique = $id`, { id: recId('rubrique', id) });
+  await query(`DELETE $id`, { id: recId('rubrique', id) });
 }

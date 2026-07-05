@@ -95,3 +95,59 @@ export async function listOrdersForUser(userId: string) {
     { u: recId('user', userId) }
   );
 }
+
+/* ————————————————————— Back-office ————————————————————— */
+
+export const ORDER_STATUSES = [
+  'pending', 'paid', 'processing', 'sent_to_bl', 'completed', 'cancelled', 'refunded', 'failed'
+] as const;
+
+const PAID_LIKE = new Set(['paid', 'processing', 'sent_to_bl', 'completed']);
+
+export interface OrderStats { orders: number; revenue: number; pending: number; toShip: number }
+
+/** Indicateurs commandes pour le tableau de bord. */
+export async function orderStats(): Promise<OrderStats> {
+  const rows = await query<any>(`SELECT status, count() AS n, math::sum(total) AS rev FROM order GROUP BY status`);
+  let orders = 0, revenue = 0, pending = 0, toShip = 0;
+  for (const r of rows) {
+    const n = r.n ?? 0;
+    orders += n;
+    if (PAID_LIKE.has(r.status)) revenue += r.rev ?? 0;
+    if (r.status === 'pending') pending += n;
+    if (r.status === 'paid' || r.status === 'processing') toShip += n;
+  }
+  return { orders, revenue: r2(revenue), pending, toShip };
+}
+
+/** Liste paginée des commandes (back-office), recherche par n° ou client. */
+export async function listOrdersAdmin(opts: { q?: string; status?: string; limit?: number; offset?: number } = {}) {
+  const where: string[] = [];
+  const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
+  if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  if (opts.q && opts.q.trim()) {
+    const q = opts.q.trim();
+    if (/^\d+$/.test(q)) { where.push('number = $num'); vars.num = Number(q); }
+    else {
+      vars.q = q;
+      where.push('(email CONTAINS $q OR customer.email CONTAINS $q OR customer.full_name CONTAINS $q)');
+    }
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await query<any>(
+    `SELECT number, status, total, item_count, has_ebook, has_physical, created_at, paid_at, email,
+       customer.full_name AS customer_name, customer.email AS customer_email
+     FROM order ${whereSql} ORDER BY created_at DESC LIMIT $limit START $start`,
+    vars
+  );
+  const count = await query<any>(`SELECT count() AS n FROM order ${whereSql} GROUP ALL`, vars);
+  return { orders: rows, total: count[0]?.n ?? 0 };
+}
+
+/** Change le statut d'une commande (par numéro), horodatage selon l'état. */
+export async function setOrderStatus(number: number, status: string): Promise<void> {
+  const extra =
+    status === 'completed' ? ', completed_at = time::now()' :
+    status === 'paid' ? ', paid_at = time::now()' : '';
+  await query(`UPDATE order SET status = $s${extra} WHERE number = $n`, { s: status, n: number });
+}

@@ -274,9 +274,10 @@
     -webkit-line-clamp: unset;
     flex: 1 1 0%;
     min-height: 0;
+    max-height: 18rem; /* borne la hauteur : l'article reste compact */
     overflow: hidden;
-    -webkit-mask-image: linear-gradient(to bottom, #000 85%, transparent);
-    mask-image: linear-gradient(to bottom, #000 85%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent);
+    mask-image: linear-gradient(to bottom, #000 82%, transparent);
   }
 }
 
