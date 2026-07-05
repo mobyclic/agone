@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { query } from '$lib/server/surreal';
-import { orderStats, listOrdersAdmin } from '$lib/server/order';
+import { listOrdersAdmin } from '$lib/server/order';
+import { ytdSales } from '$lib/server/stats';
 
 async function count(table: string, where = ''): Promise<number> {
   const rows = await query<any>(`SELECT count() AS n FROM ${table} ${where ? `WHERE ${where}` : ''} GROUP ALL`);
@@ -8,8 +9,10 @@ async function count(table: string, where = ''): Promise<number> {
 }
 
 export const load: PageServerLoad = async () => {
-  const [stats, books, forthcoming, authors, articles, events, recent] = await Promise.all([
-    orderStats(),
+  const now = new Date();
+  const [ytd, pending, books, forthcoming, authors, articles, events, recent] = await Promise.all([
+    ytdSales(now),
+    count('order', "status = 'pending'"),
     count('book', "status = 'published'"),
     count('book', "status = 'forthcoming'"),
     count('author'),
@@ -18,7 +21,9 @@ export const load: PageServerLoad = async () => {
     listOrdersAdmin({ limit: 6 })
   ]);
   return {
-    stats,
+    ytd,
+    pending,
+    asOf: now.toISOString(),
     counts: { books, forthcoming, authors, articles, events },
     recentOrders: recent.orders
   };

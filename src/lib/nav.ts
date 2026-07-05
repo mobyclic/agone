@@ -30,6 +30,7 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Catalogue', href: '/admin/catalogue', icon: 'BookOpen' },
   { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
   { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
+  { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' },
   { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
   { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
   { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
