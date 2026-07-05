@@ -12,6 +12,7 @@ import { GeometryPoint } from 'surrealdb';
 import { query, recId } from './surreal';
 import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
+import { wpautop } from './wpautop';
 
 export interface ImportResult {
   type: string;
@@ -486,7 +487,7 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
       if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
       const fields = {
         title: String(a.post_title || '').trim() || '(sans titre)',
-        body_html: a.post_content || undefined,
+        body_html: wpautop(a.post_content) || undefined,
         excerpt,
         status: a.post_status === 'draft' ? 'draft' : 'published',
         is_newsletter_issue: /\[\s*lettrinfo/i.test(String(a.post_title || '')),
@@ -552,8 +553,8 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
     const fields = {
       title: String(b.post_title || '').trim() || '(sans titre)',
       subtitle: (m.sous_titre || '').trim() || undefined,
-      description_html: b.post_content || undefined,
-      extra_info_html: (m.infos_additionnelles || '').trim() || undefined,
+      description_html: wpautop(b.post_content) || undefined,
+      extra_info_html: wpautop((m.infos_additionnelles || '').trim()) || undefined,
       title_original: (m.titre_originale || '').trim() || undefined,
       language_original: (m.langue_originale || '').trim() || undefined,
       status: b.post_status === 'draft' ? 'forthcoming' : 'published',
