@@ -7,7 +7,7 @@
   let { data, form } = $props();
   const o = $derived(data.order);
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' }) : '—');
-  const fmtFormat = (f: string) => (f === 'epub' ? 'Numérique (ePub)' : f === 'paper' ? 'Papier' : f);
+  const fmtFormat = (f: string) => (f === 'epub' ? 'Numérique (ePub)' : f === 'souscription' ? 'Souscription' : f === 'papier' ? 'Papier' : f);
 
   const statusTone: Record<string, string> = {
     pending: 'bg-warning/15 text-warning', paid: 'bg-success/15 text-success',
