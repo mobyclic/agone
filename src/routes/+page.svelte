@@ -20,11 +20,11 @@
 
 <!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
 <section class="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
-  <div class="grid gap-x-12 gap-y-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+  <div class="grid gap-x-10 gap-y-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
 
     <!-- Manchette : le dernier article de L'Antichambre -->
     {#if article}
-      <div class="flex flex-col lg:border-r lg:border-border lg:pr-12">
+      <div class="flex flex-col">
         <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
           <span class="eyebrow">L’Antichambre</span>
           <a href="/antichambre" class="link shrink-0 font-display text-xs font-semibold uppercase tracking-wider">Le magazine →</a>
@@ -78,9 +78,9 @@
                 {/if}
               </div>
               <div class="mt-3">
-                <h3 class="line-clamp-2 font-sans text-[15px] font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
-                {#if book.subtitle}<p class="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
-                {#if book.authors?.length}<p class="mt-1 line-clamp-1 text-sm text-link">{authorList(book.authors)}</p>{/if}
+                <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground group-hover:text-link sm:text-[17px]">{book.title}</h3>
+                {#if book.subtitle}<p class="mt-1 line-clamp-2 text-[13px] leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
+                {#if book.authors?.length}<p class="mt-1.5 line-clamp-1 text-sm font-semibold uppercase tracking-wide text-link">{authorList(book.authors)}</p>{/if}
               </div>
             </a>
           {/each}

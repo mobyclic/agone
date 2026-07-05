@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import { ROLE_LABEL, euros } from '$lib/labels';
-  import { ArrowLeft, ShoppingCart, PencilSimple } from 'phosphor-svelte';
+  import { ArrowLeft, BookOpen, FileText, HandCoins, PencilSimple } from 'phosphor-svelte';
 
   let { data } = $props();
   const b = $derived(data.book);
@@ -13,14 +13,15 @@
   const formats = $derived(
     [
       b.price_paper != null ? { key: 'papier', label: 'Papier', price: b.price_paper } : null,
-      b.price_ebook != null ? { key: 'epub', label: 'Numérique (ePub)', price: b.price_ebook } : null,
+      b.price_ebook != null ? { key: 'epub', label: 'ePub', price: b.price_ebook } : null,
       b.subscription_price != null && b.status === 'forthcoming'
         ? { key: 'souscription', label: 'Souscription', price: b.subscription_price }
         : null
     ].filter((x): x is { key: string; label: string; price: number } => x !== null)
   );
-  let selectedFormat = $state('');
-  $effect(() => { if (!selectedFormat && formats.length) selectedFormat = formats[0].key; });
+
+  const mainAuthors = $derived((b.contributors ?? []).find((c: any) => c.role === 'author')?.people ?? []);
+  const otherContributors = $derived((b.contributors ?? []).filter((c: any) => c.role !== 'author'));
 
   const pubFull = $derived(b.published_at ? new Date(b.published_at).toLocaleDateString('fr-FR') : null);
   const pubLabel = $derived(b.published_at ? new Date(b.published_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : null);
@@ -42,65 +43,62 @@
   {/if}
 
   <div class="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)_240px] lg:gap-10">
-    <!-- Couverture + achat -->
-    <div class="space-y-4">
-      <div class="bg-ink p-5">
-        <div class="relative aspect-[2/3] overflow-hidden border border-white/10 bg-neutral-800 shadow-2xl">
-          {#if b.cover_url}
-            <img src={b.cover_url} alt={b.title} class="size-full object-cover" />
-          {:else}
-            <div class="flex size-full items-end p-4"><span class="font-display text-lg uppercase leading-tight text-white">{b.title}</span></div>
-          {/if}
-        </div>
-      </div>
-
-      <div class="border border-border p-4">
-        <div class="space-y-1.5 text-sm">
-          {#if euros(b.price_paper)}<div class="flex items-baseline justify-between"><span class="text-muted-foreground">Papier</span><span class="text-xl font-bold">{euros(b.price_paper)}</span></div>{/if}
-          {#if euros(b.price_ebook)}<div class="flex items-baseline justify-between"><span class="text-muted-foreground">Numérique</span><span class="font-semibold">{euros(b.price_ebook)}</span></div>{/if}
-        </div>
-        {#if formats.length}
-          <form method="POST" action="/panier?/add" use:enhance class="mt-4 space-y-3">
-            <input type="hidden" name="id" value={b.id} />
-            {#if formats.length > 1}
-              <div class="flex flex-col gap-1.5">
-                {#each formats as f (f.key)}
-                  <label class="flex cursor-pointer items-center justify-between border px-3 py-2 text-sm {selectedFormat === f.key ? 'border-foreground bg-accent' : 'border-border'}">
-                    <input type="radio" name="format" value={f.key} bind:group={selectedFormat} class="sr-only" />
-                    <span>{f.label}</span><span class="font-semibold">{euros(f.price)}</span>
-                  </label>
-                {/each}
-              </div>
-            {:else}
-              <input type="hidden" name="format" value={formats[0].key} />
-            {/if}
-            <input type="hidden" name="qty" value="1" />
-            <button type="submit" class="btn-brand flex h-11 w-full items-center justify-center gap-2 font-display text-sm font-medium uppercase tracking-wide">
-              <ShoppingCart size={16} /> Ajouter au panier
-            </button>
-          </form>
+    <!-- Couverture -->
+    <div class="bg-ink p-5">
+      <div class="relative aspect-[2/3] overflow-hidden border border-white/10 bg-neutral-800 shadow-2xl">
+        {#if b.cover_url}
+          <img src={b.cover_url} alt={b.title} class="size-full object-cover" />
         {:else}
-          <button type="button" disabled class="btn-brand mt-4 h-11 w-full font-display text-sm font-medium uppercase tracking-wide opacity-60">Bientôt disponible</button>
+          <div class="flex size-full items-end p-4"><span class="font-display text-lg uppercase leading-tight text-white">{b.title}</span></div>
         {/if}
       </div>
     </div>
 
     <!-- Contenu -->
     <div class="min-w-0">
-      <h1 class="display-title text-4xl leading-[0.95] sm:text-5xl">{b.title}</h1>
+      {#if collection}
+        <a href="/collections/{collection.slug}" class="eyebrow inline-block hover:text-link">{collection.name}</a>
+      {/if}
+
+      <h1 class="display-title mt-2 text-4xl leading-[0.95] sm:text-5xl">{b.title}</h1>
       {#if b.subtitle}<p class="mt-3 text-lg text-muted-foreground">{b.subtitle}</p>{/if}
 
-      <div class="mt-4">
-        {#if b.contributors?.length}
-          {#each b.contributors as c (c.role)}
+      <!-- Auteur principal : proche du titre, plus gros -->
+      {#if mainAuthors.length}
+        <p class="mt-3 font-display text-xl font-semibold uppercase tracking-wide sm:text-2xl">
+          {#each mainAuthors as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link">{p.name}</a>{#if i < mainAuthors.length - 1}<span>, </span>{/if}{/each}
+        </p>
+      {/if}
+
+      <!-- Autres contributeurs -->
+      {#if otherContributors.length}
+        <div class="mt-2 space-y-0.5">
+          {#each otherContributors as c (c.role)}
             <p class="font-display text-sm">
-              {#if c.role !== 'author'}<span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} : </span>{/if}
-              {#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>, </span>{/if}{/each}
+              <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} : </span>{#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>, </span>{/if}{/each}
             </p>
           {/each}
-        {/if}
-        {#if collection}<a href="/collections/{collection.slug}" class="mt-1 inline-block font-display text-sm font-medium uppercase tracking-wide text-foreground hover:text-link">{collection.name}</a>{/if}
-      </div>
+        </div>
+      {/if}
+
+      <!-- Boutons d'achat par format -->
+      {#if formats.length}
+        <div class="mt-6 flex flex-wrap gap-3">
+          {#each formats as f (f.key)}
+            <form method="POST" action="/panier?/add" use:enhance>
+              <input type="hidden" name="id" value={b.id} />
+              <input type="hidden" name="format" value={f.key} />
+              <input type="hidden" name="qty" value="1" />
+              <button type="submit" class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background">
+                {#if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
+                Format {f.label} <span>({euros(f.price)})</span>
+              </button>
+            </form>
+          {/each}
+        </div>
+      {:else}
+        <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
+      {/if}
 
       {#if b.status === 'forthcoming' && pubFull}
         <div class="mt-5 inline-block bg-link px-3 py-1.5 font-display text-sm font-semibold uppercase tracking-wide text-white">
