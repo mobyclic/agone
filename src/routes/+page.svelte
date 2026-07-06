@@ -133,7 +133,7 @@
 
 <!-- RENCONTRES -->
 {#if data.events.length}
-  <section class="border-y border-border bg-secondary/40">
+  <section class="border-y border-border bg-background">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
       <SectionHead title="Rencontres" href="/rencontres" more="L’agenda" />
       <div class="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
@@ -145,23 +145,6 @@
             </div>
             <h3 class="mt-3 line-clamp-3 font-display text-lg font-medium leading-tight group-hover:text-link">{e.title}</h3>
             {#if e.venue_name}<p class="mt-auto pt-3 text-xs text-muted-foreground"><MapPin size={12} class="mb-0.5 mr-0.5 inline" />{e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</p>{/if}
-          </a>
-        {/each}
-      </div>
-    </div>
-  </section>
-{/if}
-
-<!-- COLLECTIONS -->
-{#if data.collections.length}
-  <section class="border-t border-border">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-      <SectionHead title="Les collections" href="/catalogue" more="Explorer" />
-      <div class="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
-        {#each data.collections as c (c.slug)}
-          <a href="/collections/{c.slug}" class="group flex items-baseline justify-between border-b border-border py-3 font-display hover:border-foreground">
-            <span class="text-xl font-medium uppercase tracking-wide group-hover:text-link">{c.name}</span>
-            <span class="text-sm text-muted-foreground">{c.book_count}</span>
           </a>
         {/each}
       </div>
