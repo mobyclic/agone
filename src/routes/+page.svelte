@@ -21,7 +21,7 @@
 
 <!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
 <section class="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
-  <div class="grid gap-x-10 gap-y-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+  <div class="grid gap-x-10 gap-y-14 lg:grid-cols-2">
 
     <!-- Manchette : le dernier article de L'Antichambre -->
     {#if article}
