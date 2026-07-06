@@ -46,7 +46,7 @@
         {/if}
 
         {#if lede}
-          <p class="mt-5 line-clamp-5 max-w-prose text-base leading-relaxed text-foreground/80">{lede}</p>
+          <p class="mt-5 max-w-prose text-base leading-relaxed text-foreground/80">{lede}</p>
         {/if}
 
         <a href="/article/{article.slug}" class="link mt-5 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider">

@@ -19,10 +19,9 @@ export interface ArticleCard {
   summary?: string;
 }
 
-/** Résumé en texte brut depuis le HTML, tronqué proprement en FIN DE MOT. */
-function plainSummary(html?: string, maxLen = 360): string | undefined {
-  if (!html) return undefined;
-  const text = html
+/** HTML → texte brut (décode les entités, supprime les balises, normalise les espaces). */
+function htmlToText(html: string): string {
+  return html
     .replace(/<\/?(strong|em|b|i|u|sup|sub|span|a|mark|small|code)\b[^>]*>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
@@ -35,12 +34,73 @@ function plainSummary(html?: string, maxLen = 360): string | undefined {
     .replace(/&raquo;/g, '»')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!text) return undefined;
-  if (text.length <= maxLen) return text;
+}
+
+/** Coupe une chaîne à maxLen en FIN DE MOT et ajoute « … ». */
+function cutAtWord(text: string, maxLen: number): string {
   const cut = text.slice(0, maxLen);
   const lastSpace = cut.lastIndexOf(' ');
   const base = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.…«»–—-]+$/u, '');
   return `${base} …`;
+}
+
+/**
+ * Coupe « propre » à maxLen : de préférence en FIN DE PHRASE (dernier
+ * « . ! ? … » passé la moitié, ponctuation conservée), sinon en FIN DE MOT + « … ».
+ */
+function truncateClean(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const sentence = Math.max(
+    cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '), cut.lastIndexOf('… ')
+  );
+  if (sentence > maxLen * 0.5) return cut.slice(0, sentence + 1).trim();
+  return cutAtWord(text, maxLen);
+}
+
+/** Résumé en texte brut depuis le HTML, tronqué proprement en FIN DE MOT. */
+function plainSummary(html?: string, maxLen = 360): string | undefined {
+  if (!html) return undefined;
+  const text = htmlToText(html);
+  if (!text) return undefined;
+  return text.length <= maxLen ? text : cutAtWord(text, maxLen);
+}
+
+/**
+ * Accroche en GRAS du début d'article (le chapô en <strong>/<b>).
+ * Capture les runs gras contigus au tout début du 1er paragraphe, jusqu'au
+ * premier texte non gras. undefined si pas d'accroche substantielle (≥ 30 car.).
+ */
+function boldLead(html: string, maxLen = 600): string | undefined {
+  const p = html.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i);
+  let seg = (p ? p[1] : html).replace(/^(?:\s|&nbsp;|<br\s*\/?>)+/i, '');
+  const parts: string[] = [];
+  const boldRe = /^<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/i;
+  let m: RegExpExecArray | null;
+  while ((m = boldRe.exec(seg))) {
+    parts.push(m[2]);
+    seg = seg.slice(m[0].length).replace(/^(?:\s|&nbsp;|<br\s*\/?>)+/i, '');
+  }
+  if (!parts.length) return undefined;
+  const text = htmlToText(parts.join(' '));
+  if (text.length < 30) return undefined; // simple mot/nom en gras : on ignore
+  return truncateClean(text, maxLen);
+}
+
+/**
+ * Résumé « propre » d'au plus maxLen caractères : coupe de préférence en FIN
+ * DE PHRASE (dernier « . ! ? … » passé la moitié), sinon en FIN DE MOT + « … ».
+ */
+function cleanSummary(html: string, maxLen = 500): string | undefined {
+  const text = htmlToText(html);
+  if (!text) return undefined;
+  return truncateClean(text, maxLen);
+}
+
+/** Accroche de la manchette d'accueil : le gras de début, sinon ~500 car. propres. */
+function articleLede(html?: string): string | undefined {
+  if (!html) return undefined;
+  return boldLead(html) ?? cleanSummary(html, 500);
 }
 
 const CARD = `
@@ -101,7 +161,7 @@ export async function latestArticle(): Promise<ArticleCard | null> {
   if (!rows[0]) return null;
   const card = toCard(rows[0]);
   card.title = card.title.replace(/\s*\[LettrInfos?\b[^\]]*\]\s*$/i, '').trim();
-  card.summary = plainSummary(rows[0].body_html, 1600) ?? card.excerpt;
+  card.summary = articleLede(rows[0].body_html) ?? card.excerpt;
   return card;
 }
 
