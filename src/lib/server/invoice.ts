@@ -26,11 +26,16 @@ export interface Company {
   phone?: string;
   capital?: string;
   footer?: string;
-  vat_rate: number;
+  vat_rate: number; // taux par défaut (nouvelles lignes)
+  vat_rates: number[]; // taux disponibles (sélecteur)
 }
 
 export async function getCompany(): Promise<Company> {
   const s = ((await getSetting('billing')) as Record<string, any>) ?? {};
+  const rates = Array.isArray(s.vat_rates) && s.vat_rates.length
+    ? s.vat_rates.map(Number).filter((n: number) => !Number.isNaN(n))
+    : [5.5, 20, 10, 2.1, 0];
+  const vat_rate = s.vat_rate != null && s.vat_rate !== '' ? Number(s.vat_rate) : 5.5;
   return {
     legal_name: s.legal_name || 'Éditions Agone',
     address: s.address || '',
@@ -44,7 +49,8 @@ export async function getCompany(): Promise<Company> {
     phone: s.phone || undefined,
     capital: s.capital || undefined,
     footer: s.footer || undefined,
-    vat_rate: s.vat_rate != null && s.vat_rate !== '' ? Number(s.vat_rate) : 5.5
+    vat_rate,
+    vat_rates: rates.includes(vat_rate) ? rates : [vat_rate, ...rates]
   };
 }
 
@@ -71,13 +77,36 @@ export interface InvoiceLine {
   qty: number;
   unit_price_ttc: number;
   line_total_ttc: number;
+  vat_rate: number; // TVA de la ligne (%)
 }
 
-function computeTotals(lines: InvoiceLine[], vatRate: number) {
-  const total_ttc = r2(lines.reduce((s, l) => s + l.qty * l.unit_price_ttc, 0));
-  const subtotal_ht = r2(total_ttc / (1 + vatRate / 100));
-  const tax_total = r2(total_ttc - subtotal_ht);
-  return { total_ttc, subtotal_ht, tax_total };
+/** Totaux d'une facture multi-taux (prix TTC → HT + TVA, agrégés). */
+function computeTotals(lines: InvoiceLine[]) {
+  let total_ttc = 0;
+  let subtotal_ht = 0;
+  for (const l of lines) {
+    const ttc = l.qty * l.unit_price_ttc;
+    total_ttc += ttc;
+    subtotal_ht += ttc / (1 + (l.vat_rate ?? 0) / 100);
+  }
+  total_ttc = r2(total_ttc);
+  subtotal_ht = r2(subtotal_ht);
+  return { total_ttc, subtotal_ht, tax_total: r2(total_ttc - subtotal_ht) };
+}
+
+/** Ventilation de la TVA par taux (pour l'affichage et le PDF). */
+export function vatBreakdown(lines: InvoiceLine[]): { rate: number; base_ht: number; tax: number }[] {
+  const byRate = new Map<number, number>();
+  for (const l of lines) {
+    const rate = l.vat_rate ?? 0;
+    byRate.set(rate, (byRate.get(rate) ?? 0) + l.qty * l.unit_price_ttc);
+  }
+  return [...byRate.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([rate, ttc]) => {
+      const base_ht = r2(ttc / (1 + rate / 100));
+      return { rate, base_ht, tax: r2(ttc - base_ht) };
+    });
 }
 
 /* ————————————————————— Snapshot client ————————————————————— */
@@ -113,13 +142,15 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
     `SELECT out.title AS title, title_snapshot, format, qty, unit_price FROM contains WHERE in = $id`,
     { id: recId('order', orderId) }
   );
+  const { vat_rate } = await getCompany(); // TVA par défaut (livres) appliquée à chaque ligne
   const cleanText = (s: string) =>
     s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, '’').replace(/\s+/g, ' ').trim();
   const lines: InvoiceLine[] = rawLines.map((l) => ({
     description: `${cleanText(String(l.title_snapshot || l.title || 'Livre'))}${l.format && l.format !== 'papier' ? ` (${l.format})` : ''}`,
     qty: l.qty ?? 1,
     unit_price_ttc: l.unit_price ?? 0,
-    line_total_ttc: r2((l.qty ?? 1) * (l.unit_price ?? 0))
+    line_total_ttc: r2((l.qty ?? 1) * (l.unit_price ?? 0)),
+    vat_rate
   }));
 
   let name = '';
@@ -130,9 +161,7 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
     email = email || u?.email || '';
   }
   const bill_to = billToFromAddress(name, email, o.billing ?? o.shipping ?? {});
-
-  const { vat_rate } = await getCompany();
-  const totals = computeTotals(lines, vat_rate);
+  const totals = computeTotals(lines);
   const year = new Date().getFullYear();
   const { number, ref } = await nextInvoiceRef(year);
 
@@ -153,22 +182,24 @@ export interface ManualInvoiceInput {
   kind: 'invoice' | 'credit_note';
   customerId?: string;
   bill_to: { name: string; email?: string; address_1?: string; postcode?: string; city?: string; country?: string };
-  lines: { description: string; qty: number; unit_price_ttc: number }[];
-  vat_rate?: number;
+  lines: { description: string; qty: number; unit_price_ttc: number; vat_rate?: number }[];
+  vat_rate?: number; // taux de base (défaut des lignes sans taux)
   notes?: string;
 }
 
 export async function createManualInvoice(input: ManualInvoiceInput): Promise<string> {
-  const vat_rate = input.vat_rate != null ? input.vat_rate : (await getCompany()).vat_rate;
+  const base = input.vat_rate != null ? input.vat_rate : (await getCompany()).vat_rate;
   const lines: InvoiceLine[] = input.lines
     .filter((l) => l.description.trim() && l.qty > 0)
     .map((l) => ({
       description: l.description.trim(),
       qty: l.qty,
       unit_price_ttc: r2(l.unit_price_ttc),
-      line_total_ttc: r2(l.qty * l.unit_price_ttc)
+      line_total_ttc: r2(l.qty * l.unit_price_ttc),
+      vat_rate: l.vat_rate != null ? l.vat_rate : base
     }));
-  const totals = computeTotals(lines, vat_rate);
+  const totals = computeTotals(lines);
+  const vat_rate = base;
   const year = new Date().getFullYear();
   const { number, ref } = await nextInvoiceRef(year);
   const rows = await query<any>(`CREATE invoice CONTENT $c`, {
@@ -193,7 +224,10 @@ export async function getInvoice(id: string) {
   const rows = await query<any>(`SELECT ${INV_FIELDS} FROM invoice WHERE id = $id LIMIT 1`, {
     id: recId('invoice', id)
   });
-  return rows[0] ?? null;
+  const inv = rows[0];
+  if (!inv) return null;
+  inv.vat_breakdown = vatBreakdown(inv.lines ?? []);
+  return inv;
 }
 
 export async function getInvoiceIdForOrder(orderId: string): Promise<string | null> {
@@ -302,12 +336,15 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   }
   y += 2; hline(y); y += 16;
 
-  // — Totaux (droite) —
+  // — Totaux (droite), avec ventilation TVA par taux —
   const sign = isCredit ? -1 : 1;
+  const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[]);
   const totRows: [string, string, boolean][] = [
-    [`Total HT`, fmtEur(sign * inv.subtotal_ht), false],
-    [`TVA ${String(inv.vat_rate).replace('.', ',')} %`, fmtEur(sign * inv.tax_total), false],
-    [`Total TTC`, fmtEur(sign * inv.total_ttc), true]
+    ['Total HT', fmtEur(sign * inv.subtotal_ht), false],
+    ...breakdown.map(
+      (b) => [`TVA ${String(b.rate).replace('.', ',')} %`, fmtEur(sign * b.tax), false] as [string, string, boolean]
+    ),
+    ['Total TTC', fmtEur(sign * inv.total_ttc), true]
   ];
   for (const [k, v, b] of totRows) {
     text(k, colPU, y, { size: b ? 11 : 9, bold: b });

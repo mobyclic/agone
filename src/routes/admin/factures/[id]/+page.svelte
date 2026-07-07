@@ -41,7 +41,7 @@
     <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full text-sm">
         <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-          <tr><th class="px-3 py-2 font-medium">Désignation</th><th class="px-3 py-2 text-center font-medium">Qté</th><th class="px-3 py-2 text-right font-medium">P.U. TTC</th><th class="px-3 py-2 text-right font-medium">Total TTC</th></tr>
+          <tr><th class="px-3 py-2 font-medium">Désignation</th><th class="px-3 py-2 text-center font-medium">Qté</th><th class="px-3 py-2 text-right font-medium">P.U. TTC</th><th class="px-3 py-2 text-center font-medium">TVA</th><th class="px-3 py-2 text-right font-medium">Total TTC</th></tr>
         </thead>
         <tbody class="divide-y divide-border">
           {#each f.lines ?? [] as l (l.description + l.unit_price_ttc)}
@@ -49,14 +49,17 @@
               <td class="px-3 py-2">{l.description}</td>
               <td class="px-3 py-2 text-center">{l.qty}</td>
               <td class="px-3 py-2 text-right tabular-nums">{eur(l.unit_price_ttc)}</td>
+              <td class="px-3 py-2 text-center text-muted-foreground">{String(l.vat_rate ?? f.vat_rate).replace('.', ',')} %</td>
               <td class="px-3 py-2 text-right tabular-nums">{eur(l.line_total_ttc)}</td>
             </tr>
           {/each}
         </tbody>
         <tfoot class="border-t border-border">
-          <tr><td colspan="3" class="px-3 py-1.5 text-right text-muted-foreground">Total HT</td><td class="px-3 py-1.5 text-right tabular-nums">{sign}{eur(f.subtotal_ht)}</td></tr>
-          <tr><td colspan="3" class="px-3 py-1.5 text-right text-muted-foreground">TVA {String(f.vat_rate).replace('.', ',')} %</td><td class="px-3 py-1.5 text-right tabular-nums">{sign}{eur(f.tax_total)}</td></tr>
-          <tr class="font-bold"><td colspan="3" class="px-3 py-2 text-right">Total TTC</td><td class="px-3 py-2 text-right tabular-nums">{sign}{eur(f.total_ttc)}</td></tr>
+          <tr><td colspan="4" class="px-3 py-1.5 text-right text-muted-foreground">Total HT</td><td class="px-3 py-1.5 text-right tabular-nums">{sign}{eur(f.subtotal_ht)}</td></tr>
+          {#each f.vat_breakdown ?? [] as b (b.rate)}
+            <tr><td colspan="4" class="px-3 py-1.5 text-right text-muted-foreground">TVA {String(b.rate).replace('.', ',')} %</td><td class="px-3 py-1.5 text-right tabular-nums">{sign}{eur(b.tax)}</td></tr>
+          {/each}
+          <tr class="font-bold"><td colspan="4" class="px-3 py-2 text-right">Total TTC</td><td class="px-3 py-2 text-right tabular-nums">{sign}{eur(f.total_ttc)}</td></tr>
         </tfoot>
       </table>
     </div>

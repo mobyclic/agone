@@ -86,7 +86,8 @@
       <label><span class={label}>Email</span><input name="email" type="email" value={data.company.email ?? ''} class={input} /></label>
       <label><span class={label}>Téléphone</span><input name="phone" value={data.company.phone ?? ''} class={input} /></label>
       <label><span class={label}>Capital social</span><input name="capital" value={data.company.capital ?? ''} class={input} placeholder="ex. 10 000 €" /></label>
-      <label><span class={label}>Taux de TVA (%)</span><input name="vat_rate" value={String(data.company.vat_rate)} class={input} placeholder="5.5" /></label>
+      <label><span class={label}>TVA par défaut (%)</span><input name="vat_rate" value={String(data.company.vat_rate)} class={input} placeholder="5.5" /></label>
+      <label class="sm:col-span-2"><span class={label}>Taux de TVA disponibles (séparés par des virgules)</span><input name="vat_rates" value={data.company.vat_rates.join(', ')} class={input} placeholder="5.5, 20, 10, 2.1, 0" /></label>
       <label class="sm:col-span-2"><span class={label}>Mention de pied de page</span><textarea name="footer" rows="2" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" placeholder="Association loi 1901 · TVA non applicable…">{data.company.footer ?? ''}</textarea></label>
     </div>
     <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>

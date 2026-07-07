@@ -1,15 +1,17 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Plus, Trash, MagnifyingGlass, X } from 'phosphor-svelte';
 
-  let { form } = $props();
+  let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
   const euro = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+  const vatLabel = (r: number) => `${String(r).replace('.', ',')} %`;
 
   let kind = $state<'invoice' | 'credit_note'>('invoice');
-  let vatRate = $state('5.5');
+  let baseVat = $state(untrack(() => data.defaultVat)); // TVA de base : défaut des nouvelles lignes
   let notes = $state('');
 
   // Client (nom manuel + recherche optionnelle)
@@ -31,9 +33,10 @@
     customerId = c.id; name = c.full_name; email = c.email ?? ''; cq = ''; chits = [];
   }
 
-  // Lignes
-  type Line = { description: string; qty: number; unit_price_ttc: number };
-  let lines = $state<Line[]>([{ description: '', qty: 1, unit_price_ttc: 0 }]);
+  // Lignes (TVA par ligne)
+  type Line = { description: string; qty: number; unit_price_ttc: number; vat_rate: number };
+  let lines = $state<Line[]>(untrack(() => [{ description: '', qty: 1, unit_price_ttc: 0, vat_rate: data.defaultVat }]));
+  const addLine = () => (lines = [...lines, { description: '', qty: 1, unit_price_ttc: 0, vat_rate: baseVat }]);
   const total = $derived(lines.reduce((s, l) => s + l.qty * l.unit_price_ttc, 0));
 </script>
 
@@ -55,8 +58,10 @@
       <button type="button" class="px-3 py-1.5 {kind === 'credit_note' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'credit_note')}>Avoir</button>
     </div>
     <div class="ml-auto flex items-center gap-2">
-      <span class="text-sm text-muted-foreground">TVA %</span>
-      <input bind:value={vatRate} class="h-9 w-20 rounded-md border border-border bg-background px-2 text-sm" />
+      <span class="text-sm text-muted-foreground">TVA de base</span>
+      <select bind:value={baseVat} class="h-9 rounded-md border border-border bg-background px-2 text-sm">
+        {#each data.vatRates as r (r)}<option value={r}>{vatLabel(r)}</option>{/each}
+      </select>
     </div>
   </section>
 
@@ -87,9 +92,17 @@
 
   <!-- Lignes -->
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
-    <div class="mb-3 flex items-center justify-between">
-      <h3 class="eyebrow">Lignes</h3>
-      <button type="button" class="inline-flex items-center gap-1 text-sm text-link hover:underline" onclick={() => (lines = [...lines, { description: '', qty: 1, unit_price_ttc: 0 }])}><Plus size={14} /> Ajouter</button>
+    <div class="mb-2 flex items-center justify-between">
+      <h3 class="eyebrow">Lignes <span class="font-normal normal-case text-muted-foreground">(prix TTC)</span></h3>
+      <button type="button" class="inline-flex items-center gap-1 text-sm text-link hover:underline" onclick={addLine}><Plus size={14} /> Ajouter</button>
+    </div>
+    <div class="mb-1 flex items-center gap-2 px-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <span class="flex-1">Désignation</span>
+      <span class="w-14 text-center">Qté</span>
+      <span class="w-24 text-right">P.U. TTC</span>
+      <span class="w-[84px] text-center">TVA</span>
+      <span class="w-20 text-right">Total</span>
+      <span class="w-5"></span>
     </div>
     <div class="space-y-2">
       {#each lines as l, i (i)}
@@ -97,6 +110,9 @@
           <input bind:value={l.description} placeholder="Désignation" class="h-9 flex-1 rounded border border-border bg-background px-2 text-sm" />
           <input type="number" min="1" bind:value={l.qty} class="h-9 w-14 rounded border border-border bg-background px-2 text-center text-sm" />
           <input type="number" min="0" step="0.01" bind:value={l.unit_price_ttc} class="h-9 w-24 rounded border border-border bg-background px-2 text-right text-sm" />
+          <select bind:value={l.vat_rate} class="h-9 w-[84px] rounded border border-border bg-background px-1 text-center text-sm">
+            {#each data.vatRates as r (r)}<option value={r}>{vatLabel(r)}</option>{/each}
+          </select>
           <span class="w-20 text-right text-sm tabular-nums text-muted-foreground">{euro(l.qty * l.unit_price_ttc)}</span>
           <button type="button" class="text-muted-foreground hover:text-destructive" onclick={() => (lines = lines.filter((_, j) => j !== i))} aria-label="Retirer"><Trash size={15} /></button>
         </div>
@@ -112,7 +128,7 @@
 
   <!-- Champs cachés -->
   <input type="hidden" name="kind" value={kind} />
-  <input type="hidden" name="vat_rate" value={vatRate} />
+  <input type="hidden" name="vat_rate" value={baseVat} />
   <input type="hidden" name="customerId" value={customerId} />
   <input type="hidden" name="name" value={name} />
   <input type="hidden" name="email" value={email} />

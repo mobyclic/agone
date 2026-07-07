@@ -1,12 +1,13 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff, requireAdmin } from '$lib/server/access';
-import { createManualInvoice } from '$lib/server/invoice';
+import { createManualInvoice, getCompany } from '$lib/server/invoice';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ locals }) => {
   requireStaff(locals);
-  return {};
+  const company = await getCompany();
+  return { vatRates: company.vat_rates, defaultVat: company.vat_rate };
 };
 
 export const actions: Actions = {
@@ -15,14 +16,15 @@ export const actions: Actions = {
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
 
-    let lines: { description: string; qty: number; unit_price_ttc: number }[] = [];
+    let lines: { description: string; qty: number; unit_price_ttc: number; vat_rate?: number }[] = [];
     try {
       const parsed = JSON.parse(S('lines') || '[]');
       lines = (Array.isArray(parsed) ? parsed : [])
         .map((l: any) => ({
           description: String(l.description || '').trim(),
           qty: Math.max(1, Math.floor(Number(l.qty) || 1)),
-          unit_price_ttc: Math.max(0, Number(l.unit_price_ttc) || 0)
+          unit_price_ttc: Math.max(0, Number(l.unit_price_ttc) || 0),
+          vat_rate: l.vat_rate != null && l.vat_rate !== '' ? Number(l.vat_rate) : undefined
         }))
         .filter((l: any) => l.description);
     } catch {

@@ -68,11 +68,16 @@ export const actions: Actions = {
     requireAdmin(locals);
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
+    const vatRates = S('vat_rates')
+      .split(',')
+      .map((x) => Number(x.trim().replace(',', '.')))
+      .filter((n) => !Number.isNaN(n) && n >= 0);
     await setSetting('billing', {
       legal_name: S('legal_name'), address: S('address'), siret: S('siret'), vat_number: S('vat_number'),
       rcs: S('rcs'), ape: S('ape'), iban: S('iban'), bic: S('bic'), email: S('email'), phone: S('phone'),
       capital: S('capital'), footer: S('footer'),
-      vat_rate: S('vat_rate') ? Number(S('vat_rate').replace(',', '.')) : 5.5
+      vat_rate: S('vat_rate') ? Number(S('vat_rate').replace(',', '.')) : 5.5,
+      vat_rates: vatRates.length ? [...new Set(vatRates)] : [5.5, 20, 10, 2.1, 0]
     });
     throw redirect(303, withFlash('/admin/parametres', 'Informations de facturation enregistrées.', 'success'));
   },
