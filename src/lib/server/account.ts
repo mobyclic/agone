@@ -49,6 +49,85 @@ export async function createUser(input: NewUserInput): Promise<string> {
   return String(rows[0].id).replace(/^user:/, '');
 }
 
+/* ————————————————————— Back-office : fiche client ————————————————————— */
+
+export interface UserEdit {
+  id: string;
+  email?: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone?: string;
+  role: string;
+  email_verified: boolean;
+  accepts_newsletter: boolean;
+  notes?: string;
+  created_at?: string;
+  legacy: boolean;
+  orders: { number: number; status: string; total: number; channel?: string; created_at?: string }[];
+}
+
+export async function getUserForEdit(id: string): Promise<UserEdit | null> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, email, first_name, last_name, full_name, phone, role,
+        email_verified, accepts_newsletter, notes, created_at, legacy_wp_id
+      FROM user WHERE id = $id LIMIT 1`,
+    { id: recId('user', id) }
+  );
+  const u = rows[0];
+  if (!u) return null;
+  const orders = await query<any>(
+    `SELECT number, status, total, channel, created_at FROM order WHERE customer = $id ORDER BY created_at DESC LIMIT 100`,
+    { id: recId('user', id) }
+  );
+  return {
+    id: u.id,
+    email: u.email ?? undefined,
+    first_name: u.first_name ?? '',
+    last_name: u.last_name ?? '',
+    full_name: u.full_name || u.email || 'Client',
+    phone: u.phone ?? undefined,
+    role: u.role ?? 'customer',
+    email_verified: u.email_verified === true,
+    accepts_newsletter: u.accepts_newsletter !== false,
+    notes: u.notes ?? undefined,
+    created_at: u.created_at ?? undefined,
+    legacy: u.legacy_wp_id != null,
+    orders
+  };
+}
+
+export interface UserUpdateInput {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  accepts_newsletter?: boolean;
+  notes?: string;
+}
+
+const USER_ROLES = ['admin', 'editor', 'customer', 'pending'];
+
+/** Met à jour la fiche client (back-office). Lève si l'email est déjà pris. */
+export async function updateUser(id: string, d: UserUpdateInput): Promise<void> {
+  const set = ['first_name = $fn', 'last_name = $ln', 'accepts_newsletter = $nl', 'role = $role'];
+  const vars: Record<string, unknown> = {
+    id: recId('user', id),
+    fn: d.first_name?.trim() ?? '',
+    ln: d.last_name?.trim() ?? '',
+    nl: !!d.accepts_newsletter,
+    role: USER_ROLES.includes(d.role ?? '') ? d.role : 'customer'
+  };
+  if (d.email?.trim()) { set.push('email = $email'); vars.email = d.email.trim().toLowerCase(); }
+  else set.push('email = NONE');
+  if (d.phone?.trim()) { set.push('phone = $phone'); vars.phone = d.phone.trim(); }
+  else set.push('phone = NONE');
+  if (d.notes?.trim()) { set.push('notes = $notes'); vars.notes = d.notes.trim(); }
+  else set.push('notes = NONE');
+  await query(`UPDATE $id SET ${set.join(', ')}`, vars);
+}
+
 /** Valide l'email et promeut pending → customer. */
 export async function markEmailVerified(userId: string): Promise<void> {
   await query(

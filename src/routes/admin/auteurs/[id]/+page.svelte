@@ -26,9 +26,8 @@
 </a>
 
 <form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4 flex items-center justify-between gap-3">
+  <div class="mb-4">
     <h2 class="text-xl font-bold">{data.isNew ? 'Nouvel auteur' : a?.full_name}</h2>
-    <Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button>
   </div>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
@@ -70,6 +69,11 @@
         </label>
       </div>
     </div>
+  </div>
+
+  <!-- Bouton flottant -->
+  <div class="fixed bottom-6 right-6 z-40">
+    <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
   </div>
 </form>
 

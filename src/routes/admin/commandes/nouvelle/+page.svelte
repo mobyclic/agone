@@ -67,9 +67,8 @@
 </a>
 
 <form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4 flex items-center justify-between gap-3">
+  <div class="mb-4">
     <h2 class="text-xl font-bold">Nouvelle commande</h2>
-    <Button type="submit"><FloppyDisk size={16} /> Créer la commande</Button>
   </div>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
@@ -221,4 +220,9 @@
   <input type="hidden" name="ship_city" value={sc} />
   <input type="hidden" name="ship_country" value={sco} />
   <input type="hidden" name="lines" value={JSON.stringify(lines)} />
+
+  <!-- Bouton flottant -->
+  <div class="fixed bottom-6 right-6 z-40">
+    <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Créer la commande</Button>
+  </div>
 </form>

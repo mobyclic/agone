@@ -68,7 +68,7 @@
       {#each data.users as u (u.id)}
         <tr class="hover:bg-muted/30">
           <td class="px-3 py-2">
-            <span class="font-medium">{u.full_name}</span>
+            <a href="/admin/utilisateurs/{u.id}" class="font-medium hover:text-link">{u.full_name}</a>
             {#if u.legacy}<span class="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">Importé</span>{/if}
           </td>
           <td class="px-3 py-2 text-muted-foreground">
