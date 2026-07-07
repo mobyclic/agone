@@ -49,6 +49,9 @@
     {:else if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status)}
       <form method="POST" action="?/generate_invoice" use:enhance><button type="submit" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Générer la facture</button></form>
     {/if}
+    {#if o.channel === 'sortie_editeur'}
+      <a href="/admin/commandes/{o.number}/livraison?dl=1" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Bon de livraison</a>
+    {/if}
     {#if o.channel && o.channel !== 'web'}<span class="rounded border border-border px-2.5 py-1 text-sm font-medium text-muted-foreground">{CHANNEL_LABEL[o.channel] ?? o.channel}</span>{/if}
     <span class="rounded px-2.5 py-1 text-sm font-medium {statusTone[o.status] ?? 'bg-secondary'}">{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
   </div>
