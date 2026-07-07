@@ -3,7 +3,8 @@
   import { goto } from '$app/navigation';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { MagnifyingGlass, DownloadSimple, X } from 'phosphor-svelte';
+  import { MagnifyingGlass, DownloadSimple, X, Plus, PencilSimple, Eye } from 'phosphor-svelte';
+  import { CONTENT_STATUS_LABEL } from '$lib/labels';
 
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
@@ -51,6 +52,51 @@
     </div>
   {/each}
 </div>
+
+<!-- Numéros de la LettrInfo -->
+<section class="mb-8">
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h3 class="text-base font-semibold">Numéros</h3>
+      <p class="text-sm text-muted-foreground">Chaque numéro est un article « LettrInfo » ; l'email reprend le corps, les livres associés et les prochaines rencontres.</p>
+    </div>
+    <Button href="/admin/newsletter/numeros/nouveau"><Plus size={16} /> Nouveau numéro</Button>
+  </div>
+  <div class="overflow-x-auto rounded-lg border border-border bg-card">
+    <table class="w-full text-sm">
+      <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+        <tr>
+          <th class="px-3 py-2 font-medium">Titre</th>
+          <th class="px-3 py-2 font-medium">Statut</th>
+          <th class="px-3 py-2 text-right font-medium">Livres</th>
+          <th class="px-3 py-2 text-right font-medium">Date</th>
+          <th class="px-3 py-2 text-right font-medium">Email</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {#each data.issues as it (it.id)}
+          <tr class="hover:bg-muted/30">
+            <td class="px-3 py-2"><a href="/admin/newsletter/numeros/{it.id}" class="font-medium hover:text-link">{it.title}</a></td>
+            <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{CONTENT_STATUS_LABEL[it.status] ?? it.status}</span></td>
+            <td class="px-3 py-2 text-right tabular-nums text-muted-foreground">{it.book_count}</td>
+            <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(it.published_at)}</td>
+            <td class="px-3 py-2">
+              <div class="flex items-center justify-end gap-3">
+                <a href="/admin/newsletter/numeros/{it.id}" class="text-muted-foreground hover:text-foreground" aria-label="Éditer"><PencilSimple size={15} /></a>
+                <a href="/admin/newsletter/apercu/{it.id}" target="_blank" class="inline-flex items-center gap-1 text-link hover:underline"><Eye size={15} /> Aperçu</a>
+              </div>
+            </td>
+          </tr>
+        {/each}
+        {#if data.issues.length === 0}
+          <tr><td colspan="5" class="px-3 py-8 text-center text-muted-foreground">Aucun numéro. Créez-en un.</td></tr>
+        {/if}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<h3 class="mb-3 text-base font-semibold">Abonnés</h3>
 
 <div class="mb-4 flex flex-wrap gap-2">
   <div class="relative min-w-[240px] flex-1">

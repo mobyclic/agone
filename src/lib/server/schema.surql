@@ -284,6 +284,9 @@ DEFINE FIELD OVERWRITE cover        ON article TYPE option<record<media>>;
 DEFINE FIELD OVERWRITE published_at ON article TYPE option<datetime>;
 DEFINE FIELD OVERWRITE rubrique     ON article TYPE option<record<rubrique>>;
 DEFINE FIELD OVERWRITE is_newsletter_issue ON article TYPE bool DEFAULT false;  -- [LettrInfo NN]
+-- Composition par blocs du numéro de LettrInfo (titre, texte, livres, rencontres, bouton…).
+DEFINE FIELD OVERWRITE newsletter_blocks ON article TYPE option<array>;
+DEFINE FIELD OVERWRITE newsletter_blocks[*] ON article TYPE object FLEXIBLE;
 DEFINE FIELD OVERWRITE authors      ON article TYPE option<array<record<author>>>;
 DEFINE FIELD OVERWRITE books        ON article TYPE option<array<record<book>>>;
 DEFINE FIELD OVERWRITE views        ON article TYPE int DEFAULT 0;   -- compteur de vues (importé de WP puis incrémenté)

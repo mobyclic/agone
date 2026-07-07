@@ -141,6 +141,33 @@ export async function seedFromUsers(): Promise<{ added: number }> {
   return { added };
 }
 
+/* ————————————————————— Numéros (LettrInfo = article is_newsletter_issue) ————————————————————— */
+
+export interface NewsletterIssueRow {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  published_at?: string;
+  book_count: number;
+}
+
+export async function listNewsletterIssues(limit = 60): Promise<NewsletterIssueRow[]> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, title, slug, status, published_at, array::len(books ?? []) AS book_count
+       FROM article WHERE is_newsletter_issue = true ORDER BY published_at DESC LIMIT $limit`,
+    { limit }
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    slug: r.slug,
+    status: r.status ?? 'draft',
+    published_at: r.published_at ?? undefined,
+    book_count: r.book_count ?? 0
+  }));
+}
+
 /* ————————————————————— Brevo (best-effort, optionnel) ————————————————————— */
 
 async function syncBrevo(email: string, action: 'subscribe' | 'unsubscribe', input?: SubscribeInput): Promise<void> {
