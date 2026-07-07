@@ -3,16 +3,16 @@
     SquaresFour, BookOpen, Books, Users, User, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
-    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar
-  } from 'phosphor-svelte';
+    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib
+ } from 'phosphor-svelte';
 
   // Registre nom → composant (icônes utilisées dans la navigation & les listes).
   const MAP: Record<string, any> = {
     SquaresFour, BookOpen, Books, Users, User, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
-    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar
-  };
+    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib
+ };
 </script>
 
 <script lang="ts">

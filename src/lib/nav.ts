@@ -28,6 +28,7 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Tableau de bord', href: '/admin', icon: 'SquaresFour' },
   { label: 'Antichambre', href: '/admin/contenu', icon: 'Article' },
   { label: 'Catalogue', href: '/admin/catalogue', icon: 'BookOpen' },
+  { label: 'Auteurs', href: '/admin/auteurs', icon: 'PenNib' },
   { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
   { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
   { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' },

@@ -167,6 +167,12 @@ export async function upsertAuthor(id: string | null, d: AuthorInput): Promise<s
   const parts: string[] = [];
   const vars: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) {
+    // first_name / last_name sont des string requis (DEFAULT '') : jamais NONE.
+    if (k === 'first_name' || k === 'last_name') {
+      vars[k] = typeof v === 'string' ? v : '';
+      parts.push(`${k} = $${k}`);
+      continue;
+    }
     const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
     if (empty) parts.push(`${k} = NONE`);
     else { vars[k] = v; parts.push(`${k} = $${k}`); }
