@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
+  import { MagnifyingGlass, BookOpen, PenNib, Article, Plus, ArrowRight } from 'phosphor-svelte';
 
   let { data } = $props();
   const eur = (n: number) => euros(n) ?? '0 €';
@@ -23,6 +24,38 @@
     completed: 'bg-success/15 text-success', cancelled: 'bg-muted text-muted-foreground',
     refunded: 'bg-muted text-muted-foreground', failed: 'bg-destructive/10 text-destructive'
   };
+
+  // — Recherche rapide (livre / auteur / article → édition) —
+  type Hit = { type: 'book' | 'author' | 'article'; id: string; label: string; sub?: string; href: string };
+  const TYPE_META: Record<Hit['type'], { icon: any; label: string }> = {
+    book: { icon: BookOpen, label: 'Livre' },
+    author: { icon: PenNib, label: 'Auteur' },
+    article: { icon: Article, label: 'Article' }
+  };
+  let q = $state('');
+  let hits = $state<Hit[]>([]);
+  let searching = $state(false);
+  let timer: ReturnType<typeof setTimeout>;
+  let ctrl: AbortController | null = null;
+
+  function onInput() {
+    clearTimeout(timer);
+    const term = q.trim();
+    if (term.length < 2) { hits = []; searching = false; return; }
+    searching = true;
+    timer = setTimeout(async () => {
+      ctrl?.abort();
+      ctrl = new AbortController();
+      try {
+        const r = await fetch(`/admin/api/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
+        hits = r.ok ? (await r.json()).results : [];
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') hits = [];
+      } finally {
+        searching = false;
+      }
+    }, 200);
+  }
 </script>
 
 <svelte:head><title>Tableau de bord · Admin Agone</title></svelte:head>
@@ -32,51 +65,109 @@
   <h2 class="mt-1 text-xl font-bold">Bonjour {data.user.first_name || data.user.email} 👋</h2>
 </div>
 
-<!-- Ventes année en cours vs N-1 à date -->
-<section class="rounded-lg border border-border bg-card p-5">
-  <div class="flex flex-wrap items-start justify-between gap-3">
-    <div>
-      <p class="eyebrow">Ventes {y.year}</p>
-      <p class="text-xs text-muted-foreground">au {asOfLabel}</p>
+<!-- Ventes + catalogue en bref -->
+<div class="grid gap-4 lg:grid-cols-3">
+  <!-- Ventes année en cours vs N-1 à date -->
+  <section class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="eyebrow">Ventes {y.year}</p>
+        <p class="text-xs text-muted-foreground">au {asOfLabel}</p>
+      </div>
+      <a href="/admin/statistiques" class="text-sm text-link hover:underline">Statistiques détaillées →</a>
     </div>
-    <a href="/admin/statistiques" class="text-sm text-link hover:underline">Statistiques détaillées →</a>
-  </div>
 
-  <div class="mt-3 flex flex-wrap items-end gap-x-8 gap-y-2">
-    <div>
-      <div class="text-4xl font-bold tabular-nums">{eur(y.ca)}</div>
+    <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div class="text-3xl font-bold tabular-nums">{eur(y.ca)}</div>
       <div class="text-sm text-muted-foreground">{y.orders.toLocaleString('fr-FR')} commande{y.orders > 1 ? 's' : ''}</div>
+      {#if y.deltaPct !== null}
+        <div class="rounded px-2 py-0.5 text-sm font-semibold {y.deltaPct >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/10 text-destructive'}">
+          {y.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(y.deltaPct).toFixed(1)} % vs {y.prevYear}
+        </div>
+      {/if}
     </div>
-    {#if y.deltaPct !== null}
-      <div class="rounded px-2 py-1 text-sm font-semibold {y.deltaPct >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/10 text-destructive'}">
-        {y.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(y.deltaPct).toFixed(1)} % vs {y.prevYear}
+
+    <div class="mt-4 space-y-1.5">
+      <div class="flex items-center gap-3 text-sm">
+        <span class="w-10 shrink-0 font-medium tabular-nums">{y.year}</span>
+        <div class="h-2.5 flex-1 bg-secondary"><div class="h-2.5 bg-foreground" style="width:{(y.ca / barMax) * 100}%"></div></div>
+        <span class="w-24 shrink-0 text-right tabular-nums">{eur(y.ca)}</span>
+      </div>
+      <div class="flex items-center gap-3 text-sm">
+        <span class="w-10 shrink-0 font-medium tabular-nums text-muted-foreground">{y.prevYear}</span>
+        <div class="h-2.5 flex-1 bg-secondary"><div class="h-2.5 bg-muted-foreground/40" style="width:{(y.prevCa / barMax) * 100}%"></div></div>
+        <span class="w-24 shrink-0 text-right tabular-nums text-muted-foreground">{eur(y.prevCa)}</span>
+      </div>
+    </div>
+    <p class="mt-2.5 text-xs text-muted-foreground">{y.prevYear} à la même date · {y.prevOrders.toLocaleString('fr-FR')} commandes{#if data.pending} · <a href="/admin/commandes?status=pending" class="text-link hover:underline">{data.pending} en attente</a>{/if}</p>
+  </section>
+
+  <!-- Catalogue en bref (compact) -->
+  <section class="rounded-lg border border-border bg-card p-2">
+    <p class="eyebrow px-3 pb-1 pt-2">Catalogue en bref</p>
+    <ul class="divide-y divide-border">
+      {#each catalogueStats as c (c.label)}
+        <li>
+          <a href={c.href} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/40">
+            <span class="text-sm text-muted-foreground">{c.label}</span>
+            <span class="text-base font-bold tabular-nums">{c.value.toLocaleString('fr-FR')}</span>
+          </a>
+        </li>
+      {/each}
+    </ul>
+  </section>
+</div>
+
+<!-- Recherche rapide + raccourcis -->
+<div class="mt-4 grid gap-4 lg:grid-cols-3">
+  <section class="rounded-lg border border-border bg-card p-4 lg:col-span-2">
+    <p class="eyebrow mb-2">Recherche rapide</p>
+    <div class="relative">
+      <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <input
+        bind:value={q}
+        oninput={onInput}
+        placeholder="Livre, auteur, article… (ISBN accepté)"
+        autocomplete="off"
+        class="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary"
+      />
+    </div>
+
+    {#if q.trim().length >= 2}
+      <div class="mt-2 overflow-hidden rounded-md border border-border">
+        {#if hits.length}
+          <ul class="divide-y divide-border">
+            {#each hits as h (h.type + h.id)}
+              {@const Meta = TYPE_META[h.type]}
+              <li>
+                <a href={h.href} class="flex items-center gap-3 px-3 py-2 hover:bg-muted/40">
+                  <Meta.icon size={18} class="shrink-0 text-muted-foreground" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium">{h.label}</span>
+                    {#if h.sub}<span class="block truncate text-xs text-muted-foreground">{h.sub}</span>{/if}
+                  </span>
+                  <span class="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">{Meta.label}</span>
+                  <ArrowRight size={14} class="shrink-0 text-muted-foreground" />
+                </a>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="px-3 py-4 text-center text-sm text-muted-foreground">{searching ? 'Recherche…' : 'Aucun résultat.'}</p>
+        {/if}
       </div>
     {/if}
-  </div>
+  </section>
 
-  <div class="mt-4 max-w-xl space-y-2">
-    <div class="flex items-center gap-3 text-sm">
-      <span class="w-12 shrink-0 font-medium tabular-nums">{y.year}</span>
-      <div class="h-5 flex-1 bg-secondary"><div class="h-5 bg-foreground" style="width:{(y.ca / barMax) * 100}%"></div></div>
-      <span class="w-24 shrink-0 text-right tabular-nums">{eur(y.ca)}</span>
+  <!-- Raccourcis -->
+  <section class="rounded-lg border border-border bg-card p-4">
+    <p class="eyebrow mb-2">Raccourcis</p>
+    <div class="grid gap-2">
+      <a href="/admin/catalogue/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouveau livre</a>
+      <a href="/admin/auteurs/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel auteur</a>
+      <a href="/admin/contenu/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel article</a>
     </div>
-    <div class="flex items-center gap-3 text-sm">
-      <span class="w-12 shrink-0 font-medium tabular-nums text-muted-foreground">{y.prevYear}</span>
-      <div class="h-5 flex-1 bg-secondary"><div class="h-5 bg-muted-foreground/40" style="width:{(y.prevCa / barMax) * 100}%"></div></div>
-      <span class="w-24 shrink-0 text-right tabular-nums text-muted-foreground">{eur(y.prevCa)}</span>
-    </div>
-    <p class="text-xs text-muted-foreground">{y.prevYear} à la même date · {y.prevOrders.toLocaleString('fr-FR')} commandes{#if data.pending} · <a href="/admin/commandes?status=pending" class="text-link hover:underline">{data.pending} en attente</a>{/if}</p>
-  </div>
-</section>
-
-<!-- Catalogue en bref -->
-<div class="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-  {#each catalogueStats as c (c.label)}
-    <a href={c.href} class="rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:border-primary">
-      <div class="text-xl font-bold tabular-nums">{c.value}</div>
-      <div class="text-xs text-muted-foreground">{c.label}</div>
-    </a>
-  {/each}
+  </section>
 </div>
 
 <!-- Dernières commandes -->
