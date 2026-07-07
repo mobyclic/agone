@@ -422,6 +422,10 @@ DEFINE FIELD OVERWRITE customer     ON order TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE email        ON order TYPE option<string>;
 DEFINE FIELD OVERWRITE status       ON order TYPE string
   ASSERT $value IN ['pending','paid','processing','sent_to_bl','completed','cancelled','refunded','failed'] DEFAULT 'pending';
+-- Canal / type de commande : web (site), comptoir (back-office), vpc (→ Belles Lettres),
+-- sortie_editeur (expédition directe Agone → bon de livraison PDF).
+DEFINE FIELD OVERWRITE channel      ON order TYPE string
+  ASSERT $value IN ['web','comptoir','vpc','sortie_editeur'] DEFAULT 'web';
 DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR';
 DEFINE FIELD OVERWRITE billing      ON order TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE shipping     ON order TYPE option<object> FLEXIBLE;

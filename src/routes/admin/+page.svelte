@@ -163,6 +163,7 @@
   <section class="rounded-lg border border-border bg-card p-4">
     <p class="eyebrow mb-2">Raccourcis</p>
     <div class="grid gap-2">
+      <a href="/admin/commandes/nouvelle" class="flex items-center gap-2 rounded-md border-2 border-foreground px-3 py-2 text-sm font-semibold hover:bg-foreground hover:text-background"><Plus size={15} /> Nouvelle commande</a>
       <a href="/admin/catalogue/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouveau livre</a>
       <a href="/admin/auteurs/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel auteur</a>
       <a href="/admin/contenu/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel article</a>

@@ -20,6 +20,19 @@ export async function findUserByEmail(email: string): Promise<any | null> {
   return rows[0] ?? null;
 }
 
+/** Recherche de clients (back-office) par nom ou email — pour le sélecteur de commande. */
+export async function searchCustomers(qRaw: string): Promise<{ id: string; full_name: string; email?: string }[]> {
+  const q = (qRaw ?? '').trim().toLowerCase();
+  if (q.length < 2) return [];
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, full_name, email FROM user
+       WHERE string::lowercase(full_name) CONTAINS $q OR (email ?? '') CONTAINS $q
+       ORDER BY full_name ASC LIMIT 8`,
+    { q }
+  );
+  return rows.map((r) => ({ id: r.id, full_name: r.full_name || r.email || 'Client', email: r.email ?? undefined }));
+}
+
 /** Crée un compte. Renvoie l'id brut (sans préfixe "user:"). */
 export async function createUser(input: NewUserInput): Promise<string> {
   const rows = await query<any>(`CREATE user CONTENT $d`, {

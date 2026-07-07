@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, Check } from 'phosphor-svelte';
-  import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
+  import { ORDER_STATUS_LABEL, CHANNEL_LABEL, euros } from '$lib/labels';
 
   let { data, form } = $props();
   const o = $derived(data.order);
@@ -43,7 +43,10 @@
     <h2 class="text-xl font-bold">Commande #{o.number}</h2>
     <p class="text-sm text-muted-foreground">Passée le {dateFr(o.created_at)}{#if o.invoice_number} · Facture n°{o.invoice_number}{/if}</p>
   </div>
-  <span class="rounded px-2.5 py-1 text-sm font-medium {statusTone[o.status] ?? 'bg-secondary'}">{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
+  <div class="flex items-center gap-2">
+    {#if o.channel && o.channel !== 'web'}<span class="rounded border border-border px-2.5 py-1 text-sm font-medium text-muted-foreground">{CHANNEL_LABEL[o.channel] ?? o.channel}</span>{/if}
+    <span class="rounded px-2.5 py-1 text-sm font-medium {statusTone[o.status] ?? 'bg-secondary'}">{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
+  </div>
 </div>
 
 <div class="grid gap-6 lg:grid-cols-[1fr_320px]">

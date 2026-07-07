@@ -1,7 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { MagnifyingGlass } from 'phosphor-svelte';
+  import { MagnifyingGlass, Plus } from 'phosphor-svelte';
+  import { Button } from '$lib/components/ui/button';
   import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
 
   let { data } = $props();
@@ -36,9 +37,12 @@
 
 <svelte:head><title>Commandes · Admin Agone</title></svelte:head>
 
-<div class="mb-5">
-  <h2 class="text-xl font-bold">Commandes</h2>
-  <p class="text-sm text-muted-foreground">{data.total} commande{data.total > 1 ? 's' : ''}</p>
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h2 class="text-xl font-bold">Commandes</h2>
+    <p class="text-sm text-muted-foreground">{data.total} commande{data.total > 1 ? 's' : ''}</p>
+  </div>
+  <Button href="/admin/commandes/nouvelle"><Plus size={16} /> Nouvelle commande</Button>
 </div>
 
 <div class="mb-4 flex flex-wrap gap-2">

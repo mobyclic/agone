@@ -24,6 +24,14 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
   failed: 'Échec'
 };
 
+/** Canal / type de commande (libellés FR). */
+export const CHANNEL_LABEL: Record<string, string> = {
+  web: 'Web',
+  comptoir: 'Comptoir',
+  vpc: 'VPC',
+  sortie_editeur: 'Sortie éditeur'
+};
+
 /** Statuts d'article/livre (libellés FR). */
 export const CONTENT_STATUS_LABEL: Record<string, string> = {
   published: 'Publié',

@@ -129,6 +129,27 @@ export async function searchBooksForPicker(q: string): Promise<{ id: string; tit
   );
 }
 
+/** Recherche livres pour la commande rapide : id + titre + prix + ISBN (par titre ou ISBN). */
+export async function searchBooksForOrder(
+  qRaw: string
+): Promise<{ id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string }[]> {
+  const q = (qRaw ?? '').trim().toLowerCase();
+  if (q.length < 2) return [];
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, title, price_paper, price_ebook, isbn_paper FROM book
+       WHERE string::lowercase(title) CONTAINS $q OR (isbn_paper ?? '') CONTAINS $q
+       ORDER BY title ASC LIMIT 12`,
+    { q }
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    price_paper: r.price_paper ?? undefined,
+    price_ebook: r.price_ebook ?? undefined,
+    isbn_paper: r.isbn_paper ?? undefined
+  }));
+}
+
 /** Autres livres du même auteur (par slug d'auteur). */
 export async function booksByAuthorSlug(authorSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
   const rows = await query<any>(

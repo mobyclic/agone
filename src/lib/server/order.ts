@@ -3,6 +3,7 @@
  */
 import { query, recId } from './surreal';
 import type { CartLine } from './cart';
+import { findUserByEmail, createUser } from './account';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -17,8 +18,9 @@ async function nextCounter(field: 'order_number' | 'invoice_number', start: numb
 }
 
 export interface CreateOrderInput {
-  customerId: string;
+  customerId?: string;
   email?: string;
+  channel?: string;
   billing?: Record<string, unknown>;
   shipping?: Record<string, unknown>;
   lines: CartLine[];
@@ -36,7 +38,9 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
 
   const rows = await query<any>(`CREATE order CONTENT $c`, {
     c: {
-      number, customer: recId('user', input.customerId), email: input.email,
+      number,
+      customer: input.customerId ? recId('user', input.customerId) : undefined,
+      email: input.email, channel: input.channel ?? 'web',
       status: 'pending', billing: input.billing, shipping: input.shipping,
       item_count, subtotal: r2(subtotal), shipping_total, total, has_ebook, has_physical
     }
@@ -74,7 +78,7 @@ export async function markOrderPaid(orderId: string): Promise<void> {
 }
 
 const ORDER_FIELDS = `
-  id, number, status, total, subtotal, shipping_total, item_count, has_ebook, has_physical,
+  id, number, status, channel, total, subtotal, shipping_total, item_count, has_ebook, has_physical,
   invoice_number, created_at, paid_at, billing, shipping, email
 `;
 
@@ -150,4 +154,80 @@ export async function setOrderStatus(number: number, status: string): Promise<vo
     status === 'completed' ? ', completed_at = time::now()' :
     status === 'paid' ? ', paid_at = time::now()' : '';
   await query(`UPDATE order SET status = $s${extra} WHERE number = $n`, { s: status, n: number });
+}
+
+/* ————————————————————— Commande rapide (back-office) ————————————————————— */
+
+export interface AdminOrderLine {
+  bookId: string;
+  title: string;
+  format: 'papier' | 'epub' | 'souscription';
+  qty: number;
+  unit_price: number; // TTC ; 0 = livre offert
+}
+
+export interface AdminOrderInput {
+  customerId?: string;
+  newCustomer?: { first_name?: string; last_name?: string; email: string };
+  channel: string; // 'comptoir' | 'vpc' | 'sortie_editeur'
+  status?: string; // statut initial (défaut 'paid')
+  billing?: Record<string, unknown>;
+  shipping?: Record<string, unknown>;
+  lines: AdminOrderLine[];
+}
+
+/**
+ * Crée une commande depuis le back-office : client existant OU nouveau (créé à la
+ * volée), lignes gratuites ou payantes, canal (comptoir/vpc/sortie éditeur), statut
+ * initial. Un statut « payé/traité/… » déclenche la numérotation de facture (markOrderPaid).
+ */
+export async function createAdminOrder(input: AdminOrderInput): Promise<{ id: string; number: number }> {
+  // 1) Résoudre / créer le client.
+  let customerId = input.customerId;
+  let email: string | undefined;
+  if (!customerId && input.newCustomer?.email) {
+    const existing = await findUserByEmail(input.newCustomer.email);
+    customerId = existing
+      ? String(existing.id).replace(/^user:/, '')
+      : await createUser({
+          email: input.newCustomer.email,
+          first_name: input.newCustomer.first_name,
+          last_name: input.newCustomer.last_name,
+          role: 'customer'
+        });
+    email = input.newCustomer.email.toLowerCase();
+  } else if (customerId) {
+    const u = (await query<any>(`SELECT email FROM $id`, { id: recId('user', customerId) }))[0];
+    email = u?.email ?? undefined;
+  }
+
+  // 2) Lignes (line_total = qty × prix unitaire ; 0 possible).
+  const lines: CartLine[] = input.lines
+    .filter((l) => l.bookId && l.qty > 0)
+    .map((l) => ({
+      id: l.bookId,
+      slug: '',
+      title: l.title,
+      format: l.format,
+      qty: l.qty,
+      unit_price: r2(l.unit_price),
+      line_total: r2(l.qty * l.unit_price)
+    }));
+
+  const { id, number } = await createOrder({
+    customerId, email, channel: input.channel,
+    billing: input.billing, shipping: input.shipping, lines
+  });
+
+  // 3) Statut initial (défaut : payé → facture émise).
+  const status = input.status ?? 'paid';
+  if (status !== 'pending') {
+    if (PAID_LIKE.has(status)) {
+      await markOrderPaid(id);
+      if (status !== 'paid') await setOrderStatus(number, status);
+    } else {
+      await setOrderStatus(number, status);
+    }
+  }
+  return { id, number };
 }
