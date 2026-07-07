@@ -45,7 +45,7 @@
   </div>
   <div class="flex flex-wrap items-center gap-2">
     {#if data.invoiceId}
-      <a href="/admin/factures/{data.invoiceId}/pdf?dl=1" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Facture PDF</a>
+      <a href="/admin/factures/{data.invoiceId}" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Voir la facture</a>
     {:else if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status)}
       <form method="POST" action="?/generate_invoice" use:enhance><button type="submit" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Générer la facture</button></form>
     {/if}

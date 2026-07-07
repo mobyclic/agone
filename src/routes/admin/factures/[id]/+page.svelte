@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Download, Eye, Receipt } from 'phosphor-svelte';
+  import { ArrowLeft, Download, Printer, Receipt } from 'phosphor-svelte';
   import { euros } from '$lib/labels';
 
   let { data } = $props();
@@ -10,6 +10,16 @@
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—');
   const eur = (n?: number) => euros(n) ?? '—';
   const sign = $derived(isCredit ? '−' : '');
+
+  let frame = $state<HTMLIFrameElement | null>(null);
+  function printPdf() {
+    try {
+      frame?.contentWindow?.focus();
+      frame?.contentWindow?.print();
+    } catch {
+      window.open(`/admin/factures/${f.id}/pdf`, '_blank');
+    }
+  }
 </script>
 
 <svelte:head><title>{f.ref} · Facturation · Admin</title></svelte:head>
@@ -30,9 +40,14 @@
     </p>
   </div>
   <div class="flex gap-2">
-    <Button href="/admin/factures/{f.id}/pdf" target="_blank" variant="outline"><Eye size={16} /> Aperçu</Button>
-    <Button href="/admin/factures/{f.id}/pdf?dl=1" variant="brand"><Download size={16} /> PDF</Button>
+    <Button type="button" onclick={printPdf} variant="outline"><Printer size={16} /> Imprimer</Button>
+    <Button href="/admin/factures/{f.id}/pdf?dl=1" variant="brand"><Download size={16} /> Télécharger</Button>
   </div>
+</div>
+
+<!-- Aperçu PDF embarqué -->
+<div class="mb-6 overflow-hidden rounded-lg border border-border bg-muted/30">
+  <iframe bind:this={frame} src="/admin/factures/{f.id}/pdf#toolbar=0" title="Aperçu {f.ref}" class="h-[78vh] max-h-[900px] w-full bg-white"></iframe>
 </div>
 
 <div class="grid gap-5 lg:grid-cols-[1fr_260px]">
