@@ -178,8 +178,9 @@ DEFINE FIELD OVERWRITE slug         ON book TYPE string;
 DEFINE FIELD OVERWRITE description_html ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE title_original    ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE language_original ON book TYPE option<string>;
+-- « À paraître » n'est PAS un statut : c'est un état dérivé (published + published_at futur).
 DEFINE FIELD OVERWRITE status       ON book TYPE string
-  ASSERT $value IN ['draft','published','forthcoming','out_of_print'] DEFAULT 'draft';
+  ASSERT $value IN ['draft','published','out_of_print'] DEFAULT 'draft';
 DEFINE FIELD OVERWRITE isbn_paper   ON book TYPE option<string>;   -- EAN-13 (colonne vertébrale)
 DEFINE FIELD OVERWRITE isbn_ebook   ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE price_paper        ON book TYPE option<number>;  -- € TTC

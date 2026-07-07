@@ -1,7 +1,7 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
   import SectionHead from '$lib/components/SectionHead.svelte';
-  import { authorList } from '$lib/labels';
+  import { authorList, isForthcoming } from '$lib/labels';
   import { MapPin } from 'phosphor-svelte';
 
   let { data } = $props();
@@ -90,7 +90,7 @@
                     <span class="line-clamp-5 font-display text-xs font-semibold uppercase leading-tight">{book.title}</span>
                   </div>
                 {/if}
-                {#if book.status === 'forthcoming'}
+                {#if isForthcoming(book)}
                   <span class="absolute left-0 top-0 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">À paraître</span>
                 {/if}
               </div>

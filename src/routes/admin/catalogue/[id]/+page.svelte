@@ -81,10 +81,10 @@
           <select name="status" class={input}>
             <option value="draft" selected={b?.status === 'draft'}>Brouillon</option>
             <option value="published" selected={b?.status === 'published' || data.isNew}>Publié</option>
-            <option value="forthcoming" selected={b?.status === 'forthcoming'}>À paraître</option>
             <option value="out_of_print" selected={b?.status === 'out_of_print'}>Épuisé</option>
           </select>
         </label>
+        <p class="mt-2 text-xs text-muted-foreground">« À paraître » est automatique : tout livre publié dont la date de parution est postérieure à aujourd'hui.</p>
         <label class="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" name="featured" checked={b?.featured} class="size-4 rounded border-border" /> Mettre en avant (à la une)
         </label>

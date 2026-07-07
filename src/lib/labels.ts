@@ -32,6 +32,25 @@ export const CONTENT_STATUS_LABEL: Record<string, string> = {
   out_of_print: 'Épuisé'
 };
 
+/**
+ * Un livre est « à paraître » lorsqu'il est publié ET que sa date de parution
+ * est STRICTEMENT postérieure à aujourd'hui. Ce n'est donc pas un statut mais
+ * un état calculé à partir de `published_at`.
+ */
+export function isForthcoming(book: { status?: string; published_at?: string | null }): boolean {
+  return (
+    book.status === 'published' &&
+    !!book.published_at &&
+    new Date(book.published_at).getTime() > Date.now()
+  );
+}
+
+/** Libellé d'état d'un livre (à paraître dérivé de la date, sinon le statut). */
+export function bookStateLabel(book: { status?: string; published_at?: string | null }): string {
+  if (isForthcoming(book)) return 'À paraître';
+  return CONTENT_STATUS_LABEL[book.status ?? ''] ?? book.status ?? '';
+}
+
 /** Formate un prix en euros (fr). */
 export function euros(n?: number | null): string | null {
   return n != null ? `${n.toFixed(2).replace('.', ',')} €` : null;

@@ -13,8 +13,8 @@ export const load: PageServerLoad = async () => {
   const [ytd, pending, books, forthcoming, authors, articles, events, recent] = await Promise.all([
     ytdSales(now),
     count('order', "status = 'pending'"),
-    count('book', "status = 'published'"),
-    count('book', "status = 'forthcoming'"),
+    count('book', "status = 'published' AND (published_at = NONE OR published_at <= time::now())"),
+    count('book', "status = 'published' AND published_at != NONE AND published_at > time::now()"),
     count('author'),
     count('article', "status = 'published'"),
     count('event', 'start_at > time::now()'),

@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
-  import { ROLE_LABEL, euros } from '$lib/labels';
+  import { ROLE_LABEL, euros, isForthcoming } from '$lib/labels';
   import { ArrowLeft, BookOpen, FileText, HandCoins, PencilSimple } from 'phosphor-svelte';
 
   let { data } = $props();
@@ -14,7 +14,7 @@
     [
       b.price_paper != null ? { key: 'papier', label: 'Papier', price: b.price_paper } : null,
       b.price_ebook != null ? { key: 'epub', label: 'ePub', price: b.price_ebook } : null,
-      b.subscription_price != null && b.status === 'forthcoming'
+      b.subscription_price != null && isForthcoming(b)
         ? { key: 'souscription', label: 'Souscription', price: b.subscription_price }
         : null
     ].filter((x): x is { key: string; label: string; price: number } => x !== null)
@@ -100,7 +100,7 @@
         <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
       {/if}
 
-      {#if b.status === 'forthcoming' && pubFull}
+      {#if isForthcoming(b) && pubFull}
         <div class="mt-5 inline-block bg-link px-3 py-1.5 font-display text-sm font-semibold uppercase tracking-wide text-white">
           En librairie le {pubFull}{euros(b.price_paper) ? ` — ${euros(b.price_paper)}` : ''}
         </div>

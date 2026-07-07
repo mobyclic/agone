@@ -3,10 +3,12 @@
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { Plus, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
+  import { bookStateLabel } from '$lib/labels';
 
   let { data } = $props();
 
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
+  // Options du filtre. « À paraître » = filtre virtuel (publié + date future), pas un statut stocké.
   const STATUS: Record<string, string> = { published: 'Publié', draft: 'Brouillon', forthcoming: 'À paraître', out_of_print: 'Épuisé' };
   const euro = (n?: number) => (n != null ? `${n.toFixed(2).replace('.', ',')} €` : '—');
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }) : '—');
@@ -93,7 +95,7 @@
               <span class="font-medium hover:text-link">{b.title}</span>
             </a>
           </td>
-          <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[b.status] ?? b.status}</span></td>
+          <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{bookStateLabel(b)}</span></td>
           <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{b.isbn_paper ?? '—'}</td>
           <td class="px-3 py-2 text-muted-foreground">{dateFr(b.published_at)}</td>
           <td class="px-3 py-2 text-right">{euro(b.price_paper)}</td>

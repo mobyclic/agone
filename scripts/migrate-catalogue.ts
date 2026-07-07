@@ -160,7 +160,7 @@ for (const b of bookPosts) {
     title_original: meta.titre_originale || undefined,
     title_alt: meta.titre_alternatif || undefined,
     language_original: meta.langue_originale || undefined,
-    status: b.status === 'draft' ? 'forthcoming' : 'published',
+    status: b.status === 'draft' ? 'draft' : 'published',
     isbn_paper: (meta.isbn_papier || '').trim() || undefined,
     isbn_ebook: (meta.isbn_digital || '').trim() || undefined,
     price_paper: num(meta.prix_papier),

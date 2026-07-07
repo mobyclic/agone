@@ -551,7 +551,6 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
     const wpId = Number(b.ID);
     const m = meta.get(wpId) ?? {};
     const pubDate = wpDate8(m.date_de_publication);
-    const isFuture = !!pubDate && pubDate.getTime() > Date.now();
     const fields = {
       title: String(b.post_title || '').trim() || '(sans titre)',
       subtitle: (m.sous_titre || '').trim() || undefined,
@@ -559,8 +558,8 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
       extra_info_html: wpautop((m.infos_additionnelles || '').trim()) || undefined,
       title_original: (m.titre_originale || '').trim() || undefined,
       language_original: (m.langue_originale || '').trim() || undefined,
-      // Draft OU date de parution future → à paraître.
-      status: b.post_status === 'draft' || isFuture ? 'forthcoming' : 'published',
+      // Brouillon WP → draft ; sinon published (une date de parution future le rend « à paraître »).
+      status: b.post_status === 'draft' ? 'draft' : 'published',
       isbn_paper: (m.isbn_papier || '').trim() || undefined,
       isbn_ebook: (m.isbn_digital || '').trim() || undefined,
       price_paper: num(m.prix_papier),

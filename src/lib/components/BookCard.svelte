@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { authorList } from '$lib/labels';
+  import { authorList, isForthcoming } from '$lib/labels';
   interface Book {
     title: string;
     subtitle?: string;
@@ -7,6 +7,7 @@
     price_paper?: number;
     cover_url?: string;
     status?: string;
+    published_at?: string;
     authors?: { name: string; slug: string; first_name?: string; last_name?: string }[];
   }
   let { book }: { book: Book } = $props();
@@ -31,7 +32,7 @@
         <span class="line-clamp-5 text-sm font-semibold leading-tight">{book.title}</span>
       </div>
     {/if}
-    {#if book.status === 'forthcoming'}
+    {#if isForthcoming(book)}
       <span class="absolute left-0 top-2 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">
         À paraître
       </span>

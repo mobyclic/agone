@@ -15,6 +15,7 @@ export interface BookCard {
   price_paper?: number;
   price_ebook?: number;
   status: string;
+  published_at?: string;
   featured: boolean;
   cover_url?: string;
   authors: { name: string; slug: string; first_name?: string; last_name?: string }[];
@@ -33,6 +34,7 @@ function toCard(r: any): BookCard {
     price_paper: r.price_paper ?? undefined,
     price_ebook: r.price_ebook ?? undefined,
     status: r.status,
+    published_at: r.published_at ?? undefined,
     featured: r.featured ?? false,
     cover_url: r.cover_url ?? undefined,
     authors: names
@@ -97,10 +99,12 @@ export async function featuredBooks(limit = 8): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
-/** À paraître (souscription / drafts) — les plus proches d'abord. */
+/** À paraître = publié avec une date de parution strictement future — les plus proches d'abord. */
 export async function forthcomingBooks(): Promise<BookCard[]> {
   const rows = await query<any>(
-    `SELECT ${CARD_FIELDS} FROM book WHERE status = 'forthcoming' ORDER BY published_at ASC`
+    `SELECT ${CARD_FIELDS} FROM book
+       WHERE status = 'published' AND published_at != NONE AND published_at > time::now()
+       ORDER BY published_at ASC`
   );
   return rows.map(toCard);
 }
@@ -254,7 +258,12 @@ const ADMIN_SORT: Record<string, string> = {
 export async function listBooksAdmin(opts: { q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
-  if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  if (opts.status === 'forthcoming') {
+    // Filtre virtuel « à paraître » : publié + date de parution strictement future.
+    where.push("status = 'published' AND published_at != NONE AND published_at > time::now()");
+  } else if (opts.status) {
+    where.push('status = $status'); vars.status = opts.status;
+  }
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const field = ADMIN_SORT[opts.sort ?? 'recent'] ?? 'updated_at';
