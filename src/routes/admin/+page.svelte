@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
-  import { MagnifyingGlass, BookOpen, PenNib, Article, Plus, ArrowRight } from 'phosphor-svelte';
+  import { MagnifyingGlass, BookOpen, PenNib, Article, Receipt, CalendarDots, ArrowRight } from 'phosphor-svelte';
 
   let { data } = $props();
   const eur = (n: number) => euros(n) ?? '0 €';
@@ -163,10 +163,11 @@
   <section class="rounded-lg border border-border bg-card p-4">
     <p class="eyebrow mb-2">Raccourcis</p>
     <div class="grid gap-2">
-      <a href="/admin/commandes/nouvelle" class="flex items-center gap-2 rounded-md border-2 border-foreground px-3 py-2 text-sm font-semibold hover:bg-foreground hover:text-background"><Plus size={15} /> Nouvelle commande</a>
-      <a href="/admin/catalogue/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouveau livre</a>
-      <a href="/admin/auteurs/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel auteur</a>
-      <a href="/admin/contenu/nouveau" class="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Plus size={15} /> Nouvel article</a>
+      <a href="/admin/commandes/nouvelle" class="flex items-center gap-2.5 rounded-md border-2 border-foreground px-3 py-2 text-sm font-semibold hover:bg-foreground hover:text-background"><Receipt size={17} /> Nouvelle commande</a>
+      <a href="/admin/catalogue/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><BookOpen size={17} /> Nouveau livre</a>
+      <a href="/admin/auteurs/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><PenNib size={17} /> Nouvel auteur</a>
+      <a href="/admin/rencontres/nouvelle" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><CalendarDots size={17} /> Nouvelle rencontre</a>
+      <a href="/admin/contenu/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Article size={17} /> Nouvel article</a>
     </div>
   </section>
 </div>
