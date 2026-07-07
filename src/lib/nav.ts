@@ -32,6 +32,7 @@ export const ADMIN_NAV: NavItem[] = [
   { label: 'Rencontres', href: '/admin/rencontres', icon: 'CalendarDots' },
   { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
   { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
+  { label: 'Facturation', href: '/admin/factures', icon: 'Invoice' },
   { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' },
   { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
   { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },

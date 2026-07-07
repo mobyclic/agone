@@ -41,9 +41,14 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <div>
     <h2 class="text-xl font-bold">Commande #{o.number}</h2>
-    <p class="text-sm text-muted-foreground">Passée le {dateFr(o.created_at)}{#if o.invoice_number} · Facture n°{o.invoice_number}{/if}</p>
+    <p class="text-sm text-muted-foreground">Passée le {dateFr(o.created_at)}{#if data.invoiceId} · <a href="/admin/factures/{data.invoiceId}" class="text-link hover:underline">Facture</a>{/if}</p>
   </div>
-  <div class="flex items-center gap-2">
+  <div class="flex flex-wrap items-center gap-2">
+    {#if data.invoiceId}
+      <a href="/admin/factures/{data.invoiceId}/pdf?dl=1" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Facture PDF</a>
+    {:else if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status)}
+      <form method="POST" action="?/generate_invoice" use:enhance><button type="submit" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Générer la facture</button></form>
+    {/if}
     {#if o.channel && o.channel !== 'web'}<span class="rounded border border-border px-2.5 py-1 text-sm font-medium text-muted-foreground">{CHANNEL_LABEL[o.channel] ?? o.channel}</span>{/if}
     <span class="rounded px-2.5 py-1 text-sm font-medium {statusTone[o.status] ?? 'bg-secondary'}">{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
   </div>

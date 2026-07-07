@@ -541,3 +541,30 @@ DEFINE FIELD OVERWRITE updated_at   ON newsletter_subscriber TYPE datetime DEFAU
 DEFINE INDEX OVERWRITE idx_nl_email  ON newsletter_subscriber FIELDS email UNIQUE;
 DEFINE INDEX OVERWRITE idx_nl_token  ON newsletter_subscriber FIELDS token;
 DEFINE INDEX OVERWRITE idx_nl_status ON newsletter_subscriber FIELDS status;
+
+-- ============================================================================
+-- FACTURATION — factures & avoirs. Numérotation LÉGALE continue par année
+-- (ref « 2026-0001 »). Une facture est IMMUABLE : lignes + client figés (snapshot).
+-- Prix TTC (TVA livres 5,5 %). Générée auto à la commande payée, ou manuellement.
+-- ============================================================================
+DEFINE TABLE OVERWRITE invoice SCHEMAFULL;
+DEFINE FIELD OVERWRITE year        ON invoice TYPE int;
+DEFINE FIELD OVERWRITE number      ON invoice TYPE int;                 -- séquence continue dans l'année
+DEFINE FIELD OVERWRITE ref         ON invoice TYPE string;              -- « 2026-0001 »
+DEFINE FIELD OVERWRITE kind        ON invoice TYPE string
+  ASSERT $value IN ['invoice','credit_note'] DEFAULT 'invoice';
+DEFINE FIELD OVERWRITE order       ON invoice TYPE option<record<order>>;
+DEFINE FIELD OVERWRITE customer    ON invoice TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE bill_to     ON invoice TYPE object FLEXIBLE;     -- snapshot client { name, email, address… }
+DEFINE FIELD OVERWRITE lines       ON invoice TYPE array;                -- [{ description, qty, unit_price_ttc, line_total_ttc }]
+DEFINE FIELD OVERWRITE lines[*]     ON invoice TYPE object FLEXIBLE;
+DEFINE FIELD OVERWRITE vat_rate    ON invoice TYPE number DEFAULT 5.5;
+DEFINE FIELD OVERWRITE subtotal_ht ON invoice TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE tax_total   ON invoice TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE total_ttc   ON invoice TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE notes       ON invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE issued_at   ON invoice TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE created_at  ON invoice TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_invoice_ref    ON invoice FIELDS ref UNIQUE;
+DEFINE INDEX OVERWRITE idx_invoice_order  ON invoice FIELDS order;
+DEFINE INDEX OVERWRITE idx_invoice_issued ON invoice FIELDS issued_at;

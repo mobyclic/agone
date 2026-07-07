@@ -4,6 +4,7 @@
 import { query, recId } from './surreal';
 import type { CartLine } from './cart';
 import { findUserByEmail, createUser } from './account';
+import { createInvoiceForOrder } from './invoice';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -74,6 +75,13 @@ export async function markOrderPaid(orderId: string): Promise<void> {
       if (already.length) continue;
       await query(`RELATE $u->owns->$a SET order = $o`, { u: recId('user', userId), a: recId('ebook_asset', String(asset.id)), o: recId('order', orderId) });
     }
+  }
+
+  // Facture (idempotente). Best-effort : ne bloque pas le paiement en cas d'échec.
+  try {
+    await createInvoiceForOrder(orderId);
+  } catch (e) {
+    console.error('[invoice] génération échouée pour la commande', orderId, e);
   }
 }
 

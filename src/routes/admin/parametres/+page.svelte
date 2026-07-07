@@ -69,6 +69,28 @@
     </div>
     <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
   </form>
+
+  <!-- Facturation -->
+  <form method="POST" action="?/billing" use:enhance class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
+    <h3 class="mb-1 text-base font-semibold">Facturation</h3>
+    <p class="mb-4 text-sm text-muted-foreground">Mentions légales figurant sur les factures et avoirs (émetteur : Éditions Agone).</p>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="sm:col-span-2"><span class={label}>Raison sociale</span><input name="legal_name" value={data.company.legal_name} class={input} /></label>
+      <label class="sm:col-span-2"><span class={label}>Adresse (une ligne par retour)</span><textarea name="address" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary">{data.company.address}</textarea></label>
+      <label><span class={label}>SIRET</span><input name="siret" value={data.company.siret ?? ''} class={input} /></label>
+      <label><span class={label}>N° TVA intracom.</span><input name="vat_number" value={data.company.vat_number ?? ''} class={input} /></label>
+      <label><span class={label}>RCS</span><input name="rcs" value={data.company.rcs ?? ''} class={input} /></label>
+      <label><span class={label}>Code APE</span><input name="ape" value={data.company.ape ?? ''} class={input} /></label>
+      <label><span class={label}>IBAN</span><input name="iban" value={data.company.iban ?? ''} class={input} /></label>
+      <label><span class={label}>BIC</span><input name="bic" value={data.company.bic ?? ''} class={input} /></label>
+      <label><span class={label}>Email</span><input name="email" type="email" value={data.company.email ?? ''} class={input} /></label>
+      <label><span class={label}>Téléphone</span><input name="phone" value={data.company.phone ?? ''} class={input} /></label>
+      <label><span class={label}>Capital social</span><input name="capital" value={data.company.capital ?? ''} class={input} placeholder="ex. 10 000 €" /></label>
+      <label><span class={label}>Taux de TVA (%)</span><input name="vat_rate" value={String(data.company.vat_rate)} class={input} placeholder="5.5" /></label>
+      <label class="sm:col-span-2"><span class={label}>Mention de pied de page</span><textarea name="footer" rows="2" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" placeholder="Association loi 1901 · TVA non applicable…">{data.company.footer ?? ''}</textarea></label>
+    </div>
+    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
+  </form>
 </div>
 
 <!-- Synchronisation pré-production -->
