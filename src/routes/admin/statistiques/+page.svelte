@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { euros } from '$lib/labels';
-  import { ChartBar, Package, Receipt, CurrencyEur } from 'phosphor-svelte';
+  import { ChartBar, Package, Receipt, CurrencyEur, MagnifyingGlass, CaretDown } from 'phosphor-svelte';
 
   let { data } = $props();
 
@@ -17,6 +17,24 @@
     const s = sp.toString();
     goto(`/admin/statistiques${s ? `?${s}` : ''}`, { keepFocus: true, noScroll: true });
   }
+
+  // Combobox de recherche livre
+  let comboOpen = $state(false);
+  let comboQ = $state('');
+  let comboInput = $state<HTMLInputElement | null>(null);
+  const comboFiltered = $derived(
+    comboQ.trim()
+      ? data.books.filter((b) => b.title.toLowerCase().includes(comboQ.trim().toLowerCase()))
+      : data.books
+  );
+  function selectBook(slug?: string) {
+    comboOpen = false;
+    comboQ = '';
+    nav({ livre: slug });
+  }
+  $effect(() => {
+    if (comboOpen) comboInput?.focus();
+  });
 
   const monthMax = $derived(Math.max(1, ...data.byMonth.map((m) => m.ca)));
   const yearMax = $derived(Math.max(1, ...data.byYear.map((y) => y.ca)));
@@ -38,11 +56,33 @@
     <p class="text-sm text-muted-foreground">Ventes encaissées (commandes payées / complétées){#if data.bookTitle} · <span class="text-link">{data.bookTitle}</span>{/if}</p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <select value={data.bookSlug ?? ''} onchange={(e) => nav({ livre: e.currentTarget.value || undefined })}
-      class="h-10 max-w-[260px] rounded-md border border-border bg-background px-3 text-sm">
-      <option value="">Tous les livres</option>
-      {#each data.books as b (b.slug)}<option value={b.slug}>{b.title}</option>{/each}
-    </select>
+    <!-- Combobox recherchable : filtre par livre -->
+    <div class="relative">
+      <button type="button" onclick={() => (comboOpen = !comboOpen)}
+        class="flex h-10 w-[260px] items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm">
+        <span class="truncate {data.bookTitle ? '' : 'text-muted-foreground'}">{data.bookTitle ?? 'Tous les livres'}</span>
+        <CaretDown size={14} class="shrink-0 text-muted-foreground" />
+      </button>
+      {#if comboOpen}
+        <button type="button" class="fixed inset-0 z-30 cursor-default" aria-label="Fermer" onclick={() => (comboOpen = false)}></button>
+        <div class="absolute right-0 z-40 mt-1 w-[300px] overflow-hidden rounded-md border border-border bg-background shadow-2xl">
+          <div class="border-b border-border p-2">
+            <div class="relative">
+              <MagnifyingGlass size={15} class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input bind:this={comboInput} bind:value={comboQ} placeholder="Rechercher un livre…" autocomplete="off"
+                class="h-9 w-full rounded border border-border bg-background pl-8 pr-2 text-sm outline-none focus:border-primary" />
+            </div>
+          </div>
+          <ul class="max-h-72 overflow-y-auto py-1 text-sm">
+            <li><button type="button" onclick={() => selectBook(undefined)} class="block w-full px-3 py-2 text-left hover:bg-muted/50 {data.bookSlug ? '' : 'font-medium text-link'}">Tous les livres</button></li>
+            {#each comboFiltered as b (b.slug)}
+              <li><button type="button" onclick={() => selectBook(b.slug)} class="block w-full truncate px-3 py-2 text-left hover:bg-muted/50 {data.bookSlug === b.slug ? 'font-medium text-link' : ''}">{b.title}</button></li>
+            {/each}
+            {#if comboFiltered.length === 0}<li class="px-3 py-3 text-center text-muted-foreground">Aucun livre.</li>{/if}
+          </ul>
+        </div>
+      {/if}
+    </div>
     <select value={data.year} onchange={(e) => nav({ annee: e.currentTarget.value })}
       class="h-10 rounded-md border border-border bg-background px-3 text-sm">
       {#each data.years as y (y)}<option value={y}>{y}</option>{/each}
