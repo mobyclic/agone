@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { isStaff } from '$lib/roles';
   import {
     List, X, MagnifyingGlass, ShoppingCart, CaretDown,
     FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo
@@ -7,6 +8,10 @@
 
   interface NavData { collections: { name: string; slug: string }[]; rubriques: { name: string; slug: string }[] }
   let { user, cartCount = 0, nav }: { user: App.Locals['user']; cartCount?: number; nav?: NavData } = $props();
+
+  // Staff (admin/éditeur) → back-office ; client → espace compte ; visiteur → connexion.
+  const accountHref = $derived(user ? (isStaff(user.role) ? '/admin' : '/compte') : '/connexion');
+  const accountLabel = $derived(user && isStaff(user.role) ? 'Back-office' : 'Mon compte');
 
   let open = $state(false);
   const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
@@ -89,7 +94,7 @@
         {#if cartCount > 0}<span class="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{cartCount}</span>{/if}
       </a>
 
-      <a href={user ? '/compte' : '/connexion'} class="btn-brand ml-1 hidden h-9 items-center px-3.5 font-display text-sm font-medium uppercase tracking-wide sm:inline-flex">Mon compte</a>
+      <a href={accountHref} class="btn-brand ml-1 hidden h-9 items-center px-3.5 font-display text-sm font-medium uppercase tracking-wide sm:inline-flex">{accountLabel}</a>
 
       <div class="ml-2 hidden items-center gap-0.5 border-l border-border pl-2.5 lg:flex">
         {#each socials as s (s.name)}
@@ -116,7 +121,7 @@
         <a href="/auteurs" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Auteurs</a>
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
         <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>
-        <a href={user ? '/compte' : '/connexion'} onclick={() => (open = false)} class="mt-2 block border-t border-border py-2 pt-3 font-medium text-link">Mon compte</a>
+        <a href={accountHref} onclick={() => (open = false)} class="mt-2 block border-t border-border py-2 pt-3 font-medium text-link">{accountLabel}</a>
         <div class="mt-3 flex items-center gap-3 border-t border-border pt-3">
           {#each socials as s (s.name)}
             <a href={s.href} target="_blank" rel="noopener" aria-label={s.name} class="text-muted-foreground hover:text-foreground"><s.icon size={20} /></a>
