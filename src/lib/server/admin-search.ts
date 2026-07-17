@@ -22,7 +22,7 @@ export async function adminQuickSearch(qRaw: string): Promise<QuickHit[]> {
       { q }
     ),
     query<any>(
-      `SELECT meta::id(id) AS id, full_name FROM author
+      `SELECT meta::id(id) AS id, full_name, slug FROM author
         WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 6`,
       { q }
     ),
@@ -44,7 +44,7 @@ export async function adminQuickSearch(qRaw: string): Promise<QuickHit[]> {
       type: 'author' as const,
       id: a.id,
       label: a.full_name,
-      href: `/admin/auteurs/${a.id}`
+      href: `/admin/auteurs/${a.slug}`
     })),
     ...articles.map((a) => ({
       type: 'article' as const,

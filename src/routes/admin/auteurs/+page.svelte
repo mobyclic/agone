@@ -33,7 +33,7 @@
     <tbody class="divide-y divide-border">
       {#each data.authors as a (a.id)}
         <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2"><a href="/admin/auteurs/{String(a.id).replace('author:', '')}" class="font-medium hover:text-link">{a.full_name}</a></td>
+          <td class="px-3 py-2"><a href="/admin/auteurs/{a.slug}" class="font-medium hover:text-link">{a.full_name}</a></td>
           <td class="px-3 py-2 text-right text-muted-foreground">{a.book_count}</td>
           <td class="px-3 py-2">{#if a.hidden}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Masqué</span>{:else}<span class="text-xs text-success">Visible</span>{/if}</td>
         </tr>

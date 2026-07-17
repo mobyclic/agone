@@ -278,6 +278,15 @@ export async function getStatement(id: string) {
   return rows[0] ?? null;
 }
 
+/** Relevés de droits d'un auteur (pour la fiche auteur), les plus récents d'abord. */
+export async function statementsForAuthor(authorId: string) {
+  return query<any>(
+    `SELECT meta::id(id) AS id, period_start, period_end, status, gross_total, advance_applied, total_due, paid_at
+       FROM royalty_statement WHERE author = $a ORDER BY period_start DESC`,
+    { a: recId('author', authorId) }
+  );
+}
+
 export async function setStatementStatus(id: string, status: 'draft' | 'issued' | 'paid') {
   const stamp = status === 'issued' ? ', issued_at = time::now()' : status === 'paid' ? ', paid_at = time::now()' : '';
   await query(`UPDATE $id SET status = $s${stamp}`, { id: recId('royalty_statement', id), s: status });

@@ -144,6 +144,17 @@ export async function getAuthorAdmin(id: string) {
   return rows[0] ?? null;
 }
 
+/** Fiche auteur (back-office) par slug — inclut l'id brut (pid) et le nb de titres. */
+export async function getAuthorAdminBySlug(slug: string) {
+  const rows = await query<any>(
+    `SELECT *, meta::id(id) AS pid, portrait.url AS portrait_url,
+        array::len(array::distinct(<-contributed_by<-book)) AS book_count
+      FROM author WHERE slug = $slug LIMIT 1`,
+    { slug }
+  );
+  return rows[0] ?? null;
+}
+
 export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string }[]> {
   if (!q || !q.trim()) return [];
   return query<any>(
@@ -153,38 +164,60 @@ export async function searchAuthorsForPicker(q: string): Promise<{ id: string; f
 
 export interface AuthorInput {
   first_name: string; last_name: string; bio_html?: string; portraitId?: string; hidden?: boolean;
-  nationality?: string; birth_year?: number; death_year?: number; website?: string;
+  nationality?: string; birth_date?: string; death_date?: string; website?: string;
   legal_name?: string; siret?: string;
 }
 
-export async function upsertAuthor(id: string | null, d: AuthorInput): Promise<string> {
-  const fields: Record<string, unknown> = {
-    first_name: d.first_name ?? '', last_name: d.last_name ?? '', hidden: !!d.hidden,
-    bio_html: d.bio_html, nationality: d.nationality, birth_year: d.birth_year,
-    death_year: d.death_year, website: d.website, legal_name: d.legal_name, siret: d.siret,
-    portrait: d.portraitId ? recId('media', d.portraitId) : undefined
+export async function upsertAuthor(id: string | null, d: AuthorInput): Promise<{ id: string; slug: string }> {
+  const parts: string[] = ['first_name = $first_name', 'last_name = $last_name', 'hidden = $hidden'];
+  const vars: Record<string, unknown> = {
+    first_name: d.first_name ?? '', last_name: d.last_name ?? '', hidden: !!d.hidden
   };
-  const parts: string[] = [];
-  const vars: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(fields)) {
-    // first_name / last_name sont des string requis (DEFAULT '') : jamais NONE.
-    if (k === 'first_name' || k === 'last_name') {
-      vars[k] = typeof v === 'string' ? v : '';
-      parts.push(`${k} = $${k}`);
-      continue;
+  // Optionnels simples : vide → NONE.
+  const opt = (field: string, val: unknown) => {
+    const empty = val === undefined || val === null || val === '';
+    if (empty) parts.push(`${field} = NONE`);
+    else { vars[field] = val; parts.push(`${field} = $${field}`); }
+  };
+  opt('bio_html', d.bio_html);
+  opt('nationality', d.nationality);
+  opt('website', d.website);
+  opt('legal_name', d.legal_name);
+  opt('siret', d.siret);
+  opt('portrait', d.portraitId ? recId('media', d.portraitId) : undefined);
+  // Dates de naissance/décès (+ année dérivée pour l'affichage).
+  const dateField = (dateName: string, yearName: string, iso?: string) => {
+    const dt = iso ? new Date(iso) : null;
+    if (dt && !Number.isNaN(dt.getTime())) {
+      vars[dateName] = dt.toISOString();
+      parts.push(`${dateName} = type::datetime($${dateName})`);
+      vars[yearName] = dt.getUTCFullYear();
+      parts.push(`${yearName} = $${yearName}`);
+    } else {
+      parts.push(`${dateName} = NONE`, `${yearName} = NONE`);
     }
-    const empty = v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
-    if (empty) parts.push(`${k} = NONE`);
-    else { vars[k] = v; parts.push(`${k} = $${k}`); }
-  }
+  };
+  dateField('birth_date', 'birth_year', d.birth_date);
+  dateField('death_date', 'death_year', d.death_date);
+
   const setSql = parts.join(', ');
-  if (id) { await query(`UPDATE $id SET ${setSql}`, { ...vars, id: recId('author', id) }); return id; }
+  if (id) {
+    await query(`UPDATE $id SET ${setSql}`, { ...vars, id: recId('author', id) });
+    const s = (await query<any>(`SELECT slug FROM $id`, { id: recId('author', id) }))[0];
+    return { id, slug: s?.slug ?? '' };
+  }
   const slug = await uniqueSlug('author', `${d.first_name} ${d.last_name}`.trim());
   const rows = await query<any>(`CREATE author SET ${setSql}, slug = $slug`, { ...vars, slug });
-  return String(rows[0].id).replace(/^author:/, '');
+  return { id: String(rows[0].id).replace(/^author:/, ''), slug };
 }
 
+/** Supprime un auteur — INTERDIT s'il a des titres. Lève 'AUTHOR_HAS_BOOKS' sinon. */
 export async function deleteAuthor(id: string) {
+  const n = (await query<any>(
+    `SELECT array::len(array::distinct(<-contributed_by<-book)) AS n FROM $id`,
+    { id: recId('author', id) }
+  ))[0]?.n ?? 0;
+  if (n > 0) throw new Error('AUTHOR_HAS_BOOKS');
   await query(`DELETE contributed_by WHERE out = $id`, { id: recId('author', id) });
   await query(`DELETE $id`, { id: recId('author', id) });
 }

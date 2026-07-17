@@ -157,8 +157,10 @@ DEFINE FIELD OVERWRITE bio_html    ON author TYPE option<string>;
 DEFINE FIELD OVERWRITE portrait    ON author TYPE option<record<media>>;
 DEFINE FIELD OVERWRITE hidden      ON author TYPE bool DEFAULT false;
 DEFINE FIELD OVERWRITE nationality ON author TYPE option<string>;
-DEFINE FIELD OVERWRITE birth_year  ON author TYPE option<int>;
-DEFINE FIELD OVERWRITE death_year  ON author TYPE option<int>;
+DEFINE FIELD OVERWRITE birth_year  ON author TYPE option<int>;   -- dérivé de birth_date (affichage)
+DEFINE FIELD OVERWRITE death_year  ON author TYPE option<int>;   -- dérivé de death_date (affichage)
+DEFINE FIELD OVERWRITE birth_date  ON author TYPE option<datetime>;
+DEFINE FIELD OVERWRITE death_date  ON author TYPE option<datetime>;
 DEFINE FIELD OVERWRITE website     ON author TYPE option<string>;
 -- Identité fiscale pour le paiement des droits (sensible ; renseignée au besoin).
 DEFINE FIELD OVERWRITE legal_name  ON author TYPE option<string>;
