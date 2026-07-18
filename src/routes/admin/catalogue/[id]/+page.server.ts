@@ -32,6 +32,14 @@ export const actions: Actions = {
     const title = S('title');
     if (!title) return fail(400, { error: 'Le titre est requis.' });
 
+    let galleryIds: string[] = [];
+    try {
+      const g = JSON.parse(S('galleryIds') || '[]');
+      galleryIds = Array.isArray(g) ? g.map(String).filter(Boolean) : [];
+    } catch {
+      galleryIds = [];
+    }
+
     const input: BookInput = {
       title,
       subtitle: S('subtitle') || undefined,
@@ -54,7 +62,8 @@ export const actions: Actions = {
       collectionIds: fd.getAll('collections').map(String),
       rubriqueIds: fd.getAll('rubriques').map(String),
       primaryCollectionId: S('primary_collection') || undefined,
-      coverId: S('coverId') || undefined
+      coverId: S('coverId') || undefined,
+      galleryIds
     };
 
     const editId = params.id && params.id !== 'nouveau' ? params.id : null;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
+  import GalleryUpload from '$lib/components/GalleryUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -94,6 +95,11 @@
         <h3 class="eyebrow mb-3">Couverture</h3>
         <ImageUpload bind:mediaId={coverId} bind:url={coverUrl} folder="livres/couvertures" kind="cover" label="" accept="image/*" />
         <input type="hidden" name="coverId" value={coverId ?? ''} />
+      </div>
+
+      <div class="rounded-lg border border-border bg-card p-4">
+        <h3 class="eyebrow mb-3">Autres images (4e de couverture, photos…)</h3>
+        {#key b?.id}<GalleryUpload name="galleryIds" initial={b?.gallery ?? []} folder="livres/galerie" label="" />{/key}
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">

@@ -186,13 +186,14 @@ export interface BookDetail extends BookCard {
   stock_qty: number;
   language_original?: string;
   title_original?: string;
+  gallery: string[];
   collections: { name: string; slug: string }[];
   contributors: { role: string; people: { name: string; slug: string }[] }[];
 }
 
 export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
   const rows = await query<any>(
-    `SELECT *, cover.url AS cover_url,
+    `SELECT *, cover.url AS cover_url, gallery.url AS gallery_urls,
        collections.{ name: name, slug: slug } AS collection_refs
      FROM book WHERE slug = $slug LIMIT 1`,
     { slug }
@@ -229,6 +230,7 @@ export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
     stock_qty: b.stock_qty ?? 0,
     language_original: b.language_original ?? undefined,
     title_original: b.title_original ?? undefined,
+    gallery: (b.gallery_urls ?? []).filter(Boolean),
     collections: (b.collection_refs ?? []).filter((c: any) => c?.slug),
     contributors,
     // authors already on the card; keep the whole-contributor set too
@@ -367,9 +369,15 @@ export async function listBooksAdmin(opts: { q?: string; status?: string; sort?:
 }
 
 export async function getBookAdmin(id: string) {
-  const rows = await query<any>(`SELECT *, cover.url AS cover_url FROM book WHERE id = $id LIMIT 1`, { id: recId('book', id) });
+  const rows = await query<any>(
+    `SELECT *, cover.url AS cover_url, gallery AS gallery_refs, gallery.url AS gallery_urls FROM book WHERE id = $id LIMIT 1`,
+    { id: recId('book', id) }
+  );
   const book = rows[0];
   if (!book) return null;
+  book.gallery = (book.gallery_refs ?? [])
+    .map((ref: any, i: number) => ({ id: String(ref).replace(/^media:/, ''), url: (book.gallery_urls ?? [])[i] }))
+    .filter((g: any) => g.url);
   const contributors = await query<any>(
     `SELECT out AS author_id, out.full_name AS author_name, role, share, position
        FROM contributed_by WHERE in = $id ORDER BY position`, { id: recId('book', id) });
@@ -459,7 +467,7 @@ export interface BookInput {
   price_paper?: number; price_ebook?: number; subscription_price?: number;
   published_at?: string; page_count?: number; width_cm?: number; height_cm?: number;
   stock_qty?: number; featured?: boolean;
-  collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string;
+  collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string; galleryIds?: string[];
 }
 
 /**
@@ -493,7 +501,8 @@ export async function upsertBook(id: string | null, d: BookInput): Promise<strin
   // Les tableaux sont toujours écrits (même vides).
   vars.collections = d.collectionIds.map((x) => recId('collection', x));
   vars.rubriques = d.rubriqueIds.map((x) => recId('rubrique', x));
-  const arraysSql = 'collections = $collections, rubriques = $rubriques';
+  vars.gallery = (d.galleryIds ?? []).map((x) => recId('media', x));
+  const arraysSql = 'collections = $collections, rubriques = $rubriques, gallery = $gallery';
 
   if (id) {
     await query(`UPDATE $id SET ${sql}, ${arraysSql}`, { ...vars, id: recId('book', id) });

@@ -198,6 +198,7 @@ DEFINE FIELD OVERWRITE stock_qty     ON book TYPE int DEFAULT 0;    -- autorité
 DEFINE FIELD OVERWRITE stock_synced_at ON book TYPE option<datetime>;
 DEFINE FIELD OVERWRITE featured      ON book TYPE bool DEFAULT false;
 DEFINE FIELD OVERWRITE cover         ON book TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE gallery       ON book TYPE option<array<record<media>>>;  -- 4e de couverture, photos…
 DEFINE FIELD OVERWRITE collections   ON book TYPE option<array<record<collection>>>;
 DEFINE FIELD OVERWRITE vat_rate      ON book TYPE number DEFAULT 5.5; -- TVA livre France
 DEFINE FIELD OVERWRITE legacy_wp_id  ON book TYPE option<int>;

@@ -2,11 +2,16 @@
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
+  import Lightbox from '$lib/components/Lightbox.svelte';
   import { ROLE_LABEL, euros, isForthcoming } from '$lib/labels';
-  import { ArrowLeft, BookOpen, FileText, HandCoins, PencilSimple } from 'phosphor-svelte';
+  import { ArrowLeft, BookOpen, FileText, HandCoins, PencilSimple, MagnifyingGlassPlus } from 'phosphor-svelte';
 
   let { data } = $props();
   const b = $derived(data.book);
+  const images = $derived([b.cover_url, ...(b.gallery ?? [])].filter(Boolean) as string[]);
+  let lbOpen = $state(false);
+  let lbIndex = $state(0);
+  const openLightbox = (i = 0) => { lbIndex = i; lbOpen = true; };
   const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
   const bookId = $derived(String(b.id).replace(/^book:/, ''));
 
@@ -43,15 +48,38 @@
   {/if}
 
   <div class="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)_240px] lg:gap-10">
-    <!-- Couverture -->
-    <div class="bg-ink p-5">
-      <div class="relative aspect-[2/3] overflow-hidden border border-white/10 bg-neutral-800 shadow-2xl">
-        {#if b.cover_url}
-          <img src={b.cover_url} alt={b.title} class="size-full object-cover" />
-        {:else}
+    <!-- Couverture + infos annexes -->
+    <div>
+      {#if b.cover_url}
+        <button type="button" onclick={() => openLightbox(0)} class="group block w-full cursor-zoom-in" aria-label="Agrandir la couverture">
+          <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40">
+            <img src={b.cover_url} alt={b.title} class="size-full object-cover" />
+            <span class="absolute right-2 top-2 grid size-8 place-items-center bg-background/85 text-foreground opacity-0 transition-opacity group-hover:opacity-100"><MagnifyingGlassPlus size={16} /></span>
+          </div>
+        </button>
+      {:else}
+        <div class="relative aspect-[2/3] overflow-hidden border border-border bg-ink">
           <div class="flex size-full items-end p-4"><span class="font-display text-lg uppercase leading-tight text-white">{b.title}</span></div>
-        {/if}
-      </div>
+        </div>
+      {/if}
+
+      {#if b.gallery?.length}
+        <div class="mt-3 grid grid-cols-4 gap-2">
+          {#each b.gallery as img, i (img)}
+            <button type="button" onclick={() => openLightbox(i + 1)} class="aspect-[2/3] overflow-hidden border border-border transition-colors hover:border-foreground" aria-label="Voir l'image {i + 2}">
+              <img src={img} alt="" class="size-full object-cover" />
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      <dl class="mt-6 space-y-3 border-t-2 border-foreground pt-5 text-sm">
+        {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
+        {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
+        {#if dims}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
+        {#if b.isbn_paper}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
+        {#if b.title_original}<div><dt class="text-muted-foreground">Titre original</dt><dd class="mt-0.5 font-medium">{b.title_original}{b.language_original ? ` (${b.language_original})` : ''}</dd></div>{/if}
+      </dl>
     </div>
 
     <!-- Contenu -->
@@ -114,14 +142,6 @@
       {#if b.extra_info_html}
         <div class="mt-4 border-l-2 border-link bg-secondary/50 p-4 text-sm text-muted-foreground [&_p]:mb-2">{@html b.extra_info_html}</div>
       {/if}
-
-      <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-3 border-t-2 border-foreground pt-6 text-sm sm:grid-cols-4">
-        {#if pubLabel}<div><dt class="text-muted-foreground">Parution</dt><dd class="font-medium capitalize">{pubLabel}</dd></div>{/if}
-        {#if b.page_count}<div><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
-        {#if dims}<div><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
-        {#if b.isbn_paper}<div><dt class="text-muted-foreground">ISBN</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
-        {#if b.title_original}<div class="col-span-2"><dt class="text-muted-foreground">Titre original</dt><dd class="font-medium">{b.title_original}{b.language_original ? ` (${b.language_original})` : ''}</dd></div>{/if}
-      </dl>
     </div>
 
     <!-- Sidebar : du même auteur / même collection -->
@@ -155,3 +175,5 @@
     </aside>
   </div>
 </div>
+
+<Lightbox images={images} bind:open={lbOpen} bind:index={lbIndex} alt={b.title} />
