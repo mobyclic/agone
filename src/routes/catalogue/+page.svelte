@@ -54,23 +54,37 @@
 {:else}
   <!-- Vitrine par collections -->
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
-    {#each data.collections as c (c.slug)}
-      <section class="border-t border-border py-10 first:border-t-0">
-        <div class="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-          <div class="min-w-0">
+    {#each data.collections as c, i (c.slug)}
+      <section class="border-t border-border py-12 first:border-t-0">
+        <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
+          <!-- Texte -->
+          <div class={i % 2 === 1 ? 'lg:order-2' : ''}>
             <a href="/collections/{c.slug}" class="group inline-block">
-              <h2 class="display-title text-2xl leading-none group-hover:text-link sm:text-3xl">{c.name}</h2>
+              <h2 class="display-title text-3xl leading-none group-hover:text-link sm:text-4xl lg:text-5xl">{c.name}</h2>
             </a>
             {#if c.description_html}
-              <div class="prose-agone mt-2.5 line-clamp-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{@html c.description_html}</div>
+              <div class="prose-agone mt-4 line-clamp-5 max-w-prose text-[15px] leading-relaxed text-muted-foreground">{@html c.description_html}</div>
             {/if}
+            <a href="/collections/{c.slug}" class="link mt-5 inline-flex items-center gap-1.5 font-display text-sm font-semibold uppercase tracking-wide">
+              Les {c.book_count} titres <ArrowRight size={15} />
+            </a>
           </div>
-          <a href="/collections/{c.slug}" class="link inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display text-sm font-semibold uppercase tracking-wide">
-            Les {c.book_count} titres <ArrowRight size={15} />
-          </a>
-        </div>
-        <div class="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {#each c.books as book (book.slug)}<BookCard {book} />{/each}
+          <!-- Couvertures -->
+          <div class={i % 2 === 1 ? 'lg:order-1' : ''}>
+            <div class="grid grid-cols-3 gap-3 sm:gap-4">
+              {#each c.books.slice(0, 6) as book (book.slug)}
+                <a href="/livre/{book.slug}" class="group block">
+                  <div class="aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">
+                    {#if book.cover_url}
+                      <img src={book.cover_url} alt={book.title} loading="lazy" class="size-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+                    {:else}
+                      <div class="flex size-full items-end bg-ink p-1.5 text-white"><span class="line-clamp-4 font-display text-[10px] font-semibold uppercase leading-tight">{book.title}</span></div>
+                    {/if}
+                  </div>
+                </a>
+              {/each}
+            </div>
+          </div>
         </div>
       </section>
     {/each}
