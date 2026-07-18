@@ -17,7 +17,7 @@
 
 <svelte:head><title>Catalogue · Agone</title></svelte:head>
 
-<PageHead eyebrow="Le catalogue" title="Le catalogue" meta="{data.total} ouvrages" />
+<PageHead title="Le catalogue" meta="{data.total} ouvrages" />
 
 <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
   <form method="GET" class="flex flex-wrap items-center gap-3">
@@ -34,17 +34,6 @@
     </select>
     <button type="submit" class="btn-brand h-11 px-5 font-display text-sm font-medium uppercase tracking-wide">Filtrer</button>
   </form>
-
-  <div class="mt-4 flex flex-wrap gap-1.5 font-display">
-    <a href="/catalogue{qs({ collection: undefined, page: undefined })}"
-      class="border px-3 py-1 text-xs font-medium uppercase tracking-wide {!data.collection ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'}">Toutes</a>
-    {#each data.collections as c (c.slug)}
-      <a href="/catalogue{qs({ collection: c.slug, page: undefined })}"
-        class="border px-3 py-1 text-xs font-medium uppercase tracking-wide {data.collection === c.slug ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'}">
-        {c.name} <span class="opacity-60">{c.book_count}</span>
-      </a>
-    {/each}
-  </div>
 
   {#if data.books.length === 0}
     <p class="py-16 text-center text-muted-foreground">Aucun livre ne correspond à votre recherche.</p>

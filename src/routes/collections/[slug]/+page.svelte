@@ -1,6 +1,5 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
-  import { ArrowLeft } from 'phosphor-svelte';
 
   let { data } = $props();
 </script>
@@ -9,11 +8,7 @@
 
 <section class="border-b border-border bg-sidebar text-sidebar-foreground">
   <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-    <a href="/catalogue" class="mb-4 inline-flex items-center gap-1.5 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground">
-      <ArrowLeft size={16} /> Catalogue
-    </a>
-    <p class="eyebrow" style="color:var(--sidebar-primary)">Collection</p>
-    <h1 class="mt-1 text-4xl font-extrabold tracking-tight">{data.collection.name}</h1>
+    <h1 class="text-4xl font-extrabold tracking-tight">{data.collection.name}</h1>
     <p class="mt-2 text-sidebar-foreground/70">{data.books.length} ouvrages</p>
   </div>
 </section>
