@@ -63,16 +63,6 @@
         </div>
       {/if}
 
-      {#if b.gallery?.length}
-        <div class="mt-3 grid grid-cols-4 gap-2">
-          {#each b.gallery as img, i (img)}
-            <button type="button" onclick={() => openLightbox(i + 1)} class="aspect-[2/3] overflow-hidden border border-border transition-colors hover:border-foreground" aria-label="Voir l'image {i + 2}">
-              <img src={img} alt="" class="size-full object-cover" />
-            </button>
-          {/each}
-        </div>
-      {/if}
-
       <dl class="mt-6 space-y-3 border-t-2 border-foreground pt-5 text-sm">
         {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
         {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
