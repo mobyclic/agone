@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Eye, PencilSimple } from 'phosphor-svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
+  import { Eye, PencilSimple } from 'phosphor-svelte';
   let { data } = $props();
   const a = $derived(data.article);
   const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
@@ -16,11 +17,9 @@
 
 <svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
 
-<article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-  <a href="/antichambre" class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-    <ArrowLeft size={16} /> L’Antichambre
-  </a>
+<PageHead eyebrow="Antichambre" title={a.title} />
 
+<article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
   {#if isStaff}
     <div class="fixed bottom-6 right-6 z-40">
       <Button href="/admin/contenu/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
@@ -30,7 +29,6 @@
   {#if a.rubrique_name}
     <a href="/antichambre?rubrique={a.rubrique_slug}" class="eyebrow hover:underline">{a.rubrique_name}</a>
   {/if}
-  <h1 class="mt-2 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">{a.title}</h1>
   <div class="mt-3 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
     <span>{fmt(a.published_at)}</span>
     {#if a.authors.length}

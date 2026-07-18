@@ -15,7 +15,7 @@
 
 <svelte:head><title>L’Antichambre · Agone</title></svelte:head>
 
-<PageHead eyebrow="Le magazine" title={active?.name ?? 'L’Antichambre'} subtitle={active ? undefined : 'Textes, inactualités et critiques — au-delà des livres.'} />
+<PageHead eyebrow={active ? 'Antichambre' : undefined} title={active?.name ?? 'L’Antichambre'} subtitle={active ? undefined : 'Textes, inactualités et critiques — au-delà des livres.'} />
 
 <section class="border-b border-border bg-secondary/40">
   <div class="mx-auto max-w-6xl px-4 py-4 sm:px-6">

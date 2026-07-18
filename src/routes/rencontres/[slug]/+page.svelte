@@ -1,6 +1,7 @@
 <script lang="ts">
   import VenueMap from '$lib/components/VenueMap.svelte';
-  import { ArrowLeft, MapPin, CalendarBlank, Clock } from 'phosphor-svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
+  import { MapPin, CalendarBlank, Clock } from 'phosphor-svelte';
 
   let { data } = $props();
   const e = $derived(data.event);
@@ -24,13 +25,10 @@
 
 <svelte:head><title>{e.title} · Rencontres Agone</title></svelte:head>
 
-<div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-  <a href="/rencontres" class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-    <ArrowLeft size={16} /> Toutes les rencontres
-  </a>
+<PageHead eyebrow="Rencontres" title={e.title} />
 
+<div class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
   {#if isPast}<span class="mb-3 inline-block rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Rencontre passée</span>{/if}
-  <h1 class="text-3xl font-extrabold leading-tight tracking-tight">{e.title}</h1>
 
   <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
     {#if e.start_at}

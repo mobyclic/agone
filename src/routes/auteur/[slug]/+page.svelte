@@ -1,6 +1,6 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
-  import { ArrowLeft } from 'phosphor-svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
 
   let { data } = $props();
   const a = $derived(data.author);
@@ -11,11 +11,9 @@
 
 <svelte:head><title>{a.full_name} · Agone</title></svelte:head>
 
-<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-  <a href="/auteurs" class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-    <ArrowLeft size={16} /> Tous les auteurs
-  </a>
+<PageHead eyebrow="Auteur·rice" title={a.full_name} meta={[a.nationality, years].filter(Boolean).join(' · ') || undefined} />
 
+<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
   <header class="flex flex-col gap-6 sm:flex-row sm:items-start">
     <div class="size-28 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
       {#if a.portrait_url}
@@ -27,10 +25,6 @@
       {/if}
     </div>
     <div>
-      <h1 class="text-3xl font-extrabold tracking-tight">{a.full_name}</h1>
-      {#if years || a.nationality}
-        <p class="mt-1 text-sm text-muted-foreground">{[a.nationality, years].filter(Boolean).join(' · ')}</p>
-      {/if}
       {#if a.bio_html}
         <div class="prose-agone mt-4 max-w-2xl text-[15px] leading-relaxed text-foreground/90 [&_a]:text-link [&_p]:mb-3">
           {@html a.bio_html}
