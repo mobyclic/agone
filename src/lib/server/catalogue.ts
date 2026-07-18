@@ -366,6 +366,73 @@ export async function allCollections() {
   return query<any>(`SELECT id, name, slug, sort FROM collection ORDER BY sort ASC`);
 }
 
+/* ————————————————————— Collections (back-office CRUD + ordre) ————————————————————— */
+
+export interface AdminCollection { id: string; name: string; slug: string; sort: number; book_count: number }
+
+export async function listCollectionsAdmin(): Promise<AdminCollection[]> {
+  const colls = await query<any>(`SELECT id, meta::id(id) AS pid, name, slug, sort FROM collection ORDER BY sort ASC`);
+  const counts = await query<any>(
+    `SELECT primary_collection AS c, count() AS n FROM book WHERE primary_collection != NONE GROUP BY primary_collection`
+  );
+  const byColl = new Map<string, number>();
+  for (const r of counts) if (r.c) byColl.set(String(r.c), r.n ?? 0);
+  return colls.map((r) => ({ id: r.pid, name: r.name, slug: r.slug, sort: r.sort ?? 0, book_count: byColl.get(String(r.id)) ?? 0 }));
+}
+
+export async function getCollectionForEdit(id: string) {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, name, slug, description, sort FROM collection WHERE id = $id LIMIT 1`,
+    { id: recId('collection', id) }
+  );
+  const c = rows[0];
+  if (!c) return null;
+  c.book_count = (await query<any>(
+    `SELECT count() AS n FROM book WHERE primary_collection = $c OR collections CONTAINS $c GROUP ALL`,
+    { c: recId('collection', id) }
+  ))[0]?.n ?? 0;
+  return c;
+}
+
+export async function saveCollection(id: string | null, d: { name: string; slug?: string; description?: string }): Promise<string> {
+  const set: string[] = ['name = $name'];
+  const vars: Record<string, unknown> = { name: d.name.trim() || '(sans nom)' };
+  if (d.description?.trim()) { set.push('description = $description'); vars.description = d.description.trim(); }
+  else set.push('description = NONE');
+
+  if (id) {
+    if (d.slug?.trim()) {
+      vars.slug = await uniqueSlug('collection', d.slug, { excludeId: id });
+      set.push('slug = $slug');
+    }
+    await query(`UPDATE $id SET ${set.join(', ')}`, { ...vars, id: recId('collection', id) });
+    return id;
+  }
+  vars.slug = await uniqueSlug('collection', d.slug || d.name);
+  set.push('slug = $slug');
+  const maxRow = (await query<any>(`SELECT math::max(sort) AS m FROM collection GROUP ALL`))[0];
+  vars.sort = (typeof maxRow?.m === 'number' ? maxRow.m : -1) + 1;
+  set.push('sort = $sort');
+  const rows = await query<any>(`CREATE collection SET ${set.join(', ')}`, vars);
+  return String(rows[0].id).replace(/^collection:/, '');
+}
+
+/** Supprime une collection — INTERDIT si des livres y sont rattachés. */
+export async function deleteCollection(id: string): Promise<void> {
+  const n = (await query<any>(
+    `SELECT count() AS n FROM book WHERE primary_collection = $c OR collections CONTAINS $c GROUP ALL`,
+    { c: recId('collection', id) }
+  ))[0]?.n ?? 0;
+  if (n > 0) throw new Error('COLLECTION_HAS_BOOKS');
+  await query(`DELETE $id`, { id: recId('collection', id) });
+}
+
+export async function reorderCollections(orderedIds: string[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await query(`UPDATE $id SET sort = $s`, { id: recId('collection', orderedIds[i]), s: i });
+  }
+}
+
 export interface BookInput {
   title: string; subtitle?: string; description_html?: string; extra_info_html?: string;
   title_original?: string; title_alt?: string; language_original?: string;
