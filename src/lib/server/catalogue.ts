@@ -4,6 +4,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
+import { wpautop } from './wpautop';
 import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
 export { ROLE_LABEL };
 
@@ -256,9 +257,10 @@ export async function listCollections(): Promise<CollectionInfo[]> {
 }
 
 export async function getCollectionBySlug(slug: string): Promise<{ collection: any; books: BookCard[] } | null> {
-  const rows = await query<any>(`SELECT id, name, slug FROM collection WHERE slug = $slug LIMIT 1`, { slug });
+  const rows = await query<any>(`SELECT id, name, slug, description FROM collection WHERE slug = $slug LIMIT 1`, { slug });
   const collection = rows[0];
   if (!collection) return null;
+  collection.description_html = collection.description ? wpautop(collection.description) : undefined;
   const books = await query<any>(
     `SELECT ${CARD_FIELDS} FROM book
        WHERE status = 'published' AND (primary_collection.slug = $slug OR collections.slug CONTAINS $slug)
@@ -266,6 +268,55 @@ export async function getCollectionBySlug(slug: string): Promise<{ collection: a
     { slug }
   );
   return { collection, books: books.map(toCard) };
+}
+
+export interface CollectionShowcase {
+  name: string;
+  slug: string;
+  description_html?: string;
+  book_count: number;
+  books: BookCard[];
+}
+
+/** Vitrine catalogue : chaque collection avec sa description et ses N derniers livres parus. */
+export async function collectionsWithBooks(perColl = 6): Promise<CollectionShowcase[]> {
+  const colls = await query<any>(`SELECT name, slug, description, sort FROM collection ORDER BY sort ASC`);
+  const result = await Promise.all(
+    colls.map(async (c) => {
+      const [books, count] = await Promise.all([
+        query<any>(
+          `SELECT ${CARD_FIELDS} FROM book
+             WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now())
+               AND (primary_collection.slug = $slug OR collections.slug CONTAINS $slug)
+             ORDER BY published_at DESC LIMIT $lim`,
+          { slug: c.slug, lim: perColl }
+        ),
+        query<any>(
+          `SELECT count() AS n FROM book
+             WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now())
+               AND (primary_collection.slug = $slug OR collections.slug CONTAINS $slug) GROUP ALL`,
+          { slug: c.slug }
+        )
+      ]);
+      return {
+        name: c.name,
+        slug: c.slug,
+        description_html: c.description ? wpautop(c.description) : undefined,
+        book_count: count[0]?.n ?? 0,
+        books: books.map(toCard)
+      };
+    })
+  );
+  return result.filter((c) => c.book_count > 0);
+}
+
+/** Nombre de livres publiés et parus (pour l'en-tête catalogue). */
+export async function countPublishedBooks(): Promise<number> {
+  const r = await query<any>(
+    `SELECT count() AS n FROM book
+       WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now()) GROUP ALL`
+  );
+  return r[0]?.n ?? 0;
 }
 
 // ══════════════════════════════════════════════════════════════
