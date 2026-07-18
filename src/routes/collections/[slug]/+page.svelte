@@ -7,7 +7,7 @@
 
 <svelte:head><title>{data.collection.name} · Collection Agone</title></svelte:head>
 
-<PageHead eyebrow="Catalogue" title={data.collection.name} meta="{data.books.length} ouvrages" />
+<PageHead eyebrow="Catalogue" title={data.collection.name} />
 
 {#if data.collection.description_html}
   <section class="mx-auto max-w-3xl px-4 pt-10 sm:px-6">

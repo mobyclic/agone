@@ -18,7 +18,7 @@
 
 <svelte:head><title>Catalogue · Agone</title></svelte:head>
 
-<PageHead title="Le catalogue" meta="{data.total} ouvrages" />
+<PageHead title="Le catalogue" />
 
 <section class="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
   <form method="GET" class="flex flex-wrap items-center gap-3">
