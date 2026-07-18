@@ -6,7 +6,7 @@
     FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo
   } from 'phosphor-svelte';
 
-  interface NavData { collections: { name: string; slug: string }[]; rubriques: { name: string; slug: string }[] }
+  interface NavData { collections: { name: string; slug: string; href: string }[]; rubriques: { name: string; slug: string }[] }
   let { user, cartCount = 0, nav }: { user: App.Locals['user']; cartCount?: number; nav?: NavData } = $props();
 
   // Staff (admin/éditeur) → back-office ; client → espace compte ; visiteur → connexion.
@@ -68,7 +68,7 @@
           <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each collections as c (c.slug)}
-                <a href="/collections/{c.slug}" class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{c.name}</a>
+                <a href={c.href} class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{c.name}</a>
               {/each}
             </div>
           </div>
@@ -117,7 +117,7 @@
         <a href="/antichambre" onclick={() => (open = false)} class="block py-2 font-medium">Antichambre</a>
         {#each rubriques as r (r.slug)}<a href="/antichambre?rubrique={r.slug}" onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{r.name}</a>{/each}
         <a href="/catalogue" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Catalogue</a>
-        {#each collections as c (c.slug)}<a href="/collections/{c.slug}" onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{c.name}</a>{/each}
+        {#each collections as c (c.slug)}<a href={c.href} onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{c.name}</a>{/each}
         <a href="/auteurs" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Auteurs</a>
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
         <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>

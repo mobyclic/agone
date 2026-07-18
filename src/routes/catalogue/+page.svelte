@@ -55,18 +55,20 @@
   <!-- Vitrine par collections -->
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
     {#each data.collections as c, i (c.slug)}
+      {@const single = c.book_count === 1 ? c.books[0] : null}
+      {@const target = single ? `/livre/${single.slug}` : `/collections/${c.slug}`}
       <section class="border-t border-border py-12 first:border-t-0">
         <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
           <!-- Texte -->
           <div class={i % 2 === 1 ? 'lg:order-2' : ''}>
-            <a href="/collections/{c.slug}" class="group inline-block">
+            <a href={target} class="group inline-block">
               <h2 class="display-title text-3xl leading-none group-hover:text-link sm:text-4xl lg:text-5xl">{c.name}</h2>
             </a>
             {#if c.description_html}
               <div class="prose-agone mt-4 line-clamp-5 max-w-prose text-[15px] leading-relaxed text-muted-foreground">{@html c.description_html}</div>
             {/if}
-            <a href="/collections/{c.slug}" class="link mt-5 inline-flex items-center gap-1.5 font-display text-sm font-semibold uppercase tracking-wide">
-              Les {c.book_count} titres <ArrowRight size={15} />
+            <a href={target} class="link mt-5 inline-flex items-center gap-1.5 font-display text-sm font-semibold uppercase tracking-wide">
+              {single ? 'En savoir plus' : 'Voir la collection'} <ArrowRight size={15} />
             </a>
           </div>
           <!-- Couvertures -->

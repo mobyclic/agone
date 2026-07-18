@@ -256,6 +256,25 @@ export async function listCollections(): Promise<CollectionInfo[]> {
     .filter((c) => c.book_count > 0);
 }
 
+/** Collections pour la nav : cible = la fiche livre directement si la collection n'a qu'un titre. */
+export async function collectionsForNav(): Promise<{ name: string; slug: string; href: string }[]> {
+  const colls = await listCollections(); // { id, name, slug, book_count }, book_count > 0
+  const singleIds = colls.filter((c) => c.book_count === 1).map((c) => String(c.id));
+  const bookByColl = new Map<string, string>();
+  if (singleIds.length) {
+    const rows = await query<any>(
+      `SELECT slug, primary_collection AS pc FROM book
+         WHERE status = 'published' AND primary_collection IN $ids`,
+      { ids: singleIds.map((id) => recId('collection', id)) }
+    );
+    for (const r of rows) if (r.pc && !bookByColl.has(String(r.pc))) bookByColl.set(String(r.pc), r.slug);
+  }
+  return colls.map((c) => {
+    const bookSlug = c.book_count === 1 ? bookByColl.get(String(c.id)) : undefined;
+    return { name: c.name, slug: c.slug, href: bookSlug ? `/livre/${bookSlug}` : `/collections/${c.slug}` };
+  });
+}
+
 export async function getCollectionBySlug(slug: string): Promise<{ collection: any; books: BookCard[] } | null> {
   const rows = await query<any>(`SELECT id, name, slug, description FROM collection WHERE slug = $slug LIMIT 1`, { slug });
   const collection = rows[0];
