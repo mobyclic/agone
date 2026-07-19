@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { page } from '$app/state';
+  import { Button } from '$lib/components/ui/button';
   import BookCard from '$lib/components/BookCard.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
+  import { PencilSimple } from 'phosphor-svelte';
 
   let { data } = $props();
   const a = $derived(data.author);
+  const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
   const years = $derived(
     a.birth_year || a.death_year ? `${a.birth_year ?? ''}–${a.death_year ?? ''}` : null
   );
@@ -12,6 +16,12 @@
 <svelte:head><title>{a.full_name} · Agone</title></svelte:head>
 
 <PageHead eyebrow="Auteur·rice" title={a.full_name} meta={[a.nationality, years].filter(Boolean).join(' · ') || undefined} />
+
+{#if isStaff && a.slug}
+  <div class="fixed bottom-6 right-6 z-40">
+    <Button href="/admin/auteurs/{a.slug}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
+  </div>
+{/if}
 
 <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
   <header class="flex flex-col gap-6 sm:flex-row sm:items-start">

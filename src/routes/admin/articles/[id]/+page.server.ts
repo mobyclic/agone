@@ -36,12 +36,12 @@ export const actions: Actions = {
 
     const editId = params.id && params.id !== 'nouveau' ? params.id : null;
     const id = await saveArticle(editId, input);
-    throw redirect(303, withFlash(`/admin/contenu/${id}`, 'Article enregistré.', 'success'));
+    throw redirect(303, withFlash(`/admin/articles/${id}`, 'Article enregistré.', 'success'));
   },
 
   delete: async ({ params, locals }) => {
     requireStaff(locals);
     if (params.id && params.id !== 'nouveau') await deleteArticle(params.id);
-    throw redirect(303, withFlash('/admin/contenu', 'Article supprimé.', 'success'));
+    throw redirect(303, withFlash('/admin/articles', 'Article supprimé.', 'success'));
   }
 };

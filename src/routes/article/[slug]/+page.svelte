@@ -17,15 +17,17 @@
 
 <svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
 
-<PageHead eyebrow="Antichambre" title={a.title} />
+<PageHead eyebrow="Antichambre" title={a.title} width="max-w-5xl" />
 
-<article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-  {#if isStaff}
-    <div class="fixed bottom-6 right-6 z-40">
-      <Button href="/admin/contenu/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
-    </div>
-  {/if}
+{#if isStaff}
+  <div class="fixed bottom-6 right-6 z-40">
+    <Button href="/admin/articles/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
+  </div>
+{/if}
 
+<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : ''}">
+    <article class="min-w-0 {data.books.length ? '' : 'max-w-3xl'}">
   {#if a.rubrique_name}
     <a href="/antichambre?rubrique={a.rubrique_slug}" class="eyebrow hover:underline">{a.rubrique_name}</a>
   {/if}
@@ -51,12 +53,25 @@
     </div>
   {/if}
 
-  {#if a.books.length}
-    <div class="mt-10 rounded-lg border border-border bg-secondary/40 p-4">
-      <h2 class="eyebrow mb-2">Livres liés</h2>
-      <ul class="space-y-1">
-        {#each a.books as b (b.slug)}<li><a href="/livre/{b.slug}" class="font-medium text-link hover:underline">{b.title}</a></li>{/each}
-      </ul>
-    </div>
-  {/if}
-</article>
+    </article>
+
+    {#if data.books.length}
+      <aside class="lg:sticky lg:top-28">
+        <h2 class="eyebrow mb-4">{data.books.length > 1 ? 'Livres liés' : 'Livre lié'}</h2>
+        <div class="space-y-4">
+          {#each data.books as book (book.slug)}
+            <a href="/livre/{book.slug}" class="group flex gap-3">
+              <span class="aspect-[2/3] w-16 shrink-0 overflow-hidden border border-border bg-muted">
+                {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
+              </span>
+              <span class="min-w-0">
+                <span class="line-clamp-3 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
+                {#if book.authors?.length}<span class="mt-1 block text-xs text-link">{book.authors[0].name}</span>{/if}
+              </span>
+            </a>
+          {/each}
+        </div>
+      </aside>
+    {/if}
+  </div>
+</div>

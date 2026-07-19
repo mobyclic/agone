@@ -194,6 +194,7 @@ DEFINE FIELD OVERWRITE published_original ON book TYPE option<datetime>;
 DEFINE FIELD OVERWRITE page_count    ON book TYPE option<int>;
 DEFINE FIELD OVERWRITE width_cm      ON book TYPE option<number>;
 DEFINE FIELD OVERWRITE height_cm     ON book TYPE option<number>;
+DEFINE FIELD OVERWRITE weight_grams  ON book TYPE option<int>;   -- poids en grammes (calcul frais de port)
 DEFINE FIELD OVERWRITE stock_qty     ON book TYPE int DEFAULT 0;    -- autorité = sync BLDD
 DEFINE FIELD OVERWRITE stock_synced_at ON book TYPE option<datetime>;
 DEFINE FIELD OVERWRITE featured      ON book TYPE bool DEFAULT false;
@@ -438,6 +439,8 @@ DEFINE FIELD OVERWRITE shipping     ON order TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE item_count   ON order TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE subtotal     ON order TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE shipping_total ON order TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE discount_total ON order TYPE number DEFAULT 0;   -- remise code promo
+DEFINE FIELD OVERWRITE promo_code   ON order TYPE option<string>;       -- code promo appliqué
 DEFINE FIELD OVERWRITE tax_total    ON order TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE total        ON order TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE has_ebook    ON order TYPE bool DEFAULT false;
@@ -574,3 +577,49 @@ DEFINE FIELD OVERWRITE created_at  ON invoice TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_invoice_ref    ON invoice FIELDS ref UNIQUE;
 DEFINE INDEX OVERWRITE idx_invoice_order  ON invoice FIELDS order;
 DEFINE INDEX OVERWRITE idx_invoice_issued ON invoice FIELDS issued_at;
+
+-- ————————————————————— Codes promo —————————————————————
+DEFINE TABLE OVERWRITE promo_code SCHEMAFULL;
+DEFINE FIELD OVERWRITE code        ON promo_code TYPE string;            -- en MAJUSCULES
+DEFINE FIELD OVERWRITE description ON promo_code TYPE option<string>;
+DEFINE FIELD OVERWRITE type        ON promo_code TYPE string
+  ASSERT $value IN ['percent','amount'] DEFAULT 'percent';              -- % ou montant €
+DEFINE FIELD OVERWRITE value       ON promo_code TYPE number DEFAULT 0; -- 0-100 si percent, € si amount
+DEFINE FIELD OVERWRITE min_subtotal ON promo_code TYPE option<number>;  -- montant mini de commande
+DEFINE FIELD OVERWRITE starts_at   ON promo_code TYPE option<datetime>;
+DEFINE FIELD OVERWRITE ends_at     ON promo_code TYPE option<datetime>;
+DEFINE FIELD OVERWRITE max_uses    ON promo_code TYPE option<int>;      -- quantité totale (NONE = illimité)
+DEFINE FIELD OVERWRITE used_count  ON promo_code TYPE int DEFAULT 0;
+-- Périmètre : tout le catalogue, une/des collection(s), ou des livres précis
+DEFINE FIELD OVERWRITE scope       ON promo_code TYPE string
+  ASSERT $value IN ['all','collection','book'] DEFAULT 'all';
+DEFINE FIELD OVERWRITE collections ON promo_code TYPE option<array<record<collection>>>;
+DEFINE FIELD OVERWRITE books       ON promo_code TYPE option<array<record<book>>>;
+-- Réservé à certains clients (vide = tout le monde)
+DEFINE FIELD OVERWRITE users       ON promo_code TYPE option<array<record<user>>>;
+DEFINE FIELD OVERWRITE active      ON promo_code TYPE bool DEFAULT true;
+DEFINE FIELD OVERWRITE created_at  ON promo_code TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at  ON promo_code TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_promo_code ON promo_code FIELDS code UNIQUE;
+
+-- ————————————————————— Livraison (zones + tarifs au poids) —————————————————————
+DEFINE TABLE OVERWRITE shipping_zone SCHEMAFULL;
+DEFINE FIELD OVERWRITE name          ON shipping_zone TYPE string;
+DEFINE FIELD OVERWRITE countries     ON shipping_zone TYPE array<string> DEFAULT [];  -- codes ISO-2 (ex. 'FR','BE')
+DEFINE FIELD OVERWRITE rest_of_world ON shipping_zone TYPE bool DEFAULT false;        -- capte les pays non listés ailleurs
+-- Paliers de tarif par POIDS (grammes) : liste ordonnée { up_to?: poids max du palier (g), price: € }
+DEFINE FIELD OVERWRITE rates         ON shipping_zone TYPE array<object> DEFAULT [];
+DEFINE FIELD OVERWRITE rates.*.up_to ON shipping_zone TYPE option<int>;
+DEFINE FIELD OVERWRITE rates.*.price ON shipping_zone TYPE number;
+DEFINE FIELD OVERWRITE free_over     ON shipping_zone TYPE option<number>;             -- franco de port au-dessus de ce sous-total
+DEFINE FIELD OVERWRITE active        ON shipping_zone TYPE bool DEFAULT true;
+DEFINE FIELD OVERWRITE sort          ON shipping_zone TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE created_at    ON shipping_zone TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at    ON shipping_zone TYPE datetime DEFAULT time::now() VALUE time::now();
+
+-- ————————————————————— Consentement (journal RGPD, sans PII) —————————————————————
+DEFINE TABLE OVERWRITE consent_event SCHEMAFULL;
+DEFINE FIELD OVERWRITE marketing  ON consent_event TYPE bool DEFAULT false;
+DEFINE FIELD OVERWRITE analytics  ON consent_event TYPE bool DEFAULT false;
+DEFINE FIELD OVERWRITE decision   ON consent_event TYPE string DEFAULT 'custom';
+DEFINE FIELD OVERWRITE created_at ON consent_event TYPE datetime DEFAULT time::now();

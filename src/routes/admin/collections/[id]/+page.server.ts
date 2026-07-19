@@ -1,14 +1,17 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
-import { getCollectionForEdit, saveCollection, deleteCollection } from '$lib/server/catalogue';
+import { getCollectionForEdit, saveCollection, deleteCollection, booksInCollectionAdmin } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
-  if (params.id === 'nouvelle') return { isNew: true, collection: null };
-  const collection = await getCollectionForEdit(params.id);
+  if (params.id === 'nouvelle') return { isNew: true, collection: null, books: [] };
+  const [collection, books] = await Promise.all([
+    getCollectionForEdit(params.id),
+    booksInCollectionAdmin(params.id)
+  ]);
   if (!collection) throw error(404, { message: 'Collection introuvable' });
-  return { isNew: false, collection };
+  return { isNew: false, collection, books };
 };
 
 export const actions: Actions = {

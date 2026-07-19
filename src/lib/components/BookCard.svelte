@@ -5,6 +5,8 @@
     subtitle?: string;
     slug: string;
     price_paper?: number;
+    subscription_price?: number;
+    subscription_end?: string;
     cover_url?: string;
     status?: string;
     published_at?: string;
@@ -12,8 +14,20 @@
   }
   let { book }: { book: Book } = $props();
   const authors = $derived(authorList(book.authors));
-  const price = $derived(
-    book.price_paper != null ? `${book.price_paper.toFixed(2).replace('.', ',')} €` : ''
+  const forthcoming = $derived(isForthcoming(book));
+  // À paraître → pas de prix, sauf s'il y a un prix ET une date de souscription.
+  const price = $derived.by(() => {
+    if (forthcoming) {
+      return book.subscription_price != null && book.subscription_end
+        ? `${book.subscription_price.toFixed(2).replace('.', ',')} €`
+        : '';
+    }
+    return book.price_paper != null ? `${book.price_paper.toFixed(2).replace('.', ',')} €` : '';
+  });
+  const pubDate = $derived(
+    book.published_at
+      ? new Date(book.published_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+      : ''
   );
 </script>
 
@@ -32,7 +46,7 @@
         <span class="line-clamp-5 text-sm font-semibold leading-tight">{book.title}</span>
       </div>
     {/if}
-    {#if isForthcoming(book)}
+    {#if forthcoming}
       <span class="absolute left-0 top-2 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">
         À paraître
       </span>
@@ -42,6 +56,11 @@
     <h3 class="line-clamp-2 font-sans text-sm font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
     {#if book.subtitle}<p class="mt-px line-clamp-1 text-xs leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
     {#if authors}<p class="mt-px line-clamp-1 text-xs text-link">{authors}</p>{/if}
-    {#if price}<p class="mt-1 text-xs font-medium text-foreground">{price}</p>{/if}
+    {#if forthcoming}
+      {#if pubDate}<p class="mt-1 text-xs font-medium text-muted-foreground">En librairie le {pubDate}</p>{/if}
+      {#if price}<p class="mt-0.5 text-xs font-medium text-foreground">Souscription {price}</p>{/if}
+    {:else if price}
+      <p class="mt-1 text-xs font-medium text-foreground">{price}</p>
+    {/if}
   </div>
 </a>

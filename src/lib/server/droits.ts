@@ -95,12 +95,26 @@ export async function contractCoverage(opts: { q?: string; limit?: number } = {}
   let where = 'array::len(->contributed_by) > 0';
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where += ' AND string::lowercase(title) CONTAINS $q'; }
   const books = await query<any>(
-    `SELECT id, title, slug, array::len(->contributed_by) AS contributor_count
+    `SELECT id, title, slug,
+        array::len(->contributed_by[WHERE role = 'author']) AS author_count,
+        array::len(->contributed_by[WHERE role = 'editor']) AS editor_count,
+        array::len(->contributed_by[WHERE role != 'author' AND role != 'editor']) AS contributor_count
        FROM book WHERE ${where} ORDER BY title ASC LIMIT $limit`, vars);
-  const counts = await query<any>(`SELECT book, count() AS n FROM royalty_contract GROUP BY book`);
-  const byBook = new Map<string, number>();
-  for (const c of counts) if (c.book) byBook.set(String(c.book), c.n ?? 0);
-  return books.map((b) => ({ ...b, contract_count: byBook.get(String(b.id)) ?? 0 }));
+  // Contrats par livre + statut (active | draft | ended).
+  const counts = await query<any>(`SELECT book, status, count() AS n FROM royalty_contract GROUP BY book, status`);
+  const totalByBook = new Map<string, number>();
+  const activeByBook = new Map<string, number>();
+  for (const c of counts) {
+    if (!c.book) continue;
+    const k = String(c.book);
+    totalByBook.set(k, (totalByBook.get(k) ?? 0) + (c.n ?? 0));
+    if (c.status === 'active') activeByBook.set(k, (activeByBook.get(k) ?? 0) + (c.n ?? 0));
+  }
+  return books.map((b) => ({
+    ...b,
+    contract_total: totalByBook.get(String(b.id)) ?? 0,
+    contract_active: activeByBook.get(String(b.id)) ?? 0
+  }));
 }
 
 // ── Relevés de ventes ─────────────────────────────────────────

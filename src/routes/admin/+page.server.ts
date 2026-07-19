@@ -10,21 +10,25 @@ async function count(table: string, where = ''): Promise<number> {
 
 export const load: PageServerLoad = async () => {
   const now = new Date();
-  const [ytd, pending, books, forthcoming, authors, articles, events, recent] = await Promise.all([
+  const [ytd, pending, books, forthcoming, drafts, outOfPrint, authors, articles, articleDrafts, events, pastEvents, recent] = await Promise.all([
     ytdSales(now),
     count('order', "status = 'pending'"),
     count('book', "status = 'published' AND (published_at = NONE OR published_at <= time::now())"),
     count('book', "status = 'published' AND published_at != NONE AND published_at > time::now()"),
+    count('book', "status = 'draft'"),
+    count('book', "status = 'out_of_print'"),
     count('author'),
     count('article', "status = 'published'"),
-    count('event', 'start_at > time::now()'),
+    count('article', "status = 'draft'"),
+    count('event', 'start_at != NONE AND start_at > time::now()'),
+    count('event', 'start_at != NONE AND start_at <= time::now()'),
     listOrdersAdmin({ limit: 6 })
   ]);
   return {
     ytd,
     pending,
     asOf: now.toISOString(),
-    counts: { books, forthcoming, authors, articles, events },
+    counts: { books, forthcoming, drafts, outOfPrint, authors, articles, articleDrafts, events, pastEvents },
     recentOrders: recent.orders
   };
 };

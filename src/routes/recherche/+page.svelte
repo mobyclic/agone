@@ -1,11 +1,14 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
   import { MagnifyingGlass } from 'phosphor-svelte';
   let { data } = $props();
   const nothing = $derived(data.q && !data.books.length && !data.authors.length && !data.articles.length);
 </script>
 
 <svelte:head><title>Recherche · Agone</title></svelte:head>
+
+<PageHead title="Recherche" subtitle={data.q ? `Résultats pour « ${data.q} »` : undefined} width="max-w-6xl" />
 
 <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
   <form method="GET" class="relative max-w-2xl">

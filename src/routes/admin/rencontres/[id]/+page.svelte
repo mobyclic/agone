@@ -4,7 +4,7 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import EntityPicker from '$lib/components/EntityPicker.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, MagnifyingGlass, X } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, MagnifyingGlass, X, Eye, MapPin, Spinner } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const ev = $derived(data.event);
@@ -33,6 +33,20 @@
   let vhits = $state<{ id: string; name: string; city?: string }[]>([]);
   let vtimer: ReturnType<typeof setTimeout>;
   let vname = $state(''), vstreet = $state(''), vcity = $state(''), vpost = $state(''), vcountry = $state('France'), vlat = $state(''), vlng = $state('');
+  let geoStatus = $state('');
+  let dirty = $state(false);
+  let saving = $state(false);
+  async function geolocate() {
+    const q = [vstreet, `${vpost} ${vcity}`.trim(), vcountry].map((s) => s.trim()).filter(Boolean).join(', ');
+    if (q.length < 3) { geoStatus = 'Renseignez une adresse.'; return; }
+    geoStatus = 'Recherche…';
+    try {
+      const res = await fetch(`/admin/api/geocode?q=${encodeURIComponent(q)}`);
+      const r = res.ok ? await res.json() : null;
+      if (r && r.lat != null) { vlat = String(r.lat); vlng = String(r.lng); dirty = true; geoStatus = 'Coordonnées trouvées ✓'; }
+      else geoStatus = 'Adresse introuvable — saisie manuelle possible.';
+    } catch { geoStatus = 'Erreur de géocodage.'; }
+  }
 
   $effect(() => {
     coverId = data.event?.cover_id ?? null;
@@ -65,10 +79,8 @@
   <ArrowLeft size={16} /> Rencontres
 </a>
 
-<form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4">
-    <h2 class="text-xl font-bold">{data.isNew ? 'Nouvelle rencontre' : ev?.title}</h2>
-  </div>
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+  <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvelle rencontre' : ev?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -87,9 +99,9 @@
         <div class="mb-3 flex items-center justify-between">
           <h3 class="eyebrow">Lieu</h3>
           <div class="flex overflow-hidden rounded-md border border-border text-xs">
-            <button type="button" class="px-3 py-1 {venueMode === 'existing' ? 'bg-foreground text-background' : ''}" onclick={() => (venueMode = 'existing')}>Existant</button>
-            <button type="button" class="px-3 py-1 {venueMode === 'new' ? 'bg-foreground text-background' : ''}" onclick={() => (venueMode = 'new')}>Nouveau</button>
-            <button type="button" class="px-3 py-1 {venueMode === 'none' ? 'bg-foreground text-background' : ''}" onclick={() => (venueMode = 'none')}>Aucun</button>
+            <button type="button" class="px-3 py-1 {venueMode === 'existing' ? 'bg-foreground text-background' : ''}" onclick={() => { venueMode = 'existing'; dirty = true; }}>Existant</button>
+            <button type="button" class="px-3 py-1 {venueMode === 'new' ? 'bg-foreground text-background' : ''}" onclick={() => { venueMode = 'new'; dirty = true; }}>Nouveau</button>
+            <button type="button" class="px-3 py-1 {venueMode === 'none' ? 'bg-foreground text-background' : ''}" onclick={() => { venueMode = 'none'; dirty = true; }}>Aucun</button>
           </div>
         </div>
 
@@ -126,7 +138,11 @@
               <label class={label}>Longitude <input bind:value={vlng} class={input} placeholder="5.37" /></label>
             </div>
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">Latitude/longitude optionnelles (pour la carte).</p>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <button type="button" onclick={geolocate} class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"><MapPin size={15} /> Géolocaliser l'adresse</button>
+            {#if geoStatus}<span class="text-xs text-muted-foreground">{geoStatus}</span>{/if}
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">Cliquez « Géolocaliser » pour remplir les coordonnées depuis l'adresse (sinon calculées automatiquement à l'enregistrement).</p>
         {:else}
           <p class="text-sm text-muted-foreground">Aucun lieu associé.</p>
         {/if}
@@ -134,7 +150,7 @@
 
       <div class="rounded-lg border border-border bg-card p-4">
         <span class={label}>Description</span>
-        {#key ev?.id}<RichEditor name="body_html" value={ev?.body_html ?? ''} minHeight="14rem" />{/key}
+        {#key ev?.id}<RichEditor name="body_html" value={ev?.body_html ?? ''} minHeight="14rem" onchange={() => (dirty = true)} />{/key}
       </div>
     </div>
 
@@ -146,11 +162,11 @@
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Auteurs</h3>
-        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" />{/key}
+        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Livres associés</h3>
-        {#key ev?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" initial={ev?.books ?? []} placeholder="Associer un livre…" />{/key}
+        {#key ev?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" initial={ev?.books ?? []} placeholder="Associer un livre…" onchange={() => (dirty = true)} />{/key}
       </div>
     </div>
   </div>
@@ -168,7 +184,13 @@
 
   <!-- Bouton flottant -->
   <div class="fixed bottom-6 right-6 z-40">
-    <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {#if saving}
+      <Button type="submit" variant="brand" disabled class="shadow-2xl"><Spinner size={16} class="animate-spin" /> Enregistrement…</Button>
+    {:else if data.isNew || dirty}
+      <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {:else if ev?.slug}
+      <Button href="/rencontres/{ev.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
+    {/if}
   </div>
 </form>
 

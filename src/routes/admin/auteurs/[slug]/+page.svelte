@@ -3,7 +3,7 @@
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Coins, Warning } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Coins, Warning, Eye, Spinner } from 'phosphor-svelte';
   import { euros } from '$lib/labels';
 
   let { data, form } = $props();
@@ -13,6 +13,8 @@
   let portraitId = $state<string | null>(null);
   let portraitUrl = $state<string | null>(null);
   let showDelete = $state(false);
+  let dirty = $state(false);
+  let saving = $state(false);
   $effect(() => {
     portraitId = data.author?.portrait ? String(data.author.portrait) : null;
     portraitUrl = data.author?.portrait_url ?? null;
@@ -46,10 +48,8 @@
   <ArrowLeft size={16} /> Auteurs
 </a>
 
-<form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4">
-    <h2 class="text-xl font-bold">{data.isNew ? 'Nouvel auteur' : a?.full_name}</h2>
-  </div>
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+  <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvel auteur' : a?.full_name}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -66,7 +66,7 @@
 
       <div class="rounded-lg border border-border bg-card p-4">
         <span class={label}>Biographie</span>
-        {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="10rem" />{/key}
+        {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="10rem" onchange={() => (dirty = true)} />{/key}
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">
@@ -94,7 +94,13 @@
 
   <!-- Bouton flottant -->
   <div class="fixed bottom-6 right-6 z-40">
-    <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {#if saving}
+      <Button type="submit" variant="brand" disabled class="shadow-2xl"><Spinner size={16} class="animate-spin" /> Enregistrement…</Button>
+    {:else if data.isNew || dirty}
+      <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
+    {:else if a?.slug}
+      <Button href="/auteur/{a.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
+    {/if}
   </div>
 </form>
 

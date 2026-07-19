@@ -35,7 +35,7 @@
   let status = $state('paid');
 
   // — Lignes —
-  type Line = { bookId: string; title: string; isbn?: string; format: string; qty: number; unit_price: number };
+  type Line = { bookId: string; title: string; isbn?: string; format: string; qty: number; unit_price: number; base_price: number };
   let lines = $state<Line[]>([]);
   let bq = $state('');
   let bhits = $state<{ id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string }[]>([]);
@@ -51,8 +51,18 @@
     }, 200);
   }
   function addBook(b: { id: string; title: string; price_paper?: number; isbn_paper?: string }) {
-    lines = [...lines, { bookId: b.id, title: b.title, isbn: b.isbn_paper, format: 'papier', qty: 1, unit_price: b.price_paper ?? 0 }];
+    const price = b.price_paper ?? 0;
+    lines = [...lines, { bookId: b.id, title: b.title, isbn: b.isbn_paper, format: 'papier', qty: 1, unit_price: price, base_price: price }];
     bq = ''; bhits = [];
+  }
+  // Bascule gratuit ⇄ payant : mémorise le prix courant pour pouvoir le rétablir.
+  function toggleFree(l: Line) {
+    if (l.unit_price === 0) {
+      l.unit_price = l.base_price || 0;
+    } else {
+      l.base_price = l.unit_price;
+      l.unit_price = 0;
+    }
   }
   const total = $derived(lines.reduce((s, l) => s + l.qty * l.unit_price, 0));
 
@@ -174,7 +184,11 @@
                 <td class="py-2 text-right">
                   <span class="inline-flex items-center gap-1">
                     <input type="number" min="0" step="0.01" bind:value={l.unit_price} class="h-8 w-20 rounded border border-border bg-background px-2 text-right text-sm" />
-                    <button type="button" class="rounded border border-border px-1.5 py-1 text-[10px] uppercase text-muted-foreground hover:bg-muted" title="Offrir" onclick={() => (l.unit_price = 0)}>Gratuit</button>
+                    <button type="button"
+                      class="rounded border px-1.5 py-1 text-[10px] font-medium uppercase {l.unit_price === 0 ? 'border-success bg-success/10 text-success' : 'border-border text-muted-foreground hover:bg-muted'}"
+                      title={l.unit_price === 0 ? 'Rétablir le prix' : 'Offrir ce titre'} onclick={() => toggleFree(l)}>
+                      {l.unit_price === 0 ? 'Offert' : 'Gratuit'}
+                    </button>
                   </span>
                 </td>
                 <td class="py-2 text-right tabular-nums">{euro(l.qty * l.unit_price)}</td>

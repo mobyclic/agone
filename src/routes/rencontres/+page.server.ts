@@ -1,7 +1,6 @@
 import type { PageServerLoad } from './$types';
-import { listUpcoming, listPast } from '$lib/server/events';
+import { listUpcoming } from '$lib/server/events';
 
 export const load: PageServerLoad = async () => {
-  const [upcoming, past] = await Promise.all([listUpcoming(), listPast(48)]);
-  return { upcoming, past };
+  return { upcoming: await listUpcoming() };
 };

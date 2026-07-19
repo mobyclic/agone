@@ -6,15 +6,27 @@ import type { Cookies } from '@sveltejs/kit';
 import { query, recId } from './surreal';
 
 const CART_COOKIE = 'ag_cart';
+const PROMO_COOKIE = 'ag_promo';
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// — Code promo appliqué (stocké tel quel ; la remise est recalculée à chaque affichage) —
+export function getPromoCode(cookies: Cookies): string | null {
+  return cookies.get(PROMO_COOKIE) || null;
+}
+export function setPromoCode(cookies: Cookies, code: string) {
+  cookies.set(PROMO_COOKIE, code.trim().toUpperCase(), { path: '/', httpOnly: true, sameSite: 'lax', secure: false, maxAge: 60 * 60 * 24 * 7 });
+}
+export function clearPromoCode(cookies: Cookies) {
+  cookies.delete(PROMO_COOKIE, { path: '/' });
+}
 
 export interface CartItem { id: string; format: string; qty: number }
 export interface CartLine {
-  id: string; slug: string; title: string; cover_url?: string;
-  format: string; qty: number; unit_price: number; line_total: number;
+  id: string; slug: string; title: string; cover_url?: string; author?: string;
+  format: string; qty: number; unit_price: number; line_total: number; weight?: number;
 }
 export interface CartDetails {
-  lines: CartLine[]; subtotal: number; item_count: number; has_ebook: boolean; has_physical: boolean;
+  lines: CartLine[]; subtotal: number; item_count: number; has_ebook: boolean; has_physical: boolean; total_weight: number;
 }
 
 export function readCart(cookies: Cookies): CartItem[] {
@@ -53,6 +65,14 @@ export function cartCount(cookies: Cookies): number {
   return readCart(cookies).reduce((n, i) => n + i.qty, 0);
 }
 
+/** Slugs des livres présents dans le panier (léger : une requête slug seulement). */
+export async function cartBookSlugs(cookies: Cookies): Promise<string[]> {
+  const ids = [...new Set(readCart(cookies).map((i) => i.id))];
+  if (!ids.length) return [];
+  const rows = await query<any>(`SELECT slug FROM book WHERE id IN $ids`, { ids: ids.map((x) => recId('book', x)) });
+  return rows.map((r) => r.slug).filter(Boolean);
+}
+
 function priceFor(book: any, format: string): number | null {
   if (format === 'epub') return book.price_ebook ?? null;
   if (format === 'souscription') return book.subscription_price ?? null;
@@ -61,24 +81,28 @@ function priceFor(book: any, format: string): number | null {
 
 export async function cartDetails(cookies: Cookies): Promise<CartDetails> {
   const items = readCart(cookies);
-  if (!items.length) return { lines: [], subtotal: 0, item_count: 0, has_ebook: false, has_physical: false };
+  if (!items.length) return { lines: [], subtotal: 0, item_count: 0, has_ebook: false, has_physical: false, total_weight: 0 };
   const ids = [...new Set(items.map((i) => i.id))];
   const books = await query<any>(
-    `SELECT id, title, slug, price_paper, price_ebook, subscription_price, cover.url AS cover_url FROM book WHERE id IN $ids`,
+    `SELECT id, title, slug, price_paper, price_ebook, subscription_price, weight_grams, cover.url AS cover_url,
+        ->contributed_by[WHERE role = 'author']->author.full_name AS a_names
+       FROM book WHERE id IN $ids`,
     { ids: ids.map((x) => recId('book', x)) }
   );
   const byId = new Map(books.map((b) => [String(b.id), b]));
   const lines: CartLine[] = [];
-  let subtotal = 0, item_count = 0, has_ebook = false, has_physical = false;
+  let subtotal = 0, item_count = 0, has_ebook = false, has_physical = false, total_weight = 0;
   for (const it of items) {
     const b = byId.get(it.id);
     if (!b) continue;
     const unit = priceFor(b, it.format);
     if (unit == null) continue;
     const line_total = r2(unit * it.qty);
-    lines.push({ id: it.id, slug: b.slug, title: b.title, cover_url: b.cover_url ?? undefined, format: it.format, qty: it.qty, unit_price: unit, line_total });
+    const weight = it.format === 'epub' ? 0 : (b.weight_grams ?? 0);
+    lines.push({ id: it.id, slug: b.slug, title: b.title, cover_url: b.cover_url ?? undefined, author: (b.a_names ?? [])[0] ?? undefined, format: it.format, qty: it.qty, unit_price: unit, line_total, weight });
     subtotal += line_total; item_count += it.qty;
+    total_weight += weight * it.qty;
     if (it.format === 'epub') has_ebook = true; else has_physical = true;
   }
-  return { lines, subtotal: r2(subtotal), item_count, has_ebook, has_physical };
+  return { lines, subtotal: r2(subtotal), item_count, has_ebook, has_physical, total_weight };
 }

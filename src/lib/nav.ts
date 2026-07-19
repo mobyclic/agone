@@ -7,6 +7,12 @@ export interface NavItem {
   icon?: string; // nom d'icône phosphor (ex: 'BookOpen')
 }
 
+/** Groupe de navigation (titre de section optionnel). */
+export interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
 /** Navigation publique principale. */
 export const PUBLIC_NAV: NavItem[] = [
   { label: 'Catalogue', href: '/catalogue', icon: 'BookOpen' },
@@ -23,19 +29,42 @@ export const ACCOUNT_NAV: NavItem[] = [
   { label: 'Mon profil', href: '/compte/profil', icon: 'User' }
 ];
 
-/** Back-office (/admin). */
-export const ADMIN_NAV: NavItem[] = [
-  { label: 'Tableau de bord', href: '/admin', icon: 'SquaresFour' },
-  { label: 'Antichambre', href: '/admin/contenu', icon: 'Article' },
-  { label: 'Catalogue', href: '/admin/catalogue', icon: 'BookOpen' },
-  { label: 'Collections', href: '/admin/collections', icon: 'Books' },
-  { label: 'Auteurs', href: '/admin/auteurs', icon: 'PenNib' },
-  { label: 'Rencontres', href: '/admin/rencontres', icon: 'CalendarDots' },
-  { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
-  { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
-  { label: 'Facturation', href: '/admin/factures', icon: 'Invoice' },
-  { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' },
-  { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
-  { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
-  { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
+/** Back-office (/admin) — organisé en sections. */
+export const ADMIN_NAV: NavSection[] = [
+  { items: [{ label: 'Tableau de bord', href: '/admin', icon: 'SquaresFour' }] },
+  {
+    title: 'Antichambre',
+    items: [
+      { label: 'Articles', href: '/admin/articles', icon: 'Article' },
+      { label: 'Catégories', href: '/admin/categories', icon: 'Tag' },
+      { label: 'Rencontres', href: '/admin/rencontres', icon: 'CalendarDots' }
+    ]
+  },
+  {
+    title: 'Catalogue',
+    items: [
+      { label: 'Livres', href: '/admin/catalogue', icon: 'BookOpen' },
+      { label: 'Collections', href: '/admin/collections', icon: 'Books' },
+      { label: 'Auteurs', href: '/admin/auteurs', icon: 'PenNib' }
+    ]
+  },
+  {
+    title: 'Boutique',
+    items: [
+      { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
+      { label: 'Clients', href: '/admin/utilisateurs', icon: 'Users' },
+      { label: 'Codes promo', href: '/admin/promos', icon: 'Percent' },
+      { label: 'Livraison', href: '/admin/livraison', icon: 'Truck' },
+      { label: 'Facturation', href: '/admin/factures', icon: 'Invoice' },
+      { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' }
+    ]
+  },
+  {
+    title: 'Outils',
+    items: [
+      { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
+      { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
+      { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
+    ]
+  }
 ];

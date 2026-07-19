@@ -68,6 +68,7 @@
       <div class="flex gap-4">
         <a class="hover:text-foreground" href="/mentions-legales">Mentions légales</a>
         <a class="hover:text-foreground" href="/cgv">CGV</a>
+        <button type="button" class="hover:text-foreground" onclick={() => window.dispatchEvent(new CustomEvent('open-consent-banner'))}>Gérer les cookies</button>
       </div>
     </div>
   </div>

@@ -4,11 +4,12 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import EntityPicker from '$lib/components/EntityPicker.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Eye } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const a = $derived(data.article);
   let dirty = $state(false);
+  let saving = $state(false);
 
   let coverId = $state<string | null>(null);
   let coverUrl = $state<string | null>(null);
@@ -25,11 +26,11 @@
 
 <svelte:head><title>{data.isNew ? 'Nouvel article' : a?.title} · Admin</title></svelte:head>
 
-<a href="/admin/contenu" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+<a href="/admin/articles" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
   <ArrowLeft size={16} /> Contenu
 </a>
 
-<form method="POST" action="?/save" use:enhance oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvel article' : a?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
@@ -45,7 +46,14 @@
         <label class={label} for="rubrique">Rubrique</label>
         <select id="rubrique" name="rubrique" value={a?.rubrique_id ?? ''} class={input}>
           <option value="">— Aucune —</option>
-          {#each data.rubriques as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+          <optgroup label="Publiées">
+            {#each data.rubriques.filter((r) => r.visible) as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+          </optgroup>
+          {#if data.rubriques.some((r) => !r.visible)}
+            <optgroup label="Sans article publié">
+              {#each data.rubriques.filter((r) => !r.visible) as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
+            </optgroup>
+          {/if}
         </select>
       </div>
       <div>
@@ -98,10 +106,12 @@
 
   <!-- Bouton flottant : Voir ↔ Enregistrer selon l'état de modification -->
   <div class="fixed bottom-6 right-6 z-40">
-    {#if data.isNew || dirty}
+    {#if saving}
+      <Button type="submit" variant="brand" disabled class="shadow-2xl"><Spinner size={16} class="animate-spin" /> Enregistrement…</Button>
+    {:else if data.isNew || dirty}
       <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
-    {:else}
-      <Button href="/article/{a?.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir l'article</Button>
+    {:else if a?.slug}
+      <Button href="/article/{a.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
     {/if}
   </div>
 </form>

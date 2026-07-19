@@ -65,9 +65,13 @@
 
 {#snippet sortable(label: string, col: string, align = 'left')}
   <th class="px-3 py-2 font-medium" style="text-align:{align}">
-    <button type="button" onclick={() => sortBy(col)} class="inline-flex items-center gap-1 uppercase hover:text-foreground {data.sort === col ? 'text-foreground' : ''}">
+    <button type="button" onclick={() => sortBy(col)} class="inline-flex items-center gap-1 uppercase hover:text-foreground {align === 'right' ? 'flex-row-reverse' : ''} {data.sort === col ? 'text-foreground' : ''}">
       {label}
-      {#if data.sort === col}{#if data.dir === 'asc'}<CaretUp size={11} weight="bold" />{:else}<CaretDown size={11} weight="bold" />{/if}{/if}
+      {#if data.sort === col}
+        {#if data.dir === 'asc'}<CaretUp size={11} weight="bold" />{:else}<CaretDown size={11} weight="bold" />{/if}
+      {:else}
+        <CaretDown size={11} class="opacity-25" />
+      {/if}
     </button>
   </th>
 {/snippet}
@@ -77,8 +81,8 @@
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
       <tr>
         {@render sortable('Livre', 'title')}
-        <th class="px-3 py-2 font-medium">Statut</th>
-        <th class="px-3 py-2 font-medium">ISBN</th>
+        {@render sortable('Statut', 'status')}
+        {@render sortable('ISBN', 'isbn')}
         {@render sortable('Parution', 'date')}
         {@render sortable('Prix', 'price', 'right')}
         {@render sortable('Stock', 'stock', 'right')}

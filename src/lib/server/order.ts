@@ -5,6 +5,7 @@ import { query, recId } from './surreal';
 import type { CartLine } from './cart';
 import { findUserByEmail, createUser } from './account';
 import { createInvoiceForOrder } from './invoice';
+import { recordPromoUse } from './promo';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -25,6 +26,9 @@ export interface CreateOrderInput {
   billing?: Record<string, unknown>;
   shipping?: Record<string, unknown>;
   lines: CartLine[];
+  discount?: number;
+  promoCode?: string;
+  shippingTotal?: number;
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<{ id: string; number: number }> {
@@ -34,8 +38,9 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
     subtotal += l.line_total; item_count += l.qty;
     if (l.format === 'epub') has_ebook = true; else has_physical = true;
   }
-  const shipping_total = 0; // Livraison offerte (France métropolitaine)
-  const total = r2(subtotal + shipping_total);
+  const shipping_total = r2(Math.max(0, input.shippingTotal ?? 0));
+  const discount_total = r2(Math.min(Math.max(0, input.discount ?? 0), subtotal));
+  const total = r2(subtotal - discount_total + shipping_total);
 
   const rows = await query<any>(`CREATE order CONTENT $c`, {
     c: {
@@ -43,7 +48,8 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
       customer: input.customerId ? recId('user', input.customerId) : undefined,
       email: input.email, channel: input.channel ?? 'web',
       status: 'pending', billing: input.billing, shipping: input.shipping,
-      item_count, subtotal: r2(subtotal), shipping_total, total, has_ebook, has_physical
+      item_count, subtotal: r2(subtotal), shipping_total, discount_total,
+      promo_code: input.promoCode || undefined, total, has_ebook, has_physical
     }
   });
   const orderId = String(rows[0].id).replace(/^order:/, '');
@@ -59,11 +65,12 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
 
 /** Marque une commande payée + accorde les ebooks (bibliothèque) + numéro de facture. */
 export async function markOrderPaid(orderId: string): Promise<void> {
-  const rows = await query<any>(`SELECT id, status, customer, has_ebook FROM order WHERE id = $id LIMIT 1`, { id: recId('order', orderId) });
+  const rows = await query<any>(`SELECT id, status, customer, has_ebook, promo_code FROM order WHERE id = $id LIMIT 1`, { id: recId('order', orderId) });
   const order = rows[0];
   if (!order || order.status === 'paid' || order.status === 'completed') return;
   const invoice = await nextCounter('invoice_number', 0);
   await query(`UPDATE $id SET status = 'paid', paid_at = time::now(), invoice_number = $inv`, { id: recId('order', orderId), inv: invoice });
+  if (order.promo_code) await recordPromoUse(order.promo_code);
 
   if (order.customer && order.has_ebook) {
     const ebookLines = await query<any>(`SELECT out AS book FROM contains WHERE in = $id AND format = 'epub'`, { id: recId('order', orderId) });
@@ -86,8 +93,8 @@ export async function markOrderPaid(orderId: string): Promise<void> {
 }
 
 const ORDER_FIELDS = `
-  id, number, status, channel, total, subtotal, shipping_total, item_count, has_ebook, has_physical,
-  invoice_number, created_at, paid_at, billing, shipping, email
+  id, number, status, channel, total, subtotal, shipping_total, discount_total, promo_code,
+  item_count, has_ebook, has_physical, invoice_number, created_at, paid_at, billing, shipping, email
 `;
 
 export async function getOrderByNumber(number: number) {
@@ -95,7 +102,7 @@ export async function getOrderByNumber(number: number) {
   const o = rows[0];
   if (!o) return null;
   const lines = await query<any>(
-    `SELECT out.title AS title, out.slug AS slug, format, qty, unit_price, line_total FROM contains WHERE in = $id`,
+    `SELECT out AS book_id, out.title AS title, out.slug AS slug, format, qty, unit_price, line_total FROM contains WHERE in = $id`,
     { id: recId('order', String(o.id)) }
   );
   return { ...o, lines };

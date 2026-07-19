@@ -5,11 +5,12 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Eye } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const b = $derived(data.book);
   let dirty = $state(false);
+  let saving = $state(false);
 
   let coverId = $state<string | null>(null);
   let coverUrl = $state<string | null>(null);
@@ -18,9 +19,11 @@
     coverUrl = data.book?.cover_url ?? null;
   });
 
-  const collSet = $derived(new Set((data.book?.collections ?? []).map(String)));
-  const rubSet = $derived(new Set((data.book?.rubriques ?? []).map(String)));
+  // Un livre n'a qu'une collection : publiées d'abord, puis les autres (séparateur).
+  const visibleCollections = $derived(data.collections.filter((c: any) => c.visible));
+  const hiddenCollections = $derived(data.collections.filter((c: any) => !c.visible));
   const pubDate = $derived(data.book?.published_at ? String(data.book.published_at).slice(0, 10) : '');
+  const subEndDate = $derived(data.book?.subscription_end ? String(data.book.subscription_end).slice(0, 10) : '');
   const primaryColl = $derived(data.book?.primary_collection ? String(data.book.primary_collection) : '');
 
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -33,7 +36,7 @@
   <ArrowLeft size={16} /> Catalogue
 </a>
 
-<form method="POST" action="?/save" use:enhance oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-4xl pb-24">
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-4xl pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouveau livre' : b?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
@@ -65,11 +68,13 @@
         <label class={label}>Prix papier (€) <input name="price_paper" type="number" step="0.01" value={b?.price_paper ?? ''} class={input} /></label>
         <label class={label}>Prix ebook (€) <input name="price_ebook" type="number" step="0.01" value={b?.price_ebook ?? ''} class={input} /></label>
         <label class={label}>Prix souscription (€) <input name="subscription_price" type="number" step="0.01" value={b?.subscription_price ?? ''} class={input} /></label>
+        <label class={label}>Souscription jusqu'au <input name="subscription_end" type="date" value={subEndDate} class={input} /></label>
         <label class={label}>Parution <input name="published_at" type="date" value={pubDate} class={input} /></label>
         <label class={label}>Pages <input name="page_count" type="number" value={b?.page_count ?? ''} class={input} /></label>
         <label class={label}>Stock <input name="stock_qty" type="number" value={b?.stock_qty ?? 0} class={input} /></label>
         <label class={label}>Largeur (cm) <input name="width_cm" type="number" step="0.1" value={b?.width_cm ?? ''} class={input} /></label>
         <label class={label}>Hauteur (cm) <input name="height_cm" type="number" step="0.1" value={b?.height_cm ?? ''} class={input} /></label>
+        <label class={label}>Poids (g) <input name="weight_grams" type="number" step="1" min="0" value={b?.weight_grams ?? ''} placeholder="frais de port" class={input} /></label>
         <label class={label}>Titre original <input name="title_original" value={b?.title_original ?? ''} class={input} /></label>
         <label class={label}>Langue originale <input name="language_original" value={b?.language_original ?? ''} class={input} /></label>
       </div>
@@ -103,36 +108,30 @@
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow mb-2">Collection principale</h3>
-        <select name="primary_collection" class="{input} mb-3">
+        <h3 class="eyebrow mb-2">Collection</h3>
+        <select name="primary_collection" class={input}>
           <option value="">—</option>
-          {#each data.collections as c (c.id)}<option value={String(c.id)} selected={String(c.id) === primaryColl}>{c.name}</option>{/each}
+          <optgroup label="Publiées">
+            {#each visibleCollections as c (c.id)}<option value={String(c.id)} selected={String(c.id) === primaryColl}>{c.name}</option>{/each}
+          </optgroup>
+          {#if hiddenCollections.length}
+            <optgroup label="Sans titre publié">
+              {#each hiddenCollections as c (c.id)}<option value={String(c.id)} selected={String(c.id) === primaryColl}>{c.name}</option>{/each}
+            </optgroup>
+          {/if}
         </select>
-        <h3 class="eyebrow mb-2">Collections</h3>
-        <div class="max-h-40 space-y-1 overflow-auto">
-          {#each data.collections as c (c.id)}
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="collections" value={String(c.id)} checked={collSet.has(String(c.id))} class="size-4 rounded border-border" /> {c.name}</label>
-          {/each}
-        </div>
-      </div>
-
-      <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow mb-2">Rubriques</h3>
-        <div class="max-h-40 space-y-1 overflow-auto">
-          {#each data.rubriques as r (r.id)}
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="rubriques" value={String(r.id)} checked={rubSet.has(String(r.id))} class="size-4 rounded border-border" /> {r.name}</label>
-          {/each}
-        </div>
       </div>
     </div>
   </div>
 
   <!-- Bouton flottant : Voir ↔ Enregistrer -->
   <div class="fixed bottom-6 right-6 z-40">
-    {#if data.isNew || dirty}
+    {#if saving}
+      <Button type="submit" variant="brand" disabled class="shadow-2xl"><Spinner size={16} class="animate-spin" /> Enregistrement…</Button>
+    {:else if data.isNew || dirty}
       <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
-    {:else}
-      <Button href="/livre/{b?.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir le livre</Button>
+    {:else if b?.slug}
+      <Button href="/livre/{b.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
     {/if}
   </div>
 </form>

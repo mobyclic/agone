@@ -70,6 +70,19 @@
     <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
   </form>
 
+  <!-- Traceurs & consentement -->
+  <form method="POST" action="?/tracking" use:enhance class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
+    <h3 class="mb-1 text-base font-semibold">Traceurs & mesure d'audience</h3>
+    <p class="mb-4 text-sm text-muted-foreground">Renseignez l'ID Google Tag Manager (recommandé — configurez GA4 et le Pixel Meta/Instagram dans GTM). Les traceurs ne se déclenchent qu'après consentement (CMP + Consent Mode v2). Les événements <span class="font-mono text-xs">add_to_cart</span>, <span class="font-mono text-xs">begin_checkout</span> et <span class="font-mono text-xs">purchase</span> sont poussés automatiquement dans le dataLayer.</p>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label><span class={label}>Google Tag Manager</span><input name="gtm_id" value={data.tracking.gtm_id} placeholder="GTM-XXXXXXX" class="{input} font-mono" /></label>
+      <label><span class={label}>Google Analytics 4</span><input name="ga_id" value={data.tracking.ga_id} placeholder="G-XXXXXXXXXX" class="{input} font-mono" /></label>
+      <label><span class={label}>Meta Pixel (Instagram)</span><input name="meta_pixel_id" value={data.tracking.meta_pixel_id} placeholder="123456789012345" class="{input} font-mono" /></label>
+    </div>
+    <p class="mt-2 text-xs text-muted-foreground">GA4 et Meta Pixel ne sont chargés directement que si aucun ID GTM n'est fourni (sinon, placez-les comme tags dans GTM).</p>
+    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
+  </form>
+
   <!-- Facturation -->
   <form method="POST" action="?/billing" use:enhance class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
     <h3 class="mb-1 text-base font-semibold">Facturation</h3>

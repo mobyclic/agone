@@ -40,6 +40,9 @@ export const actions: Actions = {
       galleryIds = [];
     }
 
+    // Un livre n'a qu'une seule collection : elle sert de collection principale ET de membre.
+    const collectionId = S('primary_collection') || undefined;
+
     const input: BookInput = {
       title,
       subtitle: S('subtitle') || undefined,
@@ -53,15 +56,17 @@ export const actions: Actions = {
       price_paper: N('price_paper'),
       price_ebook: N('price_ebook'),
       subscription_price: N('subscription_price'),
+      subscription_end: S('subscription_end') || undefined,
       published_at: S('published_at') || undefined,
       page_count: N('page_count'),
       width_cm: N('width_cm'),
       height_cm: N('height_cm'),
+      weight_grams: N('weight_grams'),
       stock_qty: N('stock_qty') ?? 0,
       featured: fd.get('featured') === 'on',
-      collectionIds: fd.getAll('collections').map(String),
+      collectionIds: collectionId ? [collectionId] : [],
       rubriqueIds: fd.getAll('rubriques').map(String),
-      primaryCollectionId: S('primary_collection') || undefined,
+      primaryCollectionId: collectionId,
       coverId: S('coverId') || undefined,
       galleryIds
     };

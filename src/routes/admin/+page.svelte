@@ -10,12 +10,19 @@
   const y = $derived(data.ytd);
   const barMax = $derived(Math.max(1, y.ca, y.prevCa));
 
+  const plural = (n: number, s: string, p = `${s}s`) => `${n.toLocaleString('fr-FR')} ${n > 1 ? p : s}`;
   const catalogueStats = $derived([
-    { label: 'Livres publiés', value: data.counts.books, href: '/admin/catalogue' },
-    { label: 'À paraître', value: data.counts.forthcoming, href: '/admin/catalogue?status=forthcoming' },
-    { label: 'Auteurs', value: data.counts.authors, href: '/admin/auteurs' },
-    { label: 'Articles', value: data.counts.articles, href: '/admin/contenu' },
-    { label: 'Rencontres à venir', value: data.counts.events, href: '/rencontres' }
+    {
+      label: 'Livres publiés', value: data.counts.books, href: '/admin/catalogue',
+      sub: [
+        data.counts.drafts > 0 ? plural(data.counts.drafts, 'brouillon') : null,
+        data.counts.outOfPrint > 0 ? plural(data.counts.outOfPrint, 'épuisé') : null
+      ].filter(Boolean).join(' · ')
+    },
+    { label: 'À paraître', value: data.counts.forthcoming, href: '/admin/catalogue?status=forthcoming', sub: '' },
+    { label: 'Auteurs', value: data.counts.authors, href: '/admin/auteurs', sub: '' },
+    { label: 'Articles publiés', value: data.counts.articles, href: '/admin/articles', sub: data.counts.articleDrafts > 0 ? plural(data.counts.articleDrafts, 'brouillon') : '' },
+    { label: 'Rencontres à venir', value: data.counts.events, href: '/admin/rencontres', sub: data.counts.pastEvents > 0 ? `${plural(data.counts.pastEvents, 'passée')}` : '' }
   ]);
 
   const statusTone: Record<string, string> = {
@@ -109,8 +116,11 @@
       {#each catalogueStats as c (c.label)}
         <li>
           <a href={c.href} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/40">
-            <span class="text-sm text-muted-foreground">{c.label}</span>
-            <span class="text-base font-bold tabular-nums">{c.value.toLocaleString('fr-FR')}</span>
+            <span class="min-w-0">
+              <span class="block text-sm text-muted-foreground">{c.label}</span>
+              {#if c.sub}<span class="block text-xs text-muted-foreground/60">{c.sub}</span>{/if}
+            </span>
+            <span class="shrink-0 text-base font-bold tabular-nums">{c.value.toLocaleString('fr-FR')}</span>
           </a>
         </li>
       {/each}
@@ -167,7 +177,7 @@
       <a href="/admin/catalogue/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><BookOpen size={17} /> Nouveau livre</a>
       <a href="/admin/auteurs/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><PenNib size={17} /> Nouvel auteur</a>
       <a href="/admin/rencontres/nouvelle" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><CalendarDots size={17} /> Nouvelle rencontre</a>
-      <a href="/admin/contenu/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Article size={17} /> Nouvel article</a>
+      <a href="/admin/articles/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><Article size={17} /> Nouvel article</a>
     </div>
   </section>
 </div>

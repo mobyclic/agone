@@ -1,15 +1,36 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { Plus, MagnifyingGlass } from 'phosphor-svelte';
+  import { Plus, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
 
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   function qs(p: Record<string, string | number | undefined>) {
+    const base = {
+      q: data.q,
+      sort: data.sort === 'name' ? undefined : data.sort,
+      dir: data.dir === 'asc' ? undefined : data.dir
+    };
     const sp = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q: data.q, ...p })) if (v !== undefined && v !== '') sp.set(k, String(v));
+    for (const [k, v] of Object.entries({ ...base, ...p })) if (v !== undefined && v !== '') sp.set(k, String(v));
     const s = sp.toString(); return s ? `?${s}` : '';
   }
+  // Clique sur un en-tête : même colonne → bascule ASC/DESC ; autre colonne → ASC.
+  const sortHref = (col: 'name' | 'titres' | 'visibilite') =>
+    qs({ sort: col, dir: data.sort === col && data.dir === 'asc' ? 'desc' : 'asc', page: undefined });
 </script>
+
+{#snippet th(col: 'name' | 'titres' | 'visibilite', text: string, right = false)}
+  <th class="px-3 py-2 font-medium {right ? 'text-right' : ''}">
+    <a href={sortHref(col)} class="inline-flex items-center gap-1 hover:text-foreground {right ? 'flex-row-reverse' : ''} {data.sort === col ? 'text-foreground' : ''}">
+      {text}
+      {#if data.sort === col}
+        {#if data.dir === 'asc'}<CaretUp size={11} weight="bold" />{:else}<CaretDown size={11} weight="bold" />{/if}
+      {:else}
+        <CaretDown size={11} class="opacity-25" />
+      {/if}
+    </a>
+  </th>
+{/snippet}
 
 <svelte:head><title>Auteurs · Admin Agone</title></svelte:head>
 
@@ -28,7 +49,7 @@
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-      <tr><th class="px-3 py-2 font-medium">Nom</th><th class="px-3 py-2 text-right font-medium">Titres</th><th class="px-3 py-2 font-medium">Visibilité</th></tr>
+      <tr>{@render th('name', 'Nom')}{@render th('titres', 'Titres', true)}{@render th('visibilite', 'Visibilité')}</tr>
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.authors as a (a.id)}

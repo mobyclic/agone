@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, Coins } from 'phosphor-svelte';
@@ -8,6 +9,25 @@
   const fmtP = (s: string, e: string) => `${new Date(s).toLocaleDateString('fr-FR')} → ${new Date(e).toLocaleDateString('fr-FR')}`;
   const STATUS: Record<string, string> = { draft: 'Brouillon', issued: 'Émise', paid: 'Payée' };
   const input = 'h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
+
+  // Champs de période liés + raccourcis.
+  let start = $state(untrack(() => data.start ?? ''));
+  let end = $state(untrack(() => data.end ?? ''));
+  const iso = (d: Date) => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  function setPeriod(kind: 'month' | 'prevMonth' | 'year' | 'prevYear') {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    let s: Date, e: Date;
+    if (kind === 'year') { s = new Date(y, 0, 1); e = new Date(y, 11, 31); }
+    else if (kind === 'prevYear') { s = new Date(y - 1, 0, 1); e = new Date(y - 1, 11, 31); }
+    else if (kind === 'month') { s = new Date(y, m, 1); e = new Date(y, m + 1, 0); }
+    else { s = new Date(y, m - 1, 1); e = new Date(y, m, 0); }
+    start = iso(s); end = iso(e);
+  }
+  const preset = 'rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground';
 </script>
 
 <svelte:head><title>Reddition de comptes · Admin</title></svelte:head>
@@ -19,9 +39,15 @@
 <div class="mb-6 rounded-lg border border-border bg-card p-5">
   <h3 class="eyebrow mb-3">Générer une reddition</h3>
   {#if form?.error}<p class="mb-3 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
+  <div class="mb-3 flex flex-wrap gap-1.5">
+    <button type="button" class={preset} onclick={() => setPeriod('month')}>Mois en cours</button>
+    <button type="button" class={preset} onclick={() => setPeriod('prevMonth')}>Mois précédent</button>
+    <button type="button" class={preset} onclick={() => setPeriod('year')}>Année en cours</button>
+    <button type="button" class={preset} onclick={() => setPeriod('prevYear')}>Année précédente</button>
+  </div>
   <form method="POST" action="?/generate" use:enhance class="flex flex-wrap items-end gap-3">
-    <label class="text-xs font-medium text-muted-foreground">Début<br /><input name="period_start" type="date" required class="{input} mt-1" /></label>
-    <label class="text-xs font-medium text-muted-foreground">Fin<br /><input name="period_end" type="date" required class="{input} mt-1" /></label>
+    <label class="text-xs font-medium text-muted-foreground">Début<br /><input name="period_start" type="date" required bind:value={start} class="{input} mt-1" /></label>
+    <label class="text-xs font-medium text-muted-foreground">Fin<br /><input name="period_end" type="date" required bind:value={end} class="{input} mt-1" /></label>
     <Button type="submit"><Coins size={15} /> Générer</Button>
   </form>
   {#if data.periods.length}

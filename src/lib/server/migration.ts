@@ -144,11 +144,13 @@ export async function importUsers(opts: { limit?: number; dryRun?: boolean } = {
 
     // full_name est calculé (VALUE) côté schéma → on ne le pose pas.
     try {
+      let userPid: string;
       if (existing) {
         const fields: Record<string, unknown> = { legacy_wp_id: wpId, first_name: first, last_name: last, phone, billing, shipping };
         if (createdAt) fields.created_at = createdAt; // backfill de la vraie date d'inscription
         const { sql, vars } = buildSet(fields);
         await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('user', existing) });
+        userPid = existing;
         updated++;
       } else {
         const slug = await uniqueSlug('user', full || email);
@@ -157,9 +159,15 @@ export async function importUsers(opts: { limit?: number; dryRun?: boolean } = {
           role: 'customer', email_verified: true, is_active: true, legacy_wp_id: wpId,
           phone, billing, shipping, created_at: createdAt
         });
-        await query(`CREATE user SET ${sql}`, vars);
+        const rows = await query<any>(`CREATE user SET ${sql}`, vars);
+        userPid = String(rows[0].id).replace(/^user:/, '');
         created++;
       }
+      // Sens inverse : rattacher les commandes orphelines (même e-mail, sans client).
+      await query(
+        `UPDATE order SET customer = $u WHERE string::lowercase(email) = $em AND customer = NONE`,
+        { u: recId('user', userPid), em: email }
+      );
     } catch (e) {
       skipped++;
       warnings.push(`Utilisateur WP #${wpId} (${email}) ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
@@ -264,6 +272,20 @@ export async function importOrders(opts: { limit?: number; dryRun?: boolean } = 
     const rows = await query<any>(`SELECT meta::id(id) AS pid, legacy_wp_id FROM user WHERE legacy_wp_id IN $ids`, { ids: [...customerIds] });
     for (const r of rows) userMap.set(Number(r.legacy_wp_id), r.pid);
   }
+  // Appariement complémentaire par e-mail (client sans legacy_wp_id, ou déjà présent autrement).
+  const orderEmails = new Set<string>();
+  for (const o of orders) {
+    const em = String((ometa.get(Number(o.ID)) ?? {})._billing_email ?? '').trim().toLowerCase();
+    if (em) orderEmails.add(em);
+  }
+  const emailMap = new Map<string, string>();
+  if (orderEmails.size) {
+    const rows = await query<any>(
+      `SELECT meta::id(id) AS pid, string::lowercase(email) AS em FROM user WHERE string::lowercase(email) IN $emails`,
+      { emails: [...orderEmails] }
+    );
+    for (const r of rows) if (r.em) emailMap.set(r.em, r.pid);
+  }
 
   for (const o of orders) {
     const wpId = Number(o.ID);
@@ -300,11 +322,12 @@ export async function importOrders(opts: { limit?: number; dryRun?: boolean } = 
       toRelate.push({ bookPid, format, qty, unit: qty ? r2(total / qty) : total, total: r2(total), title: String(l.name ?? '') });
     }
 
-    const customerPid = userMap.get(Number(m._customer_user ?? 0));
+    const email = (m._billing_email || '').trim().toLowerCase();
+    const customerPid = userMap.get(Number(m._customer_user ?? 0)) ?? (email ? emailMap.get(email) : undefined);
     const { sql, vars } = buildSet({
-      number: wpId, legacy_wp_id: wpId, status,
+      number: wpId, legacy_wp_id: wpId, status, channel: 'web',
       customer: customerPid ? recId('user', customerPid) : undefined,
-      email: (m._billing_email || '').trim() || undefined,
+      email: email || undefined,
       currency: (m._order_currency || 'EUR').trim(),
       billing: address(m, '_billing_'), shipping: address(m, '_shipping_'),
       item_count: itemCount, subtotal: r2(subtotal), shipping_total: num(m._order_shipping) ?? 0,

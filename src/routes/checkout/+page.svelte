@@ -1,11 +1,29 @@
 <script lang="ts">
+  import { untrack, onMount } from 'svelte';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
+  import PageHead from '$lib/components/PageHead.svelte';
+  import { quoteShippingFor } from '$lib/shipping-calc';
+  import { trackBeginCheckout, itemId } from '$lib/analytics';
   import { ArrowLeft, Lock } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const eur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+  const discount = $derived(data.promo && data.promo.ok ? data.promo.discount : 0);
   const b = $derived(form?.values ?? data.user?.billing ?? {});
+  // Livraison : le pays choisi → devis client (recalculé côté serveur à la validation).
+  let country = $state(untrack(() => (form?.values as any)?.country ?? data.user?.billing?.country ?? 'FR'));
+  const shipCountries = $derived(data.shipCountries.length ? data.shipCountries : [{ code: 'FR', name: 'France' }]);
+  const shipQuote = $derived(quoteShippingFor(data.shipZones, country, data.cart.total_weight, data.cart.subtotal));
+  const shipping = $derived(data.cart.has_physical && shipQuote.ok ? shipQuote.price : 0);
+  const total = $derived(Math.max(0, data.cart.subtotal - discount) + shipping);
+
+  onMount(() => {
+    trackBeginCheckout(
+      data.cart.lines.map((l) => ({ item_id: itemId(l.id), item_name: l.title, price: l.unit_price, quantity: l.qty, item_variant: FORMAT[l.format] ?? l.format })),
+      { value: Math.max(0, data.cart.subtotal - discount), coupon: data.promo && data.promo.ok ? data.promo.code : undefined }
+    );
+  });
   const FORMAT: Record<string, string> = { papier: 'Papier', epub: 'Numérique', souscription: 'Souscription' };
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
@@ -13,9 +31,10 @@
 
 <svelte:head><title>Commande · Agone</title></svelte:head>
 
+<PageHead eyebrow="Boutique" title="Finaliser la commande" width="max-w-4xl" />
+
 <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
   <a href="/panier" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Panier</a>
-  <h1 class="text-2xl font-extrabold tracking-tight">Finaliser la commande</h1>
 
   {#if form?.error}<p class="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -33,13 +52,17 @@
             <label class="{lbl} sm:col-span-2">Complément <input name="address_2" value={b.address_2 ?? ''} class={input} /></label>
             <label class={lbl}>Code postal * <input name="postcode" required value={b.postcode ?? ''} class={input} /></label>
             <label class={lbl}>Ville * <input name="city" required value={b.city ?? ''} class={input} /></label>
-            <label class="{lbl} sm:col-span-2">Pays <input name="country" value={b.country ?? 'FR'} class={input} /></label>
+            <label class="{lbl} sm:col-span-2">Pays de livraison *
+              <select name="country" bind:value={country} class={input}>
+                {#each shipCountries as c (c.code)}<option value={c.code}>{c.name}</option>{/each}
+              </select>
+            </label>
           {/if}
         </div>
       </div>
 
       <Button type="submit" variant="brand" size="lg" class="w-full">
-        <Lock size={16} /> {data.stripeEnabled ? 'Payer' : 'Valider la commande'} — {eur(data.cart.subtotal)}
+        <Lock size={16} /> {data.stripeEnabled ? 'Payer' : 'Valider la commande'} — {eur(total)}
       </Button>
       {#if !data.stripeEnabled}
         <p class="text-center text-xs text-muted-foreground">Le paiement en ligne sera activé prochainement — votre commande sera enregistrée.</p>
@@ -59,8 +82,12 @@
       </ul>
       <div class="mt-4 space-y-1 border-t border-border pt-3 text-sm">
         <div class="flex justify-between text-muted-foreground"><span>Sous-total</span><span>{eur(data.cart.subtotal)}</span></div>
-        {#if data.cart.has_physical}<div class="flex justify-between text-muted-foreground"><span>Livraison</span><span>Offerte</span></div>{/if}
-        <div class="flex justify-between text-base font-bold"><span>Total</span><span>{eur(data.cart.subtotal)}</span></div>
+        {#if data.promo && data.promo.ok}<div class="flex justify-between text-success"><span>Code {data.promo.code}</span><span>−{eur(data.promo.discount)}</span></div>{/if}
+        {#if data.cart.has_physical}
+          <div class="flex justify-between text-muted-foreground"><span>Livraison</span><span>{shipQuote.ok ? (shipping > 0 ? eur(shipping) : 'Offerte') : '—'}</span></div>
+          {#if !shipQuote.ok}<p class="text-xs text-destructive">{shipQuote.error}</p>{/if}
+        {/if}
+        <div class="flex justify-between text-base font-bold"><span>Total</span><span>{eur(total)}</span></div>
       </div>
     </aside>
   </div>

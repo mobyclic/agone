@@ -15,6 +15,8 @@ export interface BookCard {
   slug: string;
   price_paper?: number;
   price_ebook?: number;
+  subscription_price?: number;
+  subscription_end?: string;
   status: string;
   published_at?: string;
   featured: boolean;
@@ -34,6 +36,8 @@ function toCard(r: any): BookCard {
     slug: r.slug,
     price_paper: r.price_paper ?? undefined,
     price_ebook: r.price_ebook ?? undefined,
+    subscription_price: r.subscription_price ?? undefined,
+    subscription_end: r.subscription_end ?? undefined,
     status: r.status,
     published_at: r.published_at ?? undefined,
     featured: r.featured ?? false,
@@ -45,7 +49,7 @@ function toCard(r: any): BookCard {
 }
 
 const CARD_FIELDS = `
-  id, title, subtitle, slug, price_paper, price_ebook, status, featured, published_at,
+  id, title, subtitle, slug, price_paper, price_ebook, subscription_price, subscription_end, status, featured, published_at,
   cover.url AS cover_url,
   ->contributed_by[WHERE role = 'author']->author.full_name AS a_names,
   ->contributed_by[WHERE role = 'author']->author.slug AS a_slugs,
@@ -152,6 +156,14 @@ export async function searchBooksForOrder(
 }
 
 /** Autres livres du même auteur (par slug d'auteur). */
+/** Cartes complètes (couverture + auteurs) pour une liste de slugs, ordre préservé. */
+export async function bookCardsBySlugs(slugs: string[]): Promise<BookCard[]> {
+  if (!slugs.length) return [];
+  const rows = await query<any>(`SELECT ${CARD_FIELDS} FROM book WHERE slug IN $slugs`, { slugs });
+  const bySlug = new Map<string, BookCard>(rows.map((r) => [r.slug as string, toCard(r)]));
+  return slugs.map((s) => bySlug.get(s)).filter((b): b is BookCard => !!b);
+}
+
 export async function booksByAuthorSlug(authorSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
   const rows = await query<any>(
     `SELECT ${CARD_FIELDS} FROM book
@@ -179,6 +191,7 @@ export interface BookDetail extends BookCard {
   isbn_paper?: string;
   isbn_ebook?: string;
   subscription_price?: number;
+  subscription_end?: string;
   published_at?: string;
   page_count?: number;
   width_cm?: number;
@@ -223,6 +236,7 @@ export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
     isbn_paper: b.isbn_paper ?? undefined,
     isbn_ebook: b.isbn_ebook ?? undefined,
     subscription_price: b.subscription_price ?? undefined,
+    subscription_end: b.subscription_end ?? undefined,
     published_at: b.published_at ?? undefined,
     page_count: b.page_count ?? undefined,
     width_cm: b.width_cm ?? undefined,
@@ -345,7 +359,8 @@ export async function countPublishedBooks(): Promise<number> {
 // ══════════════════════════════════════════════════════════════
 
 const ADMIN_SORT: Record<string, string> = {
-  title: 'title', price: 'price_paper', stock: 'stock_qty', date: 'published_at', recent: 'updated_at'
+  title: 'title', status: 'status', isbn: 'isbn_paper', price: 'price_paper',
+  stock: 'stock_qty', date: 'published_at', recent: 'updated_at'
 };
 
 export async function listBooksAdmin(opts: { q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number } = {}) {
@@ -390,21 +405,60 @@ export async function allRubriques() {
 
 /** Toutes les collections (non filtrées) — pour les sélecteurs d'admin. */
 export async function allCollections() {
-  return query<any>(`SELECT id, name, slug, sort FROM collection ORDER BY sort ASC`);
+  const colls = await query<any>(`SELECT id, name, slug, sort FROM collection ORDER BY sort ASC`);
+  const pub = await query<any>(
+    `SELECT primary_collection AS c, count() AS n FROM book WHERE status = 'published' AND primary_collection != NONE GROUP BY primary_collection`
+  );
+  const byPub = new Map<string, number>();
+  for (const r of pub) if (r.c) byPub.set(String(r.c), r.n ?? 0);
+  return colls.map((r) => ({ ...r, visible: (byPub.get(String(r.id)) ?? 0) > 0 }));
 }
 
 /* ————————————————————— Collections (back-office CRUD + ordre) ————————————————————— */
 
-export interface AdminCollection { id: string; name: string; slug: string; sort: number; book_count: number }
+export interface AdminCollection { id: string; name: string; slug: string; sort: number; book_count: number; published_count: number; visible: boolean }
 
 export async function listCollectionsAdmin(): Promise<AdminCollection[]> {
   const colls = await query<any>(`SELECT id, meta::id(id) AS pid, name, slug, sort FROM collection ORDER BY sort ASC`);
+  // Total (tous statuts) + publiés (= critère d'affichage sur le site, cf. listCollections).
   const counts = await query<any>(
     `SELECT primary_collection AS c, count() AS n FROM book WHERE primary_collection != NONE GROUP BY primary_collection`
   );
+  const pub = await query<any>(
+    `SELECT primary_collection AS c, count() AS n FROM book WHERE status = 'published' AND primary_collection != NONE GROUP BY primary_collection`
+  );
   const byColl = new Map<string, number>();
   for (const r of counts) if (r.c) byColl.set(String(r.c), r.n ?? 0);
-  return colls.map((r) => ({ id: r.pid, name: r.name, slug: r.slug, sort: r.sort ?? 0, book_count: byColl.get(String(r.id)) ?? 0 }));
+  const byPub = new Map<string, number>();
+  for (const r of pub) if (r.c) byPub.set(String(r.c), r.n ?? 0);
+  return colls.map((r) => {
+    const published_count = byPub.get(String(r.id)) ?? 0;
+    return {
+      id: r.pid, name: r.name, slug: r.slug, sort: r.sort ?? 0,
+      book_count: byColl.get(String(r.id)) ?? 0,
+      published_count,
+      visible: published_count > 0
+    };
+  });
+}
+
+/** Livres d'une collection (principale ou membre) — pour la fiche collection admin. */
+export async function booksInCollectionAdmin(
+  id: string
+): Promise<{ id: string; title: string; slug: string; status: string; published_at?: string; cover_url?: string; is_primary: boolean }[]> {
+  const c = recId('collection', id);
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, title, slug, status, published_at, cover.url AS cover_url,
+        (primary_collection = $c) AS is_primary
+      FROM book WHERE primary_collection = $c OR collections CONTAINS $c
+      ORDER BY published_at DESC`,
+    { c }
+  );
+  return rows.map((r) => ({
+    id: r.id, title: r.title, slug: r.slug, status: r.status,
+    published_at: r.published_at ?? undefined, cover_url: r.cover_url ?? undefined,
+    is_primary: !!r.is_primary
+  }));
 }
 
 export async function getCollectionForEdit(id: string) {
@@ -464,8 +518,8 @@ export interface BookInput {
   title: string; subtitle?: string; description_html?: string; extra_info_html?: string;
   title_original?: string; title_alt?: string; language_original?: string;
   status: string; isbn_paper?: string; isbn_ebook?: string;
-  price_paper?: number; price_ebook?: number; subscription_price?: number;
-  published_at?: string; page_count?: number; width_cm?: number; height_cm?: number;
+  price_paper?: number; price_ebook?: number; subscription_price?: number; subscription_end?: string;
+  published_at?: string; page_count?: number; width_cm?: number; height_cm?: number; weight_grams?: number;
   stock_qty?: number; featured?: boolean;
   collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string; galleryIds?: string[];
 }
@@ -492,8 +546,9 @@ export async function upsertBook(id: string | null, d: BookInput): Promise<strin
     language_original: d.language_original, status: d.status || 'draft',
     isbn_paper: d.isbn_paper, isbn_ebook: d.isbn_ebook,
     price_paper: d.price_paper, price_ebook: d.price_ebook, subscription_price: d.subscription_price,
+    subscription_end: d.subscription_end ? new Date(d.subscription_end) : undefined,
     published_at: d.published_at ? new Date(d.published_at) : undefined,
-    page_count: d.page_count, width_cm: d.width_cm, height_cm: d.height_cm,
+    page_count: d.page_count, width_cm: d.width_cm, height_cm: d.height_cm, weight_grams: d.weight_grams,
     stock_qty: d.stock_qty ?? 0, featured: !!d.featured,
     primary_collection: d.primaryCollectionId ? recId('collection', d.primaryCollectionId) : undefined,
     cover: d.coverId ? recId('media', d.coverId) : undefined

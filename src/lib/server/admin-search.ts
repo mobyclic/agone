@@ -50,7 +50,7 @@ export async function adminQuickSearch(qRaw: string): Promise<QuickHit[]> {
       type: 'article' as const,
       id: a.id,
       label: a.title,
-      href: `/admin/contenu/${a.id}`
+      href: `/admin/articles/${a.id}`
     }))
   ];
 }

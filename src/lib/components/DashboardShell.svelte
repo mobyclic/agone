@@ -2,20 +2,25 @@
   import { page } from '$app/state';
   import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
-  import type { NavItem } from '$lib/nav';
+  import type { NavItem, NavSection } from '$lib/nav';
   import { List, X, SignOut, ArrowSquareOut } from 'phosphor-svelte';
 
   let {
     items,
+    sections,
     user,
     title = '',
     children
   }: {
-    items: NavItem[];
+    items?: NavItem[];
+    sections?: NavSection[];
     user: NonNullable<App.Locals['user']>;
     title?: string;
     children: import('svelte').Snippet;
   } = $props();
+
+  // Accepte soit des sections, soit une liste plate (repli en une section sans titre).
+  const navSections = $derived<NavSection[]>(sections ?? (items ? [{ items }] : []));
 
   let open = $state(false);
   const isActive = (href: string) =>
@@ -42,18 +47,25 @@
       </button>
     </div>
 
-    <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-      {#each items as item (item.href)}
-        <a
-          href={item.href}
-          onclick={() => (open = false)}
-          class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(item.href)
-            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}"
-        >
-          <Icon name={item.icon} size={18} />
-          {item.label}
-        </a>
+    <nav class="flex-1 space-y-3 overflow-y-auto px-3 py-2">
+      {#each navSections as section, si (section.title ?? `_${si}`)}
+        <div class="space-y-0.5">
+          {#if section.title}
+            <p class="px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">{section.title}</p>
+          {/if}
+          {#each section.items as item (item.href)}
+            <a
+              href={item.href}
+              onclick={() => (open = false)}
+              class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(item.href)
+                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}"
+            >
+              <Icon name={item.icon} size={18} />
+              {item.label}
+            </a>
+          {/each}
+        </div>
       {/each}
     </nav>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { isStaff } from '$lib/roles';
+  import SearchOverlay from './SearchOverlay.svelte';
   import {
     List, X, MagnifyingGlass, ShoppingCart, CaretDown,
     FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo
@@ -14,6 +15,7 @@
   const accountLabel = $derived(user && isStaff(user.role) ? 'Back-office' : 'Mon compte');
 
   let open = $state(false);
+  let searchOpen = $state(false);
   const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
   const collections = $derived(nav?.collections ?? []);
   const rubriques = $derived(nav?.rubriques ?? []);
@@ -88,7 +90,7 @@
 
     <!-- Droite : recherche, panier, compte, réseaux -->
     <div class="ml-auto flex items-center gap-1">
-      <a href="/recherche" class="grid size-9 place-items-center text-muted-foreground hover:text-foreground" aria-label="Rechercher"><MagnifyingGlass size={20} /></a>
+      <button type="button" onclick={() => (searchOpen = true)} class="grid size-9 place-items-center text-muted-foreground hover:text-foreground" aria-label="Rechercher"><MagnifyingGlass size={20} /></button>
       <a href="/panier" class="relative grid size-9 place-items-center text-muted-foreground hover:text-foreground" aria-label="Panier">
         <ShoppingCart size={20} />
         {#if cartCount > 0}<span class="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{cartCount}</span>{/if}
@@ -131,3 +133,5 @@
     </div>
   {/if}
 </header>
+
+<SearchOverlay bind:open={searchOpen} />

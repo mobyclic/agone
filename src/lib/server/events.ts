@@ -4,6 +4,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
+import { geocodeAddress } from './geocode';
 import { GeometryPoint } from 'surrealdb';
 
 export interface EventCard {
@@ -52,6 +53,7 @@ export async function listPast(limit = 48): Promise<EventCard[]> {
 }
 
 export interface EventDetail {
+  id: string;
   title: string;
   slug: string;
   body_html?: string;
@@ -74,7 +76,7 @@ export interface EventDetail {
 
 export async function getEventBySlug(slug: string): Promise<EventDetail | null> {
   const rows = await query<any>(
-    `SELECT title, slug, body_html, start_at, end_at, cover.url AS cover_url,
+    `SELECT meta::id(id) AS pid, title, slug, body_html, start_at, end_at, cover.url AS cover_url,
         venue.* AS venue,
         authors.{ full_name: full_name, slug: slug } AS authors,
         books.{ title: title, slug: slug } AS books
@@ -84,6 +86,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
   const e = rows[0];
   if (!e) return null;
   return {
+    id: e.pid,
     title: e.title,
     slug: e.slug,
     body_html: e.body_html ?? undefined,
@@ -191,6 +194,12 @@ async function resolveVenueId(input: EventInput): Promise<string | undefined> {
   if (input.venueId) return input.venueId;
   const v = input.newVenue;
   if (!v || !v.name?.trim()) return undefined;
+  // Géocodage auto si coordonnées manquantes mais adresse renseignée.
+  if ((v.lat == null || v.lng == null) && (v.street || v.city)) {
+    const q = [v.street, `${v.post_code ?? ''} ${v.city ?? ''}`.trim(), v.country].map((s) => (s ?? '').trim()).filter(Boolean).join(', ');
+    const geo = await geocodeAddress(q);
+    if (geo) { v.lat = geo.lat; v.lng = geo.lng; }
+  }
   const slug = await uniqueSlug('venue', v.name);
   const content: Record<string, unknown> = {
     name: v.name.trim(), slug,

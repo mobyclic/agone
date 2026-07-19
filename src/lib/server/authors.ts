@@ -126,15 +126,27 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
 // ADMINISTRATION (back-office)
 // ══════════════════════════════════════════════════════════════
 
-export async function listAuthorsAdmin(opts: { q?: string; limit?: number; offset?: number } = {}) {
+export type AuthorSort = 'name' | 'titres' | 'visibilite';
+
+export async function listAuthorsAdmin(
+  opts: { q?: string; limit?: number; offset?: number; sort?: AuthorSort; dir?: 'asc' | 'desc' } = {}
+) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 60, start: opts.offset ?? 0 };
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(full_name) CONTAINS $q'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  // Tri whitelisté (les champs sont tous présents dans le SELECT → ORDER BY valide).
+  const dir = opts.dir === 'desc' ? 'DESC' : 'ASC';
+  const orderBy: Record<AuthorSort, string> = {
+    name: `last_name ${dir}, first_name ${dir}`,
+    titres: `book_count ${dir}, last_name ASC`,
+    visibilite: `hidden ${dir}, last_name ASC`
+  };
+  const orderSql = orderBy[opts.sort ?? 'name'] ?? orderBy.name;
   const rows = await query<any>(
     `SELECT id, full_name, slug, last_name, first_name, hidden,
         array::len(array::distinct(<-contributed_by<-book)) AS book_count
-      FROM author ${whereSql} ORDER BY last_name ASC, first_name ASC LIMIT $limit START $start`, vars);
+      FROM author ${whereSql} ORDER BY ${orderSql} LIMIT $limit START $start`, vars);
   const count = await query<any>(`SELECT count() AS n FROM author ${whereSql} GROUP ALL`, vars);
   return { authors: rows, total: count[0]?.n ?? 0 };
 }

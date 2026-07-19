@@ -11,9 +11,12 @@ import {
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
-  const [contact, banner, company] = await Promise.all([getSetting('contact'), getSetting('banner'), getCompany()]);
+  const [contact, banner, company, tracking] = await Promise.all([
+    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking')
+  ]);
   const c = (contact ?? {}) as Record<string, any>;
   const b = (banner ?? {}) as Record<string, any>;
+  const t = (tracking ?? {}) as Record<string, any>;
   const msg = b.message;
   return {
     wpReady: wpConfigured(),
@@ -23,6 +26,7 @@ export const load: PageServerLoad = async () => {
       message: typeof msg === 'object' && msg ? String(msg.fr ?? '') : String(msg ?? ''),
       variant: typeof b.variant === 'string' ? b.variant : 'info'
     },
+    tracking: { gtm_id: String(t.gtm_id ?? ''), ga_id: String(t.ga_id ?? ''), meta_pixel_id: String(t.meta_pixel_id ?? '') },
     company
   };
 };
@@ -51,6 +55,17 @@ export const actions: Actions = {
       address: String(fd.get('address') ?? '').trim()
     });
     throw redirect(303, withFlash('/admin/parametres', 'Coordonnées enregistrées.', 'success'));
+  },
+
+  tracking: async ({ request, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    await setSetting('tracking', {
+      gtm_id: String(fd.get('gtm_id') ?? '').trim(),
+      ga_id: String(fd.get('ga_id') ?? '').trim(),
+      meta_pixel_id: String(fd.get('meta_pixel_id') ?? '').trim()
+    });
+    throw redirect(303, withFlash('/admin/parametres', 'Traceurs enregistrés.', 'success'));
   },
 
   banner: async ({ request, locals }) => {

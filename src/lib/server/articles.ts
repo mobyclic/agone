@@ -224,18 +224,28 @@ export interface AdminArticleRow {
   published_at?: string; is_newsletter_issue: boolean; rubrique_name?: string; author?: string; views: number;
 }
 
+export type ArticleSort = 'title' | 'status' | 'views' | 'date';
+
 /** Liste paginée des articles (tous statuts) pour le back-office. */
-export async function listArticlesAdmin(opts: { q?: string; rubrique?: string; status?: string; limit?: number; offset?: number } = {}): Promise<{ articles: AdminArticleRow[]; total: number }> {
+export async function listArticlesAdmin(opts: { q?: string; rubrique?: string; status?: string; limit?: number; offset?: number; sort?: ArticleSort; dir?: 'asc' | 'desc' } = {}): Promise<{ articles: AdminArticleRow[]; total: number }> {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
   if (opts.rubrique) { where.push('rubrique.slug = $rub'); vars.rub = opts.rubrique; }
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  // Tri whitelisté (tous les champs sont dans le SELECT → ORDER BY valide).
+  const dir = opts.dir === 'asc' ? 'ASC' : 'DESC';
+  const orderSql = {
+    title: `title ${dir}`,
+    status: `status ${dir}, published_at DESC`,
+    views: `views ${dir}`,
+    date: `published_at ${dir}`
+  }[opts.sort ?? 'date'] ?? `published_at ${dir}`;
   const rows = await query<any>(
     `SELECT id, title, slug, status, published_at, is_newsletter_issue, views,
         rubrique.name AS rubrique_name, authors.full_name AS author_names
-      FROM article ${whereSql} ORDER BY published_at DESC LIMIT $limit START $start`,
+      FROM article ${whereSql} ORDER BY ${orderSql} LIMIT $limit START $start`,
     vars
   );
   const count = await query<any>(`SELECT count() AS n FROM article ${whereSql} GROUP ALL`, vars);
@@ -316,17 +326,31 @@ export async function deleteArticle(id: string): Promise<void> {
 
 /* ————————————————————— Rubriques (édition) ————————————————————— */
 
-export interface AdminRubrique { id: string; name: string; slug: string; kind: string; sort: number; count: number }
+export interface AdminRubrique { id: string; name: string; slug: string; kind: string; sort: number; count: number; published_count: number; visible: boolean }
 
 export async function listAllRubriques(): Promise<AdminRubrique[]> {
   const rubs = await query<any>(`SELECT id, name, slug, kind, sort FROM rubrique ORDER BY sort ASC, name ASC`);
   const counts = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE GROUP BY rubrique`);
+  const pub = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE status = 'published' AND rubrique != NONE GROUP BY rubrique`);
   const byR = new Map<string, number>();
   for (const c of counts) if (c.r) byR.set(String(c.r), c.n ?? 0);
-  return rubs.map((r) => ({
-    id: plainId(r.id, 'rubrique'), name: r.name, slug: r.slug, kind: r.kind ?? 'both',
-    sort: r.sort ?? 0, count: byR.get(String(r.id)) ?? 0
-  }));
+  const byPub = new Map<string, number>();
+  for (const c of pub) if (c.r) byPub.set(String(c.r), c.n ?? 0);
+  return rubs.map((r) => {
+    const published_count = byPub.get(String(r.id)) ?? 0;
+    return {
+      id: plainId(r.id, 'rubrique'), name: r.name, slug: r.slug, kind: r.kind ?? 'both',
+      sort: r.sort ?? 0, count: byR.get(String(r.id)) ?? 0, published_count, visible: published_count > 0
+    };
+  });
+}
+
+export async function getRubriqueForEdit(id: string) {
+  const rows = await query<any>(`SELECT meta::id(id) AS id, name, slug FROM rubrique WHERE id = $id LIMIT 1`, { id: recId('rubrique', id) });
+  const r = rows[0];
+  if (!r) return null;
+  const c = await query<any>(`SELECT count() AS n FROM article WHERE rubrique = $r GROUP ALL`, { r: recId('rubrique', id) });
+  return { id: r.id, name: r.name, slug: r.slug, article_count: c[0]?.n ?? 0 };
 }
 
 export async function saveRubrique(id: string | null, d: { name: string; slug?: string; kind?: string; sort?: number }): Promise<string> {
@@ -348,4 +372,10 @@ export async function saveRubrique(id: string | null, d: { name: string; slug?: 
 export async function deleteRubrique(id: string): Promise<void> {
   await query(`UPDATE article SET rubrique = NONE WHERE rubrique = $id`, { id: recId('rubrique', id) });
   await query(`DELETE $id`, { id: recId('rubrique', id) });
+}
+
+export async function reorderRubriques(orderedIds: string[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await query(`UPDATE $id SET sort = $s`, { id: recId('rubrique', orderedIds[i]), s: i });
+  }
 }

@@ -1,0 +1,26 @@
+import { redirect, type Actions } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
+import { requireStaff } from '$lib/server/access';
+import { listAllRubriques, reorderRubriques } from '$lib/server/articles';
+import { withFlash } from '$lib/toasts';
+
+export const load: PageServerLoad = async ({ locals }) => {
+  requireStaff(locals);
+  return { rubriques: await listAllRubriques() };
+};
+
+export const actions: Actions = {
+  reorder: async ({ request, locals }) => {
+    requireStaff(locals);
+    const fd = await request.formData();
+    let ids: string[] = [];
+    try {
+      const parsed = JSON.parse(String(fd.get('order') ?? '[]'));
+      ids = Array.isArray(parsed) ? parsed.map((x) => String(x)).filter(Boolean) : [];
+    } catch {
+      ids = [];
+    }
+    if (ids.length) await reorderRubriques(ids);
+    throw redirect(303, withFlash('/admin/categories', 'Ordre des catégories enregistré.', 'success'));
+  }
+};

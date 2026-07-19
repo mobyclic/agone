@@ -1,17 +1,12 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
 </script>
 
 <svelte:head><title>À paraître · Agone</title></svelte:head>
 
-<section class="border-b border-border bg-secondary/40">
-  <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-    <p class="eyebrow">Prochainement</p>
-    <h1 class="mt-1 text-3xl font-extrabold tracking-tight">À paraître</h1>
-    <p class="mt-2 text-muted-foreground">{data.books.length} titres en préparation.</p>
-  </div>
-</section>
+<PageHead eyebrow="Catalogue" title="À paraître" subtitle="Les prochains titres des Éditions Agone." />
 
 <section class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
   {#if data.books.length === 0}

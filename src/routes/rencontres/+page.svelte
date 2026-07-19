@@ -10,8 +10,6 @@
     const d = new Date(s);
     return d.getHours() || d.getMinutes() ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
   };
-  const fmtShort = (s?: string) =>
-    s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 </script>
 
 <svelte:head><title>Rencontres · Agone</title></svelte:head>
@@ -45,22 +43,4 @@
       </div>
     {/if}
   </section>
-
-  <!-- Passées -->
-  {#if data.past.length}
-    <section class="mt-14">
-      <h2 class="text-xl font-bold tracking-tight">Rencontres passées</h2>
-      <ul class="mt-5 divide-y divide-border border-y border-border">
-        {#each data.past as e (e.slug)}
-          <li>
-            <a href="/rencontres/{e.slug}" class="group flex flex-wrap items-baseline gap-x-3 py-3 hover:bg-muted/40">
-              <span class="w-28 shrink-0 text-sm text-muted-foreground">{fmtShort(e.start_at)}</span>
-              <span class="min-w-0 flex-1 font-medium group-hover:text-link">{e.title}</span>
-              {#if e.venue_city}<span class="text-sm text-muted-foreground">{e.venue_city}</span>{/if}
-            </a>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
 </div>

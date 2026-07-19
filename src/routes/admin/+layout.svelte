@@ -5,6 +5,6 @@
   let { data, children } = $props();
 </script>
 
-<DashboardShell items={ADMIN_NAV} user={data.user} title="Back-office Agone">
+<DashboardShell sections={ADMIN_NAV} user={data.user} title="Back-office Agone">
   {@render children?.()}
 </DashboardShell>
