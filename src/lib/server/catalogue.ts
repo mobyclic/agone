@@ -4,6 +4,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
+import { accentRegex } from '$lib/text';
 import { wpautop } from './wpautop';
 import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
 export { ROLE_LABEL };
@@ -79,8 +80,8 @@ export async function listBooks(opts: ListBooksOpts = {}): Promise<{ books: Book
     vars.rub = opts.rubrique;
   }
   if (opts.q && opts.q.trim()) {
-    vars.q = opts.q.trim().toLowerCase();
-    where.push('(string::lowercase(title) CONTAINS $q OR string::lowercase(subtitle ?? "") CONTAINS $q)');
+    vars.re = accentRegex(opts.q);
+    where.push(`(string::matches(title, $re) OR string::matches(subtitle ?? "", $re))`);
   }
 
   const order =

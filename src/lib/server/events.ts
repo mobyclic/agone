@@ -15,6 +15,8 @@ export interface EventCard {
   cover_url?: string;
   venue_name?: string;
   venue_city?: string;
+  venue_lat?: number;
+  venue_lng?: number;
   author_names: string[];
 }
 
@@ -27,6 +29,8 @@ function toCard(r: any): EventCard {
     cover_url: r.cover_url ?? undefined,
     venue_name: r.venue_name ?? undefined,
     venue_city: r.venue_city ?? undefined,
+    venue_lat: r.venue_lat ?? undefined,
+    venue_lng: r.venue_lng ?? undefined,
     author_names: (r.author_names ?? []).filter(Boolean)
   };
 }
@@ -34,6 +38,7 @@ function toCard(r: any): EventCard {
 const CARD = `
   title, slug, start_at, end_at, cover.url AS cover_url,
   venue.name AS venue_name, venue.city AS venue_city,
+  venue.lat AS venue_lat, venue.lng AS venue_lng,
   authors.full_name AS author_names
 `;
 

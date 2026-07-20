@@ -18,6 +18,10 @@ export const load: PageServerLoad = async () => {
     featured,
     feature,
     articles,
-    events: upcoming.slice(0, 4)
+    events: upcoming.slice(0, 6),
+    // Pastilles carte : toutes les rencontres à venir géolocalisées.
+    eventPins: upcoming
+      .filter((e) => e.venue_lat != null && e.venue_lng != null)
+      .map((e) => ({ slug: e.slug, title: e.title, lat: e.venue_lat!, lng: e.venue_lng!, city: e.venue_city, start: e.start_at, end: e.end_at }))
   };
 };

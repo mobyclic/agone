@@ -198,12 +198,50 @@
   }
 }
 
+/* ============================================================
+   Taille de police du contenu : +2px sur tout le site, SAUF la nav.
+   Tailwind v4 : les utilitaires text-* pointent sur var(--text-*),
+   donc on redéfinit ces tokens sur le conteneur du front ; la nav
+   (.nav-base-size) restaure les valeurs par défaut. Les line-heights
+   restent des ratios sans unité → elles suivent la taille.
+   ============================================================ */
+.text-plus {
+  --text-xs: 0.875rem;   /* 12 → 14 */
+  --text-sm: 1rem;       /* 14 → 16 */
+  --text-base: 1.125rem; /* 16 → 18 */
+  --text-lg: 1.25rem;    /* 18 → 20 */
+  --text-xl: 1.375rem;   /* 20 → 22 */
+  --text-2xl: 1.625rem;  /* 24 → 26 */
+  --text-3xl: 2rem;      /* 30 → 32 */
+  --text-4xl: 2.375rem;  /* 36 → 38 */
+  --text-5xl: 3.125rem;  /* 48 → 50 */
+  --text-6xl: 3.875rem;  /* 60 → 62 */
+  --text-7xl: 4.625rem;  /* 72 → 74 */
+  --text-8xl: 6.125rem;  /* 96 → 98 */
+  --text-9xl: 8.125rem;  /* 128 → 130 */
+}
+.nav-base-size {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+  --text-7xl: 4.5rem;
+  --text-8xl: 6rem;
+  --text-9xl: 8rem;
+}
+
 /* — Petit label capitales (Oswald, noir) — */
 .eyebrow {
   font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   @apply text-foreground;
 }
@@ -226,7 +264,7 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--foreground);
 }
 .tick-label::before {

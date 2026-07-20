@@ -115,6 +115,16 @@ export async function listOrdersForUser(userId: string) {
   );
 }
 
+/** Slugs des livres déjà achetés par un client (via order->contains->book).
+ *  Indexé par idx_order_customer ; sert à ne pas re-suggérer ce qu'il possède. */
+export async function purchasedBookSlugs(userId: string): Promise<string[]> {
+  const rows = await query<any>(
+    `SELECT ->contains->book.slug AS slugs FROM order WHERE customer = $u`,
+    { u: recId('user', userId) }
+  );
+  return [...new Set(rows.flatMap((r) => (r.slugs ?? []) as string[]))];
+}
+
 /* ————————————————————— Back-office ————————————————————— */
 
 export const ORDER_STATUSES = [

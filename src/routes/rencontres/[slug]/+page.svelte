@@ -28,7 +28,7 @@
 
 <svelte:head><title>{e.title} · Rencontres Agone</title></svelte:head>
 
-<PageHead eyebrow="Rencontres" title={e.title} width="max-w-5xl" />
+<PageHead eyebrow="Rencontres" title={e.title} width="max-w-7xl" inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'} />
 
 {#if isStaff}
   <div class="fixed bottom-6 right-6 z-40">
@@ -36,9 +36,9 @@
   </div>
 {/if}
 
-<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : ''}">
-    <div class="min-w-0 {data.books.length ? '' : 'max-w-3xl'}">
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}">
+    <div class="min-w-0 {data.books.length ? '' : 'max-w-4xl'}">
   {#if isPast}<span class="mb-3 inline-block rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Rencontre passée</span>{/if}
 
   <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -89,15 +89,15 @@
     {#if data.books.length}
       <aside class="lg:sticky lg:top-28">
         <h2 class="eyebrow mb-4">{data.books.length > 1 ? 'Les livres' : 'Le livre'}</h2>
-        <div class="space-y-4">
+        <div class="space-y-6">
           {#each data.books as book (book.slug)}
-            <a href="/livre/{book.slug}" class="group flex gap-3">
-              <span class="aspect-[2/3] w-16 shrink-0 overflow-hidden border border-border bg-muted">
+            <a href="/livre/{book.slug}" class="group flex gap-4">
+              <span class="aspect-[2/3] w-32 shrink-0 overflow-hidden border border-border bg-muted">
                 {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
               </span>
               <span class="min-w-0">
-                <span class="line-clamp-3 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
-                {#if book.authors?.length}<span class="mt-1 block text-xs text-link">{book.authors[0].name}</span>{/if}
+                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
+                {#if book.authors?.length}<span class="mt-1 block text-sm text-link">{book.authors[0].name}</span>{/if}
               </span>
             </a>
           {/each}

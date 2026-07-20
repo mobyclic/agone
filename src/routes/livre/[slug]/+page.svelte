@@ -1,13 +1,13 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { invalidateAll } from '$app/navigation';
+  import { invalidate } from '$app/navigation';
   import { page } from '$app/state';
+  import { fade, scale } from 'svelte/transition';
   import { Button } from '$lib/components/ui/button';
   import Lightbox from '$lib/components/Lightbox.svelte';
-  import PageHead from '$lib/components/PageHead.svelte';
   import { ROLE_LABEL, euros, isForthcoming } from '$lib/labels';
   import { trackAddToCart, itemId } from '$lib/analytics';
-  import { ArrowLeft, BookOpen, FileText, HandCoins, PencilSimple, MagnifyingGlassPlus, CheckCircle, X, ShoppingCart, SquaresFour } from 'phosphor-svelte';
+  import { BookOpen, FileText, HandCoins, PencilSimple, MagnifyingGlassPlus, CheckCircle, X, ShoppingCart, SquaresFour, CircleNotch } from 'phosphor-svelte';
 
   let { data } = $props();
   const b = $derived(data.book);
@@ -19,11 +19,13 @@
   // Modal « Ajouté au panier »
   let cartOpen = $state(false);
   let addedFormat = $state('');
+  let loadingFormat = $state(''); // format en cours d'ajout (loader sur le bouton)
   // Livres associés (même collection + même auteur, dédoublonnés) pour le modal.
   const relatedBooks = $derived(
     [...(data.sameCollection ?? []), ...(data.sameAuthor ?? [])]
       .filter((x: any, i: number, arr: any[]) => arr.findIndex((y: any) => y.slug === x.slug) === i)
-      .filter((x: any) => !(data.cartSlugs ?? []).includes(x.slug))
+      // Écarte ce qui est déjà au panier ou déjà acheté (si connecté).
+      .filter((x: any) => !(data.cartSlugs ?? []).includes(x.slug) && !(data.purchasedSlugs ?? []).includes(x.slug))
       .slice(0, 4)
   );
   // On intercepte la redirection vers /panier : on reste sur la fiche, on ouvre le modal
@@ -31,14 +33,18 @@
   function addToCart({ formData }: { formData: FormData }) {
     const f = formats.find((x) => x.key === formData.get('format'));
     addedFormat = f?.label ?? '';
+    loadingFormat = String(formData.get('format') ?? '');
     return async ({ result, update }: any) => {
       if (result.type === 'redirect') {
         trackAddToCart({ item_id: itemId(b.id), item_name: b.title, price: f?.price ?? 0, quantity: 1, item_variant: f?.label, item_category: collection?.name });
-        await invalidateAll();
+        // Rafraîchit UNIQUEMENT le compteur panier (layout) — pas la fiche ni les
+        // suggestions : d'où un ajout au panier quasi instantané.
+        await invalidate('app:cart');
         cartOpen = true;
       } else {
         await update();
       }
+      loadingFormat = '';
     };
   }
   const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
@@ -70,14 +76,8 @@
 
 <svelte:head><title>{b.title} · Agone</title></svelte:head>
 
-<PageHead eyebrow={collection?.name ?? 'Catalogue'} title={b.title} subtitle={b.subtitle} />
-
+<!-- Fiche livre : PAS de gros header (exception) — le titre vit dans la colonne de contenu. -->
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-  <nav class="mb-6 flex flex-wrap items-center gap-1.5 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
-    <a href="/catalogue" class="inline-flex items-center gap-1.5 hover:text-foreground"><ArrowLeft size={14} /> Catalogue</a>
-    {#if collection}<span class="opacity-40">/</span><a href="/collections/{collection.slug}" class="hover:text-foreground">{collection.name}</a>{/if}
-  </nav>
-
   {#if isStaff}
     <div class="fixed bottom-6 right-6 z-40">
       <Button href="/admin/catalogue/{bookId}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
@@ -100,7 +100,7 @@
         </div>
       {/if}
 
-      <dl class="mt-6 space-y-3 border-t-2 border-foreground pt-5 text-sm">
+      <dl class="mt-6 space-y-3 text-sm">
         {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
         {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
         {#if dims}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
@@ -111,12 +111,19 @@
 
     <!-- Contenu -->
     <div class="min-w-0">
-      <h2 class="display-title text-2xl leading-tight">{b.title}</h2>
+      <!-- Fil d'Ariane, au-dessus du titre, en petit : Catalogue / Collection -->
+      <nav class="mb-3 flex flex-wrap items-center gap-1.5 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <a href="/catalogue" class="hover:text-foreground">Catalogue</a>
+        {#if collection}<span class="opacity-40">/</span><a href="/collections/{collection.slug}" class="hover:text-foreground">{collection.name}</a>{/if}
+      </nav>
+
+      <h2 class="display-title text-3xl leading-tight sm:text-4xl">{b.title}</h2>
+      {#if b.subtitle}<p class="mt-2 text-base leading-snug text-muted-foreground">{b.subtitle}</p>{/if}
 
       <!-- Auteur principal : sous le titre, plus gros -->
       {#if mainAuthors.length}
         <p class="mt-2 font-display text-xl font-semibold uppercase tracking-wide sm:text-2xl">
-          {#each mainAuthors as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link">{p.name}</a>{#if i < mainAuthors.length - 1}<span>, </span>{/if}{/each}
+          {#each mainAuthors as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link">{p.name}</a>{#if i < mainAuthors.length - 1}<span>,</span>{' '}{/if}{/each}
         </p>
       {/if}
 
@@ -124,8 +131,8 @@
       {#if otherContributors.length}
         <div class="mt-2 space-y-0.5">
           {#each otherContributors as c (c.role)}
-            <p class="font-display text-sm">
-              <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} : </span>{#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>, </span>{/if}{/each}
+            <p class="font-display text-xs">
+              <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} :</span>{' '}{#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>,</span>{' '}{/if}{/each}
             </p>
           {/each}
         </div>
@@ -139,8 +146,8 @@
               <input type="hidden" name="id" value={b.id} />
               <input type="hidden" name="format" value={f.key} />
               <input type="hidden" name="qty" value="1" />
-              <button type="submit" class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background">
-                {#if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
+              <button type="submit" disabled={loadingFormat === f.key} class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background disabled:cursor-wait disabled:opacity-70">
+                {#if loadingFormat === f.key}<CircleNotch size={20} weight="bold" class="animate-spin" />{:else if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
                 {f.key === 'souscription' ? 'Souscrire' : `Format ${f.label}`} <span>({euros(f.price)})</span>
               </button>
             </form>
@@ -177,7 +184,7 @@
           <ul class="space-y-3">
             {#each data.sameAuthor as s (s.slug)}
               <li><a href="/livre/{s.slug}" class="group flex gap-2.5">
-                <span class="h-16 w-11 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
+                <span class="h-20 w-14 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
                 <span class="min-w-0"><span class="line-clamp-2 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{s.title}</span></span>
               </a></li>
             {/each}
@@ -190,7 +197,7 @@
           <ul class="space-y-3">
             {#each data.sameCollection as s (s.slug)}
               <li><a href="/livre/{s.slug}" class="group flex gap-2.5">
-                <span class="h-16 w-11 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
+                <span class="h-20 w-14 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
                 <span class="min-w-0"><span class="line-clamp-2 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{s.title}</span>{#if s.authors?.length}<span class="mt-0.5 block text-xs text-muted-foreground">{s.authors[0].name}</span>{/if}</span>
               </a></li>
             {/each}
@@ -207,12 +214,12 @@
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape') cartOpen = false; }} />
 {#if cartOpen}
   <div class="fixed inset-0 z-[60] grid place-items-center p-4">
-    <button type="button" class="absolute inset-0 cursor-default bg-black/50" aria-label="Fermer" onclick={() => (cartOpen = false)}></button>
-    <div class="relative z-10 w-full max-w-md border border-border bg-background p-6 shadow-2xl">
+    <button type="button" class="absolute inset-0 cursor-default bg-black/50" aria-label="Fermer" onclick={() => (cartOpen = false)} transition:fade={{ duration: 150 }}></button>
+    <div class="relative z-10 w-full max-w-md border border-border bg-background p-6 shadow-2xl" transition:scale={{ duration: 200, start: 0.95, opacity: 0 }}>
       <button type="button" onclick={() => (cartOpen = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
 
       <div class="flex items-center gap-3">
-        <CheckCircle size={28} weight="fill" class="text-success" />
+        <CheckCircle size={28} weight="fill" class="text-foreground" />
         <div>
           <p class="font-display text-lg font-bold uppercase tracking-wide">Ajouté au panier</p>
           <p class="text-sm text-muted-foreground">{b.title}{addedFormat ? ` — ${addedFormat}` : ''}</p>

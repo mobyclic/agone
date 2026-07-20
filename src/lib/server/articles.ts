@@ -3,6 +3,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
+import { accentRegex } from '$lib/text';
 
 export interface ArticleCard {
   title: string;
@@ -128,7 +129,7 @@ export async function listArticles(opts: { rubrique?: string; q?: string; limit?
   const where = [`status = 'published'`];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 20, start: opts.offset ?? 0 };
   if (opts.rubrique) { where.push('rubrique.slug = $rub'); vars.rub = opts.rubrique; }
-  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
+  if (opts.q && opts.q.trim()) { vars.re = accentRegex(opts.q); where.push('string::matches(title, $re)'); }
   const whereSql = where.join(' AND ');
   const rows = await query<any>(
     `SELECT ${CARD} FROM article WHERE ${whereSql} ORDER BY published_at DESC LIMIT $limit START $start`,

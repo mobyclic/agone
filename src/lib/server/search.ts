@@ -3,6 +3,7 @@
  * — utilisée par la modale de recherche et la page /recherche.
  */
 import { query } from './surreal';
+import { deburr, accentRegex } from '$lib/text';
 
 export interface SearchResults {
   books: { title: string; slug: string; cover_url?: string; author?: string }[];
@@ -12,25 +13,25 @@ export interface SearchResults {
 }
 
 export async function siteSearch(qRaw: string, perType = 6): Promise<SearchResults> {
-  const q = (qRaw ?? '').trim().toLowerCase();
+  const q = deburr((qRaw ?? '').trim());
   if (q.length < 2) return { books: [], authors: [], articles: [], events: [] };
-  const vars = { q, lim: perType };
+  const vars = { re: accentRegex(qRaw), lim: perType };
   const [books, authors, articles, events] = await Promise.all([
     query<any>(
       `SELECT title, slug, published_at, cover.url AS cover_url, ->contributed_by[WHERE role = 'author']->author.full_name AS a_names
-         FROM book WHERE status = 'published' AND string::lowercase(title) CONTAINS $q
+         FROM book WHERE status = 'published' AND string::matches(title, $re)
          ORDER BY published_at DESC LIMIT $lim`, vars),
     query<any>(
       `SELECT full_name, slug FROM author
-         WHERE hidden != true AND string::lowercase(full_name) CONTAINS $q
+         WHERE hidden != true AND string::matches(full_name, $re)
          ORDER BY full_name ASC LIMIT $lim`, vars),
     query<any>(
       `SELECT title, slug, published_at, rubrique.name AS rubrique FROM article
-         WHERE status = 'published' AND string::lowercase(title) CONTAINS $q
+         WHERE status = 'published' AND string::matches(title, $re)
          ORDER BY published_at DESC LIMIT $lim`, vars),
     query<any>(
       `SELECT title, slug, start_at, venue.city AS venue_city FROM event
-         WHERE string::lowercase(title) CONTAINS $q
+         WHERE string::matches(title, $re)
          ORDER BY start_at DESC LIMIT $lim`, vars)
   ]);
   const now = Date.now();

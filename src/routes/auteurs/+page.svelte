@@ -1,10 +1,22 @@
 <script lang="ts">
   import PageHead from '$lib/components/PageHead.svelte';
+  import { deburr } from '$lib/text';
   let { data } = $props();
+
+  // Recherche instantanée (client) — insensible à la casse et aux accents.
+  let q = $state('');
+
+  const filtered = $derived.by(() => {
+    const needle = deburr(q.trim());
+    if (!needle) return data.authors;
+    return data.authors.filter((a) =>
+      deburr(`${a.full_name} ${a.last_name ?? ''} ${a.first_name ?? ''}`).includes(needle)
+    );
+  });
 
   const groups = $derived.by(() => {
     const map = new Map<string, { slug: string; label: string }[]>();
-    for (const a of data.authors) {
+    for (const a of filtered) {
       const letter = (a.last_name || a.full_name || '#').trim().charAt(0).toUpperCase();
       const key = /[A-Z]/.test(letter) ? letter : '#';
       const label = `${a.last_name ?? ''} ${a.first_name ?? ''}`.trim() || a.full_name;
@@ -13,22 +25,33 @@
     }
     return [...map.entries()].sort((x, y) => x[0].localeCompare(y[0], 'fr'));
   });
+
+  // Index A–Z : uniquement les lettres réellement présentes après filtrage.
+  const initials = $derived(groups.map(([l]) => l).filter((l) => /^[A-Z]$/.test(l)));
+
+  const metaText = $derived(
+    q.trim()
+      ? `${filtered.length} résultat${filtered.length > 1 ? 's' : ''} pour « ${q.trim()} »`
+      : `${data.authors.length} contributrices & contributeurs au catalogue`
+  );
 </script>
 
 <svelte:head><title>Auteurs · Agone</title></svelte:head>
 
-<PageHead eyebrow="Les auteurs" title="Autrices & auteurs" meta="{data.authors.length} contributrices & contributeurs au catalogue" />
+<PageHead eyebrow="Les auteurs" title="Autrices & auteurs" meta={metaText} />
 
 <section class="border-b border-border bg-secondary/40">
   <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-    <form method="GET" class="max-w-md">
-      <input name="q" value={data.q ?? ''} placeholder="Rechercher un auteur…"
-        class="h-11 w-full rounded-md border border-border bg-background px-3.5 text-sm outline-none focus:border-primary" />
-    </form>
+    <input
+      bind:value={q}
+      type="search"
+      placeholder="Rechercher un auteur…"
+      autocomplete="off"
+      class="h-11 w-full max-w-md rounded-md border border-border bg-background px-3.5 text-sm outline-none focus:border-primary" />
 
     <!-- Index A–Z (ancres) -->
     <div class="mt-4 flex flex-wrap gap-x-2 gap-y-1 font-display">
-      {#each data.initials as l (l)}
+      {#each initials as l (l)}
         <a href="#lettre-{l}" class="text-sm font-semibold text-muted-foreground hover:text-link">{l}</a>
       {/each}
     </div>

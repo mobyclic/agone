@@ -1,19 +1,35 @@
 <script lang="ts">
-  import Logo from './Logo.svelte';
+  import Wordmark from './Wordmark.svelte';
   import { enhance } from '$app/forms';
+  import { FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo } from 'phosphor-svelte';
 
   const year = 2026;
   let subscribed = $state(false);
+
+  const socials = [
+    { name: 'Facebook', icon: FacebookLogo, href: 'https://www.facebook.com/editions.agone' },
+    { name: 'Instagram', icon: InstagramLogo, href: 'https://www.instagram.com/editions_agone/' },
+    { name: 'LinkedIn', icon: LinkedinLogo, href: 'https://www.linkedin.com/company/editions-agone/' },
+    { name: 'Bluesky', icon: Butterfly, href: 'https://bsky.app/profile/agone.org' },
+    { name: 'Mastodon', icon: MastodonLogo, href: 'https://piaille.fr/@agone' }
+  ];
 </script>
 
 <footer class="border-t border-border bg-secondary/40">
   <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
     <div class="grid gap-10 lg:grid-cols-5">
       <div class="lg:col-span-2">
-        <Logo size={30} />
+        <a href="/" class="inline-flex text-foreground" aria-label="Agone — accueil"><Wordmark /></a>
         <p class="mt-4 max-w-xs text-sm text-muted-foreground">
           Agone — éditeur engagé. Sciences sociales, histoire, littérature et critique du présent.
         </p>
+        <div class="mt-5 flex items-center gap-1">
+          {#each socials as s (s.name)}
+            <a href={s.href} target="_blank" rel="noopener" aria-label={s.name} class="grid size-9 place-items-center text-muted-foreground hover:text-foreground">
+              <s.icon size={20} />
+            </a>
+          {/each}
+        </div>
       </div>
 
       <div>

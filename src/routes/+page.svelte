@@ -1,6 +1,7 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
   import SectionHead from '$lib/components/SectionHead.svelte';
+  import EventsMap from '$lib/components/EventsMap.svelte';
   import { authorList, isForthcoming } from '$lib/labels';
   import { MapPin } from 'phosphor-svelte';
 
@@ -131,22 +132,32 @@
   </section>
 {/if}
 
-<!-- RENCONTRES -->
+<!-- RENCONTRES — carte de France (pastilles) + 6 prochaines rencontres -->
 {#if data.events.length}
-  <section class="border-y border-border bg-background">
+  <section class="bg-background">
     <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
       <SectionHead title="Rencontres" href="/rencontres" more="L’agenda" />
-      <div class="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
-        {#each data.events as e (e.slug)}
-          <a href="/rencontres/{e.slug}" class="group flex flex-col bg-background p-5">
-            <div class="flex items-baseline gap-2 font-display">
-              <span class="text-4xl font-bold leading-none">{dayNum(e.start_at)}</span>
-              <span class="text-sm uppercase text-muted-foreground">{monShort(e.start_at)}</span>
-            </div>
-            <h3 class="mt-3 line-clamp-3 font-display text-lg font-medium leading-tight group-hover:text-link">{e.title}</h3>
-            {#if e.venue_name}<p class="mt-auto pt-3 text-xs text-muted-foreground"><MapPin size={12} class="mb-0.5 mr-0.5 inline" />{e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</p>{/if}
-          </a>
-        {/each}
+      <div class="grid gap-8 lg:grid-cols-2 lg:items-stretch">
+        <!-- Carte : toutes les prochaines rencontres géolocalisées -->
+        <div class="min-h-[380px] overflow-hidden">
+          <EventsMap pins={data.eventPins} />
+        </div>
+
+        <!-- Liste : les 6 prochaines rencontres -->
+        <div class="divide-y divide-border border-t border-border">
+          {#each data.events as e (e.slug)}
+            <a href="/rencontres/{e.slug}" class="group flex items-baseline gap-4 py-4">
+              <div class="flex w-12 shrink-0 flex-col font-display leading-none">
+                <span class="text-3xl font-bold">{dayNum(e.start_at)}</span>
+                <span class="mt-1 text-xs uppercase text-muted-foreground">{monShort(e.start_at)}</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-display text-lg font-medium leading-tight group-hover:text-link">{e.title}</h3>
+                {#if e.venue_name}<p class="mt-1 text-xs text-muted-foreground"><MapPin size={12} class="mb-0.5 mr-0.5 inline" />{e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</p>{/if}
+              </div>
+            </a>
+          {/each}
+        </div>
       </div>
     </div>
   </section>

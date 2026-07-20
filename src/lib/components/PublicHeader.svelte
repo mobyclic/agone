@@ -2,10 +2,8 @@
   import { page } from '$app/state';
   import { isStaff } from '$lib/roles';
   import SearchOverlay from './SearchOverlay.svelte';
-  import {
-    List, X, MagnifyingGlass, ShoppingCart, CaretDown,
-    FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo
-  } from 'phosphor-svelte';
+  import Wordmark from './Wordmark.svelte';
+  import { List, X, MagnifyingGlass, ShoppingCart, CaretDown } from 'phosphor-svelte';
 
   interface NavData { collections: { name: string; slug: string; href: string }[]; rubriques: { name: string; slug: string }[] }
   let { user, cartCount = 0, nav }: { user: App.Locals['user']; cartCount?: number; nav?: NavData } = $props();
@@ -13,30 +11,21 @@
   // Staff (admin/éditeur) → back-office ; client → espace compte ; visiteur → connexion.
   const accountHref = $derived(user ? (isStaff(user.role) ? '/admin' : '/compte') : '/connexion');
   const accountLabel = $derived(user && isStaff(user.role) ? 'Back-office' : 'Mon compte');
+  // Logo : le staff bascule vers le back-office (retour au front via le logo de l'admin).
+  const logoHref = $derived(user && isStaff(user.role) ? '/admin' : '/');
 
   let open = $state(false);
   let searchOpen = $state(false);
   const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
   const collections = $derived(nav?.collections ?? []);
   const rubriques = $derived(nav?.rubriques ?? []);
-
-  // Réseaux sociaux — à confirmer / ajuster (URLs réelles Agone).
-  const socials = [
-    { name: 'Facebook', icon: FacebookLogo, href: 'https://www.facebook.com/editions.agone' },
-    { name: 'Instagram', icon: InstagramLogo, href: 'https://www.instagram.com/editions_agone/' },
-    { name: 'LinkedIn', icon: LinkedinLogo, href: 'https://www.linkedin.com/company/editions-agone/' },
-    { name: 'Bluesky', icon: Butterfly, href: 'https://bsky.app/profile/agone.org' },
-    { name: 'Mastodon', icon: MastodonLogo, href: 'https://piaille.fr/@agone' }
-  ];
 </script>
 
-<header class="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: calc((100vw - min(100vw, 80rem)) / 2 + 1.5rem)">
+<header class="nav-base-size sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: calc((100vw - min(100vw, 80rem)) / 2 + 1.5rem)">
   <div class="flex h-16 items-stretch">
     <!-- Logo : bande noire pleine du bord gauche, englobant le logo (aligné au contenu) -->
-    <a href="/" class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: var(--gutter)" aria-label="Agone — accueil">
-      <span class="font-serif text-xl font-bold uppercase leading-none tracking-tight">
-        <span class="italic text-[1.4em]">A</span>GON<span class="text-[1.4em]">E</span>
-      </span>
+    <a href={logoHref} class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: var(--gutter)" aria-label="Agone — accueil">
+      <Wordmark />
     </a>
 
     <!-- Reste de la barre (aligné au contenu à droite). relative = repère du menu Antichambre. -->
@@ -98,15 +87,7 @@
 
       <a href={accountHref} class="btn-brand ml-1 hidden h-9 items-center px-3.5 font-display text-sm font-medium uppercase tracking-wide sm:inline-flex">{accountLabel}</a>
 
-      <div class="ml-2 hidden items-center gap-0.5 border-l border-border pl-2.5 lg:flex">
-        {#each socials as s (s.name)}
-          <a href={s.href} target="_blank" rel="noopener" aria-label={s.name} class="grid size-8 place-items-center text-muted-foreground hover:text-foreground">
-            <s.icon size={18} />
-          </a>
-        {/each}
-      </div>
-
-      <button class="grid size-9 place-items-center hover:bg-muted xl:hidden" onclick={() => (open = !open)} aria-label="Menu">
+      <button class="ml-1 grid size-9 place-items-center hover:bg-muted xl:hidden" onclick={() => (open = !open)} aria-label="Menu">
         {#if open}<X size={22} />{:else}<List size={22} />{/if}
       </button>
     </div>
@@ -124,11 +105,6 @@
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
         <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>
         <a href={accountHref} onclick={() => (open = false)} class="mt-2 block border-t border-border py-2 pt-3 font-medium text-link">{accountLabel}</a>
-        <div class="mt-3 flex items-center gap-3 border-t border-border pt-3">
-          {#each socials as s (s.name)}
-            <a href={s.href} target="_blank" rel="noopener" aria-label={s.name} class="text-muted-foreground hover:text-foreground"><s.icon size={20} /></a>
-          {/each}
-        </div>
       </nav>
     </div>
   {/if}

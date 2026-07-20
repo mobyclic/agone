@@ -5,6 +5,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
+import { accentRegex } from '$lib/text';
 import { ROLE_LABEL, ROLE_ORDER } from '$lib/labels';
 
 export interface AuthorCard {
@@ -24,8 +25,8 @@ export async function listAuthors(opts: { q?: string; letter?: string } = {}): P
     where.push('string::starts_with(string::lowercase(last_name), $letter)');
   }
   if (opts.q && opts.q.trim()) {
-    vars.q = opts.q.trim().toLowerCase();
-    where.push('string::lowercase(full_name) CONTAINS $q');
+    vars.re = accentRegex(opts.q);
+    where.push('string::matches(full_name, $re)');
   }
   const rows = await query<any>(
     `SELECT id, full_name, slug, last_name, first_name,

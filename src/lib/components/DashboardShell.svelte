@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import Logo from './Logo.svelte';
+  import Wordmark from './Wordmark.svelte';
   import Icon from './Icon.svelte';
   import type { NavItem, NavSection } from '$lib/nav';
   import { List, X, SignOut, ArrowSquareOut } from 'phosphor-svelte';
@@ -40,11 +40,13 @@
       ? 'translate-x-0'
       : '-translate-x-full'}"
   >
-    <div class="flex h-16 items-center justify-between px-4">
-      <a href="/"><Logo size={26} tone="light" /></a>
-      <button class="grid size-8 place-items-center rounded-md hover:bg-sidebar-accent lg:hidden" onclick={() => (open = false)} aria-label="Fermer">
+    <!-- Bandeau logo : même wordmark que le front, inversé (noir sur blanc),
+         ferré à droite avec le même pr-6 que le front (position miroir). -->
+    <div class="relative flex h-16 items-center justify-end bg-background pr-6 text-foreground">
+      <button class="absolute left-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-foreground/60 hover:bg-muted hover:text-foreground lg:hidden" onclick={() => (open = false)} aria-label="Fermer">
         <X size={18} />
       </button>
+      <a href="/" aria-label="Agone — accueil"><Wordmark /></a>
     </div>
 
     <nav class="flex-1 space-y-3 overflow-y-auto px-3 py-2">

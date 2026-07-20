@@ -17,21 +17,14 @@
 
 <svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
 
-<PageHead eyebrow="Antichambre" title={a.title} width="max-w-5xl" />
-
-{#if isStaff}
-  <div class="fixed bottom-6 right-6 z-40">
-    <Button href="/admin/articles/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
-  </div>
-{/if}
-
-<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : ''}">
-    <article class="min-w-0 {data.books.length ? '' : 'max-w-3xl'}">
-  {#if a.rubrique_name}
-    <a href="/antichambre?rubrique={a.rubrique_slug}" class="eyebrow hover:underline">{a.rubrique_name}</a>
-  {/if}
-  <div class="mt-3 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+<PageHead
+  eyebrow={a.rubrique_name ? `Antichambre / ${a.rubrique_name}` : 'Antichambre'}
+  title={a.title}
+  width="max-w-7xl"
+  inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'}
+>
+  <!-- Date & auteur, juste sous le titre, en petit (minuscules). -->
+  <div class="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
     <span>{fmt(a.published_at)}</span>
     {#if a.authors.length}
       <span>·</span>
@@ -42,7 +35,17 @@
       <span class="inline-flex items-center gap-1" title="Nombre de vues (visible admin uniquement)"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
     {/if}
   </div>
+</PageHead>
 
+{#if isStaff}
+  <div class="fixed bottom-6 right-6 z-40">
+    <Button href="/admin/articles/{a.id}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
+  </div>
+{/if}
+
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}">
+    <article class="min-w-0 {data.books.length ? '' : 'max-w-4xl'}">
   {#if a.cover_url}
     <img src={a.cover_url} alt="" class="mt-6 w-full rounded-lg border border-border" />
   {/if}
@@ -58,15 +61,15 @@
     {#if data.books.length}
       <aside class="lg:sticky lg:top-28">
         <h2 class="eyebrow mb-4">{data.books.length > 1 ? 'Livres liés' : 'Livre lié'}</h2>
-        <div class="space-y-4">
+        <div class="space-y-6">
           {#each data.books as book (book.slug)}
-            <a href="/livre/{book.slug}" class="group flex gap-3">
-              <span class="aspect-[2/3] w-16 shrink-0 overflow-hidden border border-border bg-muted">
+            <a href="/livre/{book.slug}" class="group flex gap-4">
+              <span class="aspect-[2/3] w-32 shrink-0 overflow-hidden border border-border bg-muted">
                 {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
               </span>
               <span class="min-w-0">
-                <span class="line-clamp-3 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
-                {#if book.authors?.length}<span class="mt-1 block text-xs text-link">{book.authors[0].name}</span>{/if}
+                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
+                {#if book.authors?.length}<span class="mt-1 block text-sm text-link">{book.authors[0].name}</span>{/if}
               </span>
             </a>
           {/each}
