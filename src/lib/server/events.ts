@@ -127,16 +127,26 @@ export async function listEventsAdmin(opts: { q?: string; when?: string; limit?:
 }
 
 /** Recherche de lieux (pour le sélecteur de la fiche rencontre). */
-export async function searchVenues(qRaw: string): Promise<{ id: string; name: string; city?: string }[]> {
+export async function searchVenues(qRaw: string): Promise<{ id: string; name: string; city?: string; lat?: number; lng?: number }[]> {
   const q = (qRaw ?? '').trim().toLowerCase();
   if (q.length < 2) return [];
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, name, city FROM venue
+    `SELECT meta::id(id) AS id, name, city, lat, lng FROM venue
        WHERE string::lowercase(name) CONTAINS $q OR string::lowercase(city ?? '') CONTAINS $q
        ORDER BY name ASC LIMIT 8`,
     { q }
   );
-  return rows.map((r) => ({ id: r.id, name: r.name, city: r.city ?? undefined }));
+  return rows.map((r) => ({ id: r.id, name: r.name, city: r.city ?? undefined, lat: r.lat ?? undefined, lng: r.lng ?? undefined }));
+}
+
+/** Affine la position d'un lieu existant (lat/lng + point geo). */
+export async function updateVenuePosition(venueId: string, lat: number, lng: number): Promise<void> {
+  await query(`UPDATE $id SET lat = $lat, lng = $lng, geo = $geo`, {
+    id: recId('venue', venueId),
+    lat,
+    lng,
+    geo: new GeometryPoint([lng, lat])
+  });
 }
 
 export interface EventEdit {
@@ -150,6 +160,8 @@ export interface EventEdit {
   end_at?: string;
   venue_id?: string;
   venue_label?: string;
+  venue_lat?: number;
+  venue_lng?: number;
   authors: { id: string; label: string }[];
   books: { id: string; label: string }[];
 }
@@ -159,6 +171,7 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
     `SELECT meta::id(id) AS id, title, slug, body_html,
         cover AS cover_ref, cover.url AS cover_url, start_at, end_at,
         venue AS venue_ref, venue.name AS venue_name, venue.city AS venue_city,
+        venue.lat AS venue_lat, venue.lng AS venue_lng,
         authors.{ id: id, label: full_name } AS authors,
         books.{ id: id, label: title } AS books
       FROM event WHERE id = $id LIMIT 1`,
@@ -177,6 +190,8 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
     end_at: e.end_at ?? undefined,
     venue_id: e.venue_ref ? plainId(e.venue_ref, 'venue') : undefined,
     venue_label: e.venue_name ? `${e.venue_name}${e.venue_city ? `, ${e.venue_city}` : ''}` : undefined,
+    venue_lat: e.venue_lat ?? undefined,
+    venue_lng: e.venue_lng ?? undefined,
     authors: (e.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' })),
     books: (e.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' }))
   };

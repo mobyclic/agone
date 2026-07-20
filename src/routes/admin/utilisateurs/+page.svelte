@@ -1,9 +1,16 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { MagnifyingGlass } from 'phosphor-svelte';
+  import { enhance } from '$app/forms';
+  import { Button } from '$lib/components/ui/button';
+  import { MagnifyingGlass, UserPlus, X } from 'phosphor-svelte';
 
-  let { data } = $props();
+  let { data, form } = $props();
+
+  let showNew = $state(false);
+  let creating = $state(false);
+  const inp = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
+  const lbl = 'mb-1 block text-sm font-medium';
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
   const roleLabel: Record<string, string> = { admin: 'Admin', editor: 'Éditeur', customer: 'Client', pending: 'En attente' };
@@ -51,6 +58,7 @@
     <option value="editor">Éditeurs</option>
     <option value="pending">En attente</option>
   </select>
+  <Button type="button" variant="brand" class="h-10" onclick={() => (showNew = true)}><UserPlus size={16} /> Nouvel utilisateur</Button>
 </div>
 
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
@@ -88,6 +96,40 @@
     </tbody>
   </table>
 </div>
+
+{#if showNew}
+  <div class="fixed inset-0 z-[60] grid place-items-center p-4">
+    <button type="button" class="absolute inset-0 cursor-default bg-black/50" aria-label="Fermer" onclick={() => (showNew = false)}></button>
+    <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-2xl">
+      <button type="button" onclick={() => (showNew = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
+      <h3 class="text-lg font-bold">Nouvel utilisateur</h3>
+
+      {#if form?.error}<p class="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
+
+      <form method="POST" action="?/create"
+        use:enhance={() => { creating = true; return async ({ update }) => { await update(); creating = false; }; }}
+        class="mt-4 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <label class={lbl}>Prénom <input name="first_name" class={inp} autocomplete="off" /></label>
+          <label class={lbl}>Nom <input name="last_name" class={inp} autocomplete="off" /></label>
+        </div>
+        <label class={lbl}>E-mail <input name="email" type="email" required class={inp} autocomplete="off" /></label>
+        <label class={lbl}>Rôle
+          <select name="role" class={inp}>
+            <option value="customer">Client</option>
+            <option value="editor">Éditeur</option>
+            <option value="admin">Admin</option>
+            <option value="pending">En attente</option>
+          </select>
+        </label>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onclick={() => (showNew = false)}>Annuler</Button>
+          <Button type="submit" variant="brand" disabled={creating}>{creating ? 'Création…' : 'Créer'}</Button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
 
 {#if pageCount > 1}
   <div class="mt-6 flex items-center justify-center gap-2 text-sm">

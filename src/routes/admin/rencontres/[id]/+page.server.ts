@@ -1,7 +1,7 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
-import { getEventForEdit, saveEvent, deleteEvent, type EventInput } from '$lib/server/events';
+import { getEventForEdit, saveEvent, deleteEvent, updateVenuePosition, type EventInput } from '$lib/server/events';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -60,6 +60,13 @@ export const actions: Actions = {
       authorIds: ids(fd.get('authorIds')),
       bookIds: ids(fd.get('bookIds'))
     };
+
+    // Lieu existant dont on a affiné la position sur la carte → mise à jour du venue.
+    if (venueMode === 'existing' && S('venueId') && S('venuePosEdited') === '1') {
+      const la = numOrU(S('venueLat'));
+      const ln = numOrU(S('venueLng'));
+      if (la != null && ln != null) await updateVenuePosition(S('venueId'), la, ln);
+    }
 
     const editId = params.id && params.id !== 'nouvelle' ? params.id : null;
     const id = await saveEvent(editId, input);

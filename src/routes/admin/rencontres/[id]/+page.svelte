@@ -3,6 +3,7 @@
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
   import EntityPicker from '$lib/components/EntityPicker.svelte';
+  import VenueMapPicker from '$lib/components/VenueMapPicker.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, MagnifyingGlass, X, Eye, MapPin, Spinner } from 'phosphor-svelte';
 
@@ -30,9 +31,10 @@
   let venueMode = $state<'existing' | 'new' | 'none'>('none');
   let venue = $state<{ id: string; label: string } | null>(null);
   let vq = $state('');
-  let vhits = $state<{ id: string; name: string; city?: string }[]>([]);
+  let vhits = $state<{ id: string; name: string; city?: string; lat?: number; lng?: number }[]>([]);
   let vtimer: ReturnType<typeof setTimeout>;
   let vname = $state(''), vstreet = $state(''), vcity = $state(''), vpost = $state(''), vcountry = $state('France'), vlat = $state(''), vlng = $state('');
+  let venuePosEdited = $state(false); // position affinée sur la carte → à persister
   let geoStatus = $state('');
   let dirty = $state(false);
   let saving = $state(false);
@@ -55,6 +57,9 @@
     end = toLocal(data.event?.end_at);
     venue = data.event?.venue_id ? { id: data.event.venue_id, label: data.event.venue_label ?? 'Lieu' } : null;
     venueMode = data.event?.venue_id ? 'existing' : 'none';
+    vlat = data.event?.venue_lat != null ? String(data.event.venue_lat) : '';
+    vlng = data.event?.venue_lng != null ? String(data.event.venue_lng) : '';
+    venuePosEdited = false;
     vq = ''; vhits = [];
   });
 
@@ -67,8 +72,12 @@
       vhits = r.ok ? (await r.json()).results : [];
     }, 200);
   }
-  function pickVenue(v: { id: string; name: string; city?: string }) {
+  function pickVenue(v: { id: string; name: string; city?: string; lat?: number; lng?: number }) {
     venue = { id: v.id, label: `${v.name}${v.city ? `, ${v.city}` : ''}` };
+    // Synchronise la carte sur le lieu choisi ; pas encore « édité » tant qu'on n'a pas bougé.
+    vlat = v.lat != null ? String(v.lat) : '';
+    vlng = v.lng != null ? String(v.lng) : '';
+    venuePosEdited = false;
     vq = ''; vhits = [];
   }
 </script>
@@ -111,6 +120,9 @@
               <span class="text-sm font-medium">{venue.label}</span>
               <button type="button" class="text-muted-foreground hover:text-foreground" onclick={() => (venue = null)} aria-label="Changer"><X size={16} /></button>
             </div>
+            <div class="mt-3">
+              <VenueMapPicker bind:lat={vlat} bind:lng={vlng} onedit={() => { venuePosEdited = true; dirty = true; }} />
+            </div>
           {:else}
             <div class="relative">
               <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -143,6 +155,9 @@
             {#if geoStatus}<span class="text-xs text-muted-foreground">{geoStatus}</span>{/if}
           </div>
           <p class="mt-2 text-xs text-muted-foreground">Cliquez « Géolocaliser » pour remplir les coordonnées depuis l'adresse (sinon calculées automatiquement à l'enregistrement).</p>
+          <div class="mt-3">
+            <VenueMapPicker bind:lat={vlat} bind:lng={vlng} onedit={() => { venuePosEdited = true; dirty = true; }} />
+          </div>
         {:else}
           <p class="text-sm text-muted-foreground">Aucun lieu associé.</p>
         {/if}
@@ -181,6 +196,7 @@
   <input type="hidden" name="venueCountry" value={vcountry} />
   <input type="hidden" name="venueLat" value={vlat} />
   <input type="hidden" name="venueLng" value={vlng} />
+  <input type="hidden" name="venuePosEdited" value={venuePosEdited ? '1' : ''} />
 
   <!-- Bouton flottant -->
   <div class="fixed bottom-6 right-6 z-40">

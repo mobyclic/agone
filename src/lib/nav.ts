@@ -52,7 +52,7 @@ export const ADMIN_NAV: NavSection[] = [
     title: 'Boutique',
     items: [
       { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
-      { label: 'Clients', href: '/admin/utilisateurs', icon: 'Users' },
+      { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
       { label: 'Codes promo', href: '/admin/promos', icon: 'Percent' },
       { label: 'Livraison', href: '/admin/livraison', icon: 'Truck' },
       { label: 'Facturation', href: '/admin/factures', icon: 'Invoice' },
