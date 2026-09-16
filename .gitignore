@@ -16,3 +16,6 @@ dump-*.surql
 
 # Sauvegardes de données générées par les scripts de migration
 scripts/backups/
+
+# Sauvegardes de fusion de rubriques (données, pas du code)
+scripts/.merge-rubriques-backup-*.json

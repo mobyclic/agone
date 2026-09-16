@@ -34,6 +34,8 @@
   let vhits = $state<{ id: string; name: string; city?: string; lat?: number; lng?: number }[]>([]);
   let vtimer: ReturnType<typeof setTimeout>;
   let vname = $state(''), vstreet = $state(''), vcity = $state(''), vpost = $state(''), vcountry = $state('France'), vlat = $state(''), vlng = $state('');
+  // Contact du lieu — partagé par toutes ses rencontres.
+  let vphone = $state(''), vwebsite = $state(''), vdesc = $state('');
   let venuePosEdited = $state(false); // position affinée sur la carte → à persister
   let geoStatus = $state('');
   let dirty = $state(false);
@@ -59,6 +61,9 @@
     venueMode = data.event?.venue_id ? 'existing' : 'none';
     vlat = data.event?.venue_lat != null ? String(data.event.venue_lat) : '';
     vlng = data.event?.venue_lng != null ? String(data.event.venue_lng) : '';
+    vphone = data.event?.venue_phone ?? '';
+    vwebsite = data.event?.venue_website ?? '';
+    vdesc = data.event?.venue_description ?? '';
     venuePosEdited = false;
     vq = ''; vhits = [];
   });
@@ -77,6 +82,9 @@
     // Synchronise la carte sur le lieu choisi ; pas encore « édité » tant qu'on n'a pas bougé.
     vlat = v.lat != null ? String(v.lat) : '';
     vlng = v.lng != null ? String(v.lng) : '';
+    vphone = data.event?.venue_phone ?? '';
+    vwebsite = data.event?.venue_website ?? '';
+    vdesc = data.event?.venue_description ?? '';
     venuePosEdited = false;
     vq = ''; vhits = [];
   }
@@ -138,6 +146,9 @@
               </ul>
             {/if}
           {/if}
+          {#if venue}
+            {@render contactLieu()}
+          {/if}
         {:else if venueMode === 'new'}
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="{label} sm:col-span-2">Nom du lieu <input bind:value={vname} class={input} /></label>
@@ -158,6 +169,7 @@
           <div class="mt-3">
             <VenueMapPicker bind:lat={vlat} bind:lng={vlng} onedit={() => { venuePosEdited = true; dirty = true; }} />
           </div>
+          {@render contactLieu()}
         {:else}
           <p class="text-sm text-muted-foreground">Aucun lieu associé.</p>
         {/if}
@@ -186,6 +198,21 @@
     </div>
   </div>
 
+{#snippet contactLieu()}
+  <!-- Contact du lieu : affiché sur la fiche dépliante de l'accueil. Ces champs
+       décrivent LE LIEU, donc toutes ses rencontres — pas seulement celle-ci. -->
+  <div class="mt-4 rounded-md border border-border bg-muted/20 p-3">
+    <p class="eyebrow mb-2">Contact du lieu <span class="font-normal normal-case tracking-normal text-muted-foreground">— commun à toutes ses rencontres</span></p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <label class={label}>Téléphone <input bind:value={vphone} placeholder="04 91 …" class={input} /></label>
+      <label class={label}>Site web <input bind:value={vwebsite} placeholder="exemple.org" class={input} /></label>
+      <label class="{label} sm:col-span-2">Description
+        <textarea bind:value={vdesc} rows="2" placeholder="Quelques mots sur le lieu…" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"></textarea>
+      </label>
+    </div>
+  </div>
+{/snippet}
+
   <!-- Champs cachés lieu -->
   <input type="hidden" name="venueMode" value={venueMode} />
   <input type="hidden" name="venueId" value={venue?.id ?? ''} />
@@ -196,6 +223,9 @@
   <input type="hidden" name="venueCountry" value={vcountry} />
   <input type="hidden" name="venueLat" value={vlat} />
   <input type="hidden" name="venueLng" value={vlng} />
+  <input type="hidden" name="venuePhone" value={vphone} />
+  <input type="hidden" name="venueWebsite" value={vwebsite} />
+  <input type="hidden" name="venueDescription" value={vdesc} />
   <input type="hidden" name="venuePosEdited" value={venuePosEdited ? '1' : ''} />
 
   <!-- Bouton flottant -->

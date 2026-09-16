@@ -5,7 +5,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
-import { accentRegex } from '$lib/text';
+import { accentRegex, deburr } from '$lib/text';
 import { ROLE_LABEL, ROLE_ORDER } from '$lib/labels';
 
 export interface AuthorCard {
@@ -17,12 +17,27 @@ export interface AuthorCard {
   book_count: number;
 }
 
-export async function listAuthors(opts: { q?: string; letter?: string } = {}): Promise<AuthorCard[]> {
-  const where = ['hidden = false', 'array::len(<-contributed_by<-book) > 0'];
+/**
+ * La page publique /auteurs ne liste que les AUTEURS au sens strict : crédités
+ * `role = 'author'` sur au moins un livre. Traducteurs, préfaciers et autres
+ * contributeurs restent accessibles par leur fiche, pas par l'index.
+ */
+const IS_AUTHOR = "array::len(<-contributed_by[WHERE role = 'author']<-book) > 0";
+
+/** Tri français : « Étienne » se range avec les E, pas avant les A. */
+const byName = new Intl.Collator('fr', { sensitivity: 'base' });
+
+export async function listAuthors(
+  opts: { q?: string; letter?: string; onlyAuthors?: boolean } = {}
+): Promise<AuthorCard[]> {
+  // `onlyAuthors` : index /auteurs. La recherche globale, elle, doit continuer à
+  // trouver traducteurs et préfaciers.
+  const where = ['hidden = false', opts.onlyAuthors ? IS_AUTHOR : 'array::len(<-contributed_by<-book) > 0'];
   const vars: Record<string, unknown> = {};
   if (opts.letter && /^[a-z]$/i.test(opts.letter)) {
-    vars.letter = opts.letter.toLowerCase();
-    where.push('string::starts_with(string::lowercase(last_name), $letter)');
+    // Ancré au début et tolérant aux accents : « E » ramène aussi « Étienne ».
+    vars.letterRe = `(?i)^${accentRegex(opts.letter).replace('(?i)', '')}`;
+    where.push('string::matches(last_name, $letterRe)');
   }
   if (opts.q && opts.q.trim()) {
     vars.re = accentRegex(opts.q);
@@ -31,28 +46,33 @@ export async function listAuthors(opts: { q?: string; letter?: string } = {}): P
   const rows = await query<any>(
     `SELECT id, full_name, slug, last_name, first_name,
         array::len(array::distinct(<-contributed_by<-book)) AS book_count
-      FROM author WHERE ${where.join(' AND ')}
-      ORDER BY last_name ASC, first_name ASC`,
+      FROM author WHERE ${where.join(' AND ')}`,
     vars
   );
-  return rows.map((r) => ({
-    id: r.id,
-    full_name: r.full_name,
-    slug: r.slug,
-    last_name: r.last_name ?? '',
-    first_name: r.first_name ?? '',
-    book_count: r.book_count ?? 0
-  }));
+  return rows
+    .map((r) => ({
+      id: r.id,
+      full_name: r.full_name,
+      slug: r.slug,
+      last_name: r.last_name ?? '',
+      first_name: r.first_name ?? '',
+      book_count: r.book_count ?? 0
+    }))
+    .sort((a, b) => byName.compare(a.last_name, b.last_name) || byName.compare(a.first_name, b.first_name));
 }
 
 /** Lettres de l'alphabet effectivement présentes (pour l'index A–Z). */
 export async function authorInitials(): Promise<string[]> {
   const rows = await query<any>(
-    `SELECT string::uppercase(string::slice(last_name, 0, 1)) AS l
-       FROM author WHERE hidden = false AND array::len(<-contributed_by<-book) > 0`
+    `SELECT string::slice(last_name, 0, 1) AS l
+       FROM author WHERE hidden = false AND ${IS_AUTHOR}`
   );
   const set = new Set<string>();
-  for (const r of rows) if (r.l && /^[A-Z]$/.test(r.l)) set.add(r.l);
+  // « Étienne » compte pour la lettre E : on désaccentue avant de classer.
+  for (const r of rows) {
+    const l = deburr(r.l ?? '').toUpperCase();
+    if (/^[A-Z]$/.test(l)) set.add(l);
+  }
   return [...set].sort();
 }
 
@@ -168,10 +188,10 @@ export async function getAuthorAdminBySlug(slug: string) {
   return rows[0] ?? null;
 }
 
-export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string }[]> {
+export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string; slug: string }[]> {
   if (!q || !q.trim()) return [];
   return query<any>(
-    `SELECT id, full_name FROM author WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 12`,
+    `SELECT id, full_name, slug FROM author WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 12`,
     { q: q.trim().toLowerCase() });
 }
 
@@ -233,4 +253,53 @@ export async function deleteAuthor(id: string) {
   if (n > 0) throw new Error('AUTHOR_HAS_BOOKS');
   await query(`DELETE contributed_by WHERE out = $id`, { id: recId('author', id) });
   await query(`DELETE $id`, { id: recId('author', id) });
+}
+
+export interface AuthorBookAdmin {
+  book_id: string;
+  title: string;
+  slug: string;
+  status: string;
+  cover_url?: string;
+  isbn_paper?: string;
+  role: string;
+  role_label: string;
+  share?: number;
+  year?: number;
+}
+
+/**
+ * Titres auxquels un contributeur a travaillé (back-office) — l'inverse du bloc
+ * « Contributeurs » de la fiche livre : on part de l'auteur et on remonte l'arête.
+ * Tous statuts confondus (brouillons inclus), avec le rôle et la part qui
+ * serviront au calcul des droits.
+ */
+export async function booksForAuthorAdmin(authorId: string): Promise<AuthorBookAdmin[]> {
+  const rows = await query<any>(
+    `SELECT role, share,
+        meta::id(in.id) AS book_id, in.title AS title, in.slug AS slug,
+        in.status AS status, in.cover.url AS cover_url,
+        in.isbn_paper AS isbn_paper, in.published_at AS published_at
+      FROM contributed_by WHERE out = $id`,
+    { id: recId('author', authorId) }
+  );
+  const rank = (r: string) => {
+    const i = (ROLE_ORDER as readonly string[]).indexOf(r);
+    return i < 0 ? ROLE_ORDER.length : i;
+  };
+  return rows
+    .filter((r) => r.title)
+    .map((r) => ({
+      book_id: r.book_id,
+      title: r.title,
+      slug: r.slug,
+      status: r.status ?? 'draft',
+      cover_url: r.cover_url ?? undefined,
+      isbn_paper: r.isbn_paper ?? undefined,
+      role: r.role,
+      role_label: ROLE_LABEL[r.role] ?? r.role,
+      share: typeof r.share === 'number' ? r.share : undefined,
+      year: r.published_at ? new Date(r.published_at).getFullYear() : undefined
+    }))
+    .sort((a, b) => rank(a.role) - rank(b.role) || (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title, 'fr'));
 }

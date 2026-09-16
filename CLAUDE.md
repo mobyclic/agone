@@ -49,6 +49,18 @@ await query(`RELATE $b->contributed_by->$a SET role='translator', share=100`, { 
 ```
 Notes : `FROM ONLY` renvoie un objet (ne pas déstructurer `const [x]=`). `time::now()` pour l'horodatage ; `updated_at` s'auto-met à jour. `FLEXIBLE` se met APRÈS `TYPE`. FTS : `WHERE title @@ $q` (index BM25 `ft_book_title`, `ft_author_name`).
 
+**Pièges SurrealQL vérifiés sur le serveur** (chacun a déjà causé un bug) :
+- **Mots réservés** : `value`, `select`, `create`, `update`, `delete`, `relate`, `insert`, `upsert`,
+  `define`, `remove`, `info`, `let`, `return`, `if`, `for`, `explain`, `function`, `sleep`, `throw`
+  ne peuvent pas être des identifiants nus en `SELECT` / `WHERE` / `ORDER BY` → entourer d'accents
+  graves : ``SELECT `value` FROM site_setting``. (`SET` les accepte tous.)
+- **`ORDER BY` exige le champ dans la projection** — sinon « Missing order idiom ».
+- **`DEFAULT` ne vaut qu'à la CRÉATION** : un champ ajouté après coup reste `NONE` sur l'existant et
+  fait échouer toute écriture (table `SCHEMAFULL` : tous les champs sont revalidés). Ajouter
+  `VALUE $value ?? <défaut>` pour rendre le champ auto-réparant, puis combler les lignes.
+- **`query()` renvoie les RecordId en `table:id`** : comparer/indexer avec un identifiant nu échoue
+  silencieusement (retirer le préfixe, ou passer par `recId()`).
+
 ## Modèle de données — `src/lib/server/schema.surql`
 Cœur auth (`media`, `user`, `session`, `magic_link`, `email_otp`, `password_reset`, `site_setting`).
 Catalogue & contenu (Phase 1, **migrés depuis WordPress**) : `collection`, `rubrique`, `book`,

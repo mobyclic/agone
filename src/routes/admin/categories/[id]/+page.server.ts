@@ -19,7 +19,7 @@ export const actions: Actions = {
     const S = (k: string) => String(fd.get(k) ?? '').trim();
     if (!S('name')) return fail(400, { error: 'Le nom est requis.' });
     const editId = params.id && params.id !== 'nouvelle' ? params.id : null;
-    const id = await saveRubrique(editId, { name: S('name'), slug: S('slug') || undefined, kind: 'both' });
+    const id = await saveRubrique(editId, { name: S('name'), slug: S('slug') || undefined, subtitle: S('subtitle') || undefined, kind: 'both' });
     throw redirect(303, withFlash(`/admin/categories/${id}`, 'Catégorie enregistrée.', 'success'));
   },
 

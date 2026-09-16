@@ -6,6 +6,7 @@ import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
 import { accentRegex } from '$lib/text';
 import { wpautop } from './wpautop';
+import { sansScripts } from '$lib/text';
 import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
 export { ROLE_LABEL };
 
@@ -165,10 +166,37 @@ export async function bookCardsBySlugs(slugs: string[]): Promise<BookCard[]> {
   return slugs.map((s) => bySlug.get(s)).filter((b): b is BookCard => !!b);
 }
 
+/**
+ * Livres dont la personne est L'AUTEUR (rôle `author`).
+ *
+ * LE FILTRE DE RÔLE EST LE POINT : sans lui, la requête ramenait tout livre où
+ * la personne apparaît sur l'arête `contributed_by`, préface et traduction
+ * comprises — « L'industrie du mensonge » se retrouvait ainsi « du même auteur »
+ * que « Décroiscience » au seul motif d'une préface commune. Les autres rôles
+ * sont servis à part par `booksContributedBySlug`.
+ */
 export async function booksByAuthorSlug(authorSlug: string, excludeBookId: string, limit = 4): Promise<BookCard[]> {
   const rows = await query<any>(
     `SELECT ${CARD_FIELDS} FROM book
-       WHERE status = 'published' AND id != $ex AND ->contributed_by->author.slug CONTAINS $a
+       WHERE status = 'published' AND id != $ex
+         AND ->contributed_by[WHERE role = 'author']->author.slug CONTAINS $a
+       ORDER BY published_at DESC LIMIT $limit`,
+    { a: authorSlug, ex: recId('book', excludeBookId), limit }
+  );
+  return rows.map(toCard);
+}
+
+/**
+ * Livres auxquels la personne a contribué SANS en être l'auteur : préface,
+ * postface, traduction, illustration, édition. Complément de la fonction
+ * ci-dessus — les deux ensembles sont disjoints par construction.
+ */
+export async function booksContributedBySlug(authorSlug: string, excludeBookId: string, limit = 6): Promise<BookCard[]> {
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS} FROM book
+       WHERE status = 'published' AND id != $ex
+         AND ->contributed_by[WHERE role != 'author']->author.slug CONTAINS $a
+         AND !(->contributed_by[WHERE role = 'author']->author.slug CONTAINS $a)
        ORDER BY published_at DESC LIMIT $limit`,
     { a: authorSlug, ex: recId('book', excludeBookId), limit }
   );
@@ -232,8 +260,8 @@ export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
 
   return {
     ...toCard(b),
-    description_html: b.description_html ?? undefined,
-    extra_info_html: b.extra_info_html ?? undefined,
+    description_html: sansScripts(b.description_html),
+    extra_info_html: sansScripts(b.extra_info_html),
     isbn_paper: b.isbn_paper ?? undefined,
     isbn_ebook: b.isbn_ebook ?? undefined,
     subscription_price: b.subscription_price ?? undefined,
@@ -293,7 +321,7 @@ export async function collectionsForNav(): Promise<{ name: string; slug: string;
 }
 
 export async function getCollectionBySlug(slug: string): Promise<{ collection: any; books: BookCard[] } | null> {
-  const rows = await query<any>(`SELECT id, name, slug, description FROM collection WHERE slug = $slug LIMIT 1`, { slug });
+  const rows = await query<any>(`SELECT id, name, slug, subtitle, description FROM collection WHERE slug = $slug LIMIT 1`, { slug });
   const collection = rows[0];
   if (!collection) return null;
   collection.description_html = collection.description ? wpautop(collection.description) : undefined;
@@ -337,7 +365,7 @@ export async function collectionsWithBooks(perColl = 6): Promise<CollectionShowc
       return {
         name: c.name,
         slug: c.slug,
-        description_html: c.description ? wpautop(c.description) : undefined,
+        description_html: sansScripts(c.description ? wpautop(c.description) : undefined),
         book_count: count[0]?.n ?? 0,
         books: books.map(toCard)
       };
@@ -395,7 +423,7 @@ export async function getBookAdmin(id: string) {
     .map((ref: any, i: number) => ({ id: String(ref).replace(/^media:/, ''), url: (book.gallery_urls ?? [])[i] }))
     .filter((g: any) => g.url);
   const contributors = await query<any>(
-    `SELECT out AS author_id, out.full_name AS author_name, role, share, position
+    `SELECT out AS author_id, out.full_name AS author_name, out.slug AS author_slug, role, share, position
        FROM contributed_by WHERE in = $id ORDER BY position`, { id: recId('book', id) });
   return { book, contributors };
 }
@@ -464,7 +492,7 @@ export async function booksInCollectionAdmin(
 
 export async function getCollectionForEdit(id: string) {
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, name, slug, description, sort FROM collection WHERE id = $id LIMIT 1`,
+    `SELECT meta::id(id) AS id, name, slug, subtitle, description, sort FROM collection WHERE id = $id LIMIT 1`,
     { id: recId('collection', id) }
   );
   const c = rows[0];
@@ -476,9 +504,11 @@ export async function getCollectionForEdit(id: string) {
   return c;
 }
 
-export async function saveCollection(id: string | null, d: { name: string; slug?: string; description?: string }): Promise<string> {
+export async function saveCollection(id: string | null, d: { name: string; slug?: string; subtitle?: string; description?: string }): Promise<string> {
   const set: string[] = ['name = $name'];
   const vars: Record<string, unknown> = { name: d.name.trim() || '(sans nom)' };
+  if (d.subtitle?.trim()) { set.push('subtitle = $subtitle'); vars.subtitle = d.subtitle.trim(); }
+  else set.push('subtitle = NONE');
   if (d.description?.trim()) { set.push('description = $description'); vars.description = d.description.trim(); }
   else set.push('description = NONE');
 

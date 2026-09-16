@@ -1,17 +1,17 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { createAdminOrder, type AdminOrderLine } from '$lib/server/order';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   return {};
 };
 
 export const actions: Actions = {
   save: async ({ request, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
 

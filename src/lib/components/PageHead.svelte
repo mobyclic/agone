@@ -4,7 +4,7 @@
     title,
     subtitle,
     meta,
-    width = 'max-w-7xl',
+    width = '',
     inner = '',
     children
   }: {
@@ -27,12 +27,12 @@
 </script>
 
 <section bind:this={heroEl} class="bg-background text-foreground">
-  <div class="mx-auto {width} px-4 py-10 sm:px-6 sm:py-14">
+  <div class="py-10 sm:py-14 {width}" style="padding-inline: var(--page-gutter)">
     <div class={inner}>
       {#if eyebrow}
         <p class="font-display text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
       {/if}
-      <h1 class="display-title mt-2 text-4xl leading-[0.9] sm:text-6xl">{title}</h1>
+      <h1 class="display-title mt-2 text-4xl leading-[0.9] sm:text-5xl">{title}</h1>
       {#if subtitle}<p class="mt-5 max-w-2xl text-lg leading-snug text-muted-foreground sm:text-xl">{subtitle}</p>{/if}
       {#if meta}<p class="mt-4 text-sm text-muted-foreground/70">{meta}</p>{/if}
       {@render children?.()}
@@ -47,7 +47,7 @@
     ? 'translate-y-0 opacity-100'
     : 'pointer-events-none -translate-y-full opacity-0'}"
 >
-  <div class="mx-auto flex {width} items-center gap-2 px-4 py-2.5 sm:px-6">
+  <div class="flex items-center gap-2 py-2.5 {width}" style="padding-inline: var(--page-gutter)">
     {#if eyebrow}
       <span class="shrink-0 font-display text-xs font-semibold uppercase tracking-[0.14em] text-background/55">{eyebrow}</span>
       <span class="shrink-0 text-background/30">·</span>

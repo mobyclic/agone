@@ -1,11 +1,11 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff, requireAdmin } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { createManualInvoice, getCompany } from '$lib/server/invoice';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   const company = await getCompany();
   return { vatRates: company.vat_rates, defaultVat: company.vat_rate };
 };

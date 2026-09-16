@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getInvoice, renderInvoicePdf } from '$lib/server/invoice';
 
 export const GET: RequestHandler = async ({ params, locals, url }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   const inv = await getInvoice(params.id);
   if (!inv) throw error(404, { message: 'Facture introuvable' });
   const bytes = await renderInvoicePdf(params.id);

@@ -25,11 +25,14 @@ export async function getSetting<T extends SettingValue = SettingValue>(
   key: string
 ): Promise<T | null> {
   try {
-    const rows = await query<any>(`SELECT value FROM site_setting WHERE key = $k LIMIT 1`, {
+    // `value` est un mot réservé (syntaxe `SELECT VALUE …`) : sans les accents
+    // graves, la requête ne parse pas et le catch ci-dessous renvoyait null.
+    const rows = await query<any>(`SELECT \`value\` FROM site_setting WHERE key = $k LIMIT 1`, {
       k: key
     });
     return (rows[0]?.value ?? null) as T | null;
-  } catch {
+  } catch (e) {
+    console.error(`[site] lecture du réglage « ${key} » impossible :`, e);
     return null;
   }
 }

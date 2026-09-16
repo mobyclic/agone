@@ -3,7 +3,7 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
-import { accentRegex } from '$lib/text';
+import { accentRegex, sansScripts } from '$lib/text';
 
 export interface ArticleCard {
   title: string;
@@ -166,15 +166,21 @@ export async function latestArticle(): Promise<ArticleCard | null> {
   return card;
 }
 
-export interface RubriqueInfo { id: string; name: string; slug: string; count: number }
+export interface RubriqueInfo { id: string; name: string; slug: string; subtitle?: string; count: number }
 
 export async function listBlogRubriques(): Promise<RubriqueInfo[]> {
-  const rubs = await query<any>(`SELECT id, name, slug, sort FROM rubrique ORDER BY sort ASC`);
-  const counts = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE GROUP BY rubrique`);
+  const rubs = await query<any>(`SELECT id, name, slug, subtitle, sort FROM rubrique ORDER BY sort ASC`);
+  // `status = 'published'` est INDISPENSABLE : sans lui le compteur inclut les
+  // brouillons, et une rubrique n'ayant que des brouillons s'affichait dans la
+  // sous-nav avec « 11 » pour n'ouvrir que sur « Aucun article ». La liste
+  // (listArticles) ne montre que les publiés : les deux doivent s'accorder.
+  const counts = await query<any>(
+    `SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE AND status = 'published' GROUP BY rubrique`
+  );
   const byR = new Map<string, number>();
   for (const c of counts) if (c.r) byR.set(String(c.r), c.n ?? 0);
   return rubs
-    .map((r) => ({ id: r.id, name: r.name, slug: r.slug, count: byR.get(String(r.id)) ?? 0 }))
+    .map((r) => ({ id: r.id, name: r.name, slug: r.slug, subtitle: r.subtitle ?? undefined, count: byR.get(String(r.id)) ?? 0 }))
     .filter((r) => r.count > 0);
 }
 
@@ -198,7 +204,7 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
   return {
     ...toCard(a),
     id: a.pid,
-    body_html: a.body_html ?? undefined,
+    body_html: sansScripts(a.body_html),
     authors: (a.authors ?? []).filter((x: any) => x?.slug),
     books: (a.books ?? []).filter((x: any) => x?.slug)
   };
@@ -331,7 +337,13 @@ export interface AdminRubrique { id: string; name: string; slug: string; kind: s
 
 export async function listAllRubriques(): Promise<AdminRubrique[]> {
   const rubs = await query<any>(`SELECT id, name, slug, kind, sort FROM rubrique ORDER BY sort ASC, name ASC`);
-  const counts = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE GROUP BY rubrique`);
+  // `status = 'published'` est INDISPENSABLE : sans lui le compteur inclut les
+  // brouillons, et une rubrique n'ayant que des brouillons s'affichait dans la
+  // sous-nav avec « 11 » pour n'ouvrir que sur « Aucun article ». La liste
+  // (listArticles) ne montre que les publiés : les deux doivent s'accorder.
+  const counts = await query<any>(
+    `SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE AND status = 'published' GROUP BY rubrique`
+  );
   const pub = await query<any>(`SELECT rubrique AS r, count() AS n FROM article WHERE status = 'published' AND rubrique != NONE GROUP BY rubrique`);
   const byR = new Map<string, number>();
   for (const c of counts) if (c.r) byR.set(String(c.r), c.n ?? 0);
@@ -347,15 +359,16 @@ export async function listAllRubriques(): Promise<AdminRubrique[]> {
 }
 
 export async function getRubriqueForEdit(id: string) {
-  const rows = await query<any>(`SELECT meta::id(id) AS id, name, slug FROM rubrique WHERE id = $id LIMIT 1`, { id: recId('rubrique', id) });
+  const rows = await query<any>(`SELECT meta::id(id) AS id, name, slug, subtitle FROM rubrique WHERE id = $id LIMIT 1`, { id: recId('rubrique', id) });
   const r = rows[0];
   if (!r) return null;
   const c = await query<any>(`SELECT count() AS n FROM article WHERE rubrique = $r GROUP ALL`, { r: recId('rubrique', id) });
-  return { id: r.id, name: r.name, slug: r.slug, article_count: c[0]?.n ?? 0 };
+  return { id: r.id, name: r.name, slug: r.slug, subtitle: r.subtitle ?? '', article_count: c[0]?.n ?? 0 };
 }
 
-export async function saveRubrique(id: string | null, d: { name: string; slug?: string; kind?: string; sort?: number }): Promise<string> {
-  const { sql, vars } = buildSet({ name: d.name, kind: d.kind || 'blog', sort: d.sort ?? 0 });
+export async function saveRubrique(id: string | null, d: { name: string; slug?: string; subtitle?: string; kind?: string; sort?: number }): Promise<string> {
+  // `buildSet` traduit undefined en NONE : un sous-titre vidé est donc bien effacé.
+  const { sql, vars } = buildSet({ name: d.name, subtitle: d.subtitle?.trim() || undefined, kind: d.kind || 'blog', sort: d.sort ?? 0 });
   if (id) {
     if (d.slug) {
       const slug = await uniqueSlug('rubrique', d.slug, { excludeId: id });

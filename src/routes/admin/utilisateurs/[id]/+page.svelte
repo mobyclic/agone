@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Key } from 'phosphor-svelte';
   import { ORDER_STATUS_LABEL, CHANNEL_LABEL, euros } from '$lib/labels';
 
   let { data, form } = $props();
@@ -108,3 +108,27 @@
     <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
   </div>
 </form>
+
+<!-- Mot de passe — formulaire distinct (un <form> ne peut pas en contenir un autre). -->
+{#if data.user?.role === 'admin'}
+  <form method="POST" action="?/password" use:enhance class="mt-6 max-w-3xl">
+    <div class="rounded-lg border border-border bg-card p-4">
+      <h3 class="eyebrow mb-1">Mot de passe</h3>
+      <p class="mb-3 text-sm text-muted-foreground">
+        Définit un nouveau mot de passe pour ce compte. Les autres sessions ouvertes sont déconnectées.
+      </p>
+      {#if form?.pwerror}<p class="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.pwerror}</p>{/if}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class={label}>Nouveau mot de passe
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required class={input} />
+        </label>
+        <label class={label}>Confirmation
+          <input name="password_confirm" type="password" autocomplete="new-password" minlength="8" required class={input} />
+        </label>
+      </div>
+      <div class="mt-4">
+        <Button type="submit" variant="outline"><Key size={16} /> Modifier le mot de passe</Button>
+      </div>
+    </div>
+  </form>
+{/if}

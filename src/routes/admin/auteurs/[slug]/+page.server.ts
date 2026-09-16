@@ -2,17 +2,27 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import { isAdmin } from '$lib/roles';
-import { getAuthorAdminBySlug, upsertAuthor, deleteAuthor, type AuthorInput } from '$lib/server/authors';
+import { getAuthorAdminBySlug, upsertAuthor, deleteAuthor, booksForAuthorAdmin, type AuthorInput } from '$lib/server/authors';
 import { statementsForAuthor } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  if (params.slug === 'nouveau') return { isNew: true, author: null, statements: [] };
+  if (params.slug === 'nouveau') return { isNew: true, author: null, statements: [], books: [], canSeeRoyalties: isAdmin(locals.user?.role) };
   const author = await getAuthorAdminBySlug(params.slug);
   if (!author) throw error(404, { message: 'Auteur introuvable' });
-  // Droits d'auteur : réservés aux administrateurs.
-  const statements = isAdmin(locals.user?.role) ? await statementsForAuthor(author.pid) : [];
-  return { isNew: false, author, statements };
+  // Droits d'auteur : réservés aux administrateurs. `canSeeRoyalties` permet à la
+  // page de distinguer « aucun relevé » de « relevés masqués ».
+  const canSeeRoyalties = isAdmin(locals.user?.role);
+  const [statements, books] = await Promise.all([
+    canSeeRoyalties ? statementsForAuthor(author.pid) : Promise.resolve([]),
+    booksForAuthorAdmin(author.pid)
+  ]);
+  // Identité fiscale : ne pas l'envoyer au client qui n'a pas le droit de la voir.
+  if (!canSeeRoyalties) {
+    delete author.legal_name;
+    delete author.siret;
+  }
+  return { isNew: false, author, statements, books, canSeeRoyalties };
 };
 
 export const actions: Actions = {
@@ -23,6 +33,17 @@ export const actions: Actions = {
 
     if (!S('first_name') && !S('last_name')) return fail(400, { error: 'Un nom est requis.' });
 
+    let editId: string | null = null;
+    let existing: any = null;
+    if (params.slug && params.slug !== 'nouveau') {
+      existing = await getAuthorAdminBySlug(params.slug);
+      if (!existing) throw error(404, { message: 'Auteur introuvable' });
+      editId = existing.pid;
+    }
+
+    // L'identité fiscale n'est affichée qu'aux admins : pour les autres, on
+    // reconduit l'existant, sinon `upsertAuthor` remettrait ces champs à NONE.
+    const canEditFiscal = isAdmin(locals.user?.role);
     const input: AuthorInput = {
       first_name: S('first_name'),
       last_name: S('last_name'),
@@ -33,16 +54,9 @@ export const actions: Actions = {
       birth_date: S('birth_date') || undefined,
       death_date: S('death_date') || undefined,
       website: S('website') || undefined,
-      legal_name: S('legal_name') || undefined,
-      siret: S('siret') || undefined
+      legal_name: (canEditFiscal ? S('legal_name') : existing?.legal_name) || undefined,
+      siret: (canEditFiscal ? S('siret') : existing?.siret) || undefined
     };
-
-    let editId: string | null = null;
-    if (params.slug && params.slug !== 'nouveau') {
-      const existing = await getAuthorAdminBySlug(params.slug);
-      if (!existing) throw error(404, { message: 'Auteur introuvable' });
-      editId = existing.pid;
-    }
     const { slug } = await upsertAuthor(editId, input);
     throw redirect(303, withFlash(`/admin/auteurs/${slug}`, 'Auteur enregistré.', 'success'));
   },

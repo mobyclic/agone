@@ -1,11 +1,11 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getOrderByNumber } from '$lib/server/order';
 import { renderDeliveryNotePdf } from '$lib/server/delivery';
 
 export const GET: RequestHandler = async ({ params, locals, url }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   const order = await getOrderByNumber(Number(params.number));
   if (!order) throw error(404, { message: 'Commande introuvable' });
   const bytes = await renderDeliveryNotePdf(String(order.id).replace(/^order:/, ''));

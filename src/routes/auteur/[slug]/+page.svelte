@@ -23,7 +23,7 @@
   </div>
 {/if}
 
-<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+<div class="py-10" style="padding-inline: var(--page-gutter)">
   <header class="flex flex-col gap-6 sm:flex-row sm:items-start">
     <div class="size-28 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
       {#if a.portrait_url}

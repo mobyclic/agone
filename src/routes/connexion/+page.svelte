@@ -41,7 +41,7 @@
       <h2 class="max-w-sm text-3xl font-extrabold leading-tight tracking-tight">Content de vous revoir.</h2>
       <p class="mt-3 max-w-sm text-sidebar-foreground/70">Retrouvez votre bibliothèque, vos commandes et vos téléchargements.</p>
     </div>
-    <p class="relative text-xs text-sidebar-foreground/50">Agone — éditeur engagé.</p>
+    <p class="relative text-xs text-sidebar-foreground/50">Agone — Éditeur indépendant.</p>
   </div>
 
   <!-- Formulaire -->

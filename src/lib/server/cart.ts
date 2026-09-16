@@ -89,7 +89,9 @@ export async function cartDetails(cookies: Cookies): Promise<CartDetails> {
        FROM book WHERE id IN $ids`,
     { ids: ids.map((x) => recId('book', x)) }
   );
-  const byId = new Map(books.map((b) => [String(b.id), b]));
+  // `query()` normalise les RecordId en « book:xxx » alors que le cookie ne stocke
+  // que l'identifiant nu : on retire le préfixe de table avant d'indexer.
+  const byId = new Map(books.map((b) => [String(b.id).replace(/^book:/, ''), b]));
   const lines: CartLine[] = [];
   let subtotal = 0, item_count = 0, has_ebook = false, has_physical = false, total_weight = 0;
   for (const it of items) {

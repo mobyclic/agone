@@ -81,7 +81,7 @@ function layout(title: string, inner: string): string {
       <h1 style="font-size:19px;margin:0 0 12px">${title}</h1>
       ${inner}
     </div>
-    <p style="color:#8a857c;font-size:12px;margin-top:16px;font-family:Arial,Helvetica,sans-serif">${SITE} — éditeur engagé.</p>
+    <p style="color:#8a857c;font-size:12px;margin-top:16px;font-family:Arial,Helvetica,sans-serif">${SITE} — Éditeur indépendant.</p>
   </div></body></html>`;
 }
 

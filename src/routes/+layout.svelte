@@ -14,6 +14,8 @@
     page.url.pathname.startsWith('/admin') || page.url.pathname.startsWith('/compte')
   );
 
+
+
   $effect(() => {
     consumeUrlFlash(page.url);
   });

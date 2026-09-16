@@ -69,6 +69,9 @@ export function applyConsentToTags(c: ConsentState) {
   // pas les événements comme utilisables.
   if (typeof w.fbq === 'function') w.fbq('consent', c.marketing ? 'grant' : 'revoke');
   w.dataLayer.push({ event: 'consent_update', consent: c });
+  // Signal DOM : les intégrations tierces posées dans le contenu éditorial
+  // (Instagram…) s'y accrochent pour se charger dès l'accord, sans sondage.
+  window.dispatchEvent(new CustomEvent('ag:consent', { detail: c }));
 }
 
 export function makeAcceptAll(): ConsentState {

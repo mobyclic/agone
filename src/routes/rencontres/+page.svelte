@@ -16,7 +16,7 @@
 
 <PageHead eyebrow="L’agenda" title="Rencontres" subtitle="Débats, tables rondes et présentations autour des livres et des auteurs." />
 
-<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+<div class="py-10" style="padding-inline: var(--page-gutter)">
   <!-- À venir -->
   <section>
     <h2 class="text-xl font-bold tracking-tight">À venir</h2>

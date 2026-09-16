@@ -26,6 +26,7 @@
   <div class="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
     <label class={label}>Nom <input name="name" value={r?.name ?? ''} class={input} /></label>
     <label class={label}>Slug (URL) <input name="slug" value={r?.slug ?? ''} placeholder="auto depuis le nom" class={input} /></label>
+    <label class={label}>Sous-titre <input name="subtitle" value={r?.subtitle ?? ''} placeholder="affiché sous le nom sur la page publique" class={input} /></label>
   </div>
   {#if !data.isNew}<p class="mt-2 text-xs text-muted-foreground">{r?.article_count ?? 0} article{(r?.article_count ?? 0) > 1 ? 's' : ''} dans cette catégorie.</p>{/if}
 

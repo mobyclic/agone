@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ajouterFondDeCarte } from '$lib/client/map-tiles';
   import { onMount } from 'svelte';
 
   let { lat, lng, name = '' }: { lat: number; lng: number; name?: string } = $props();
@@ -9,10 +10,7 @@
     (async () => {
       const L = (await import('leaflet')).default;
       map = L.map(el, { scrollWheelZoom: false, attributionControl: true }).setView([lat, lng], 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19
-      }).addTo(map);
+      ajouterFondDeCarte(L, map, { maxZoom: 19 });
       const icon = L.divIcon({
         className: '',
         html: '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:#d4211c;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)"></div>',

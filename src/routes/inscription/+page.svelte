@@ -34,7 +34,7 @@
         <li>• La lettre d’information (optionnelle)</li>
       </ul>
     </div>
-    <p class="relative text-xs text-sidebar-foreground/50">Agone — éditeur engagé.</p>
+    <p class="relative text-xs text-sidebar-foreground/50">Agone — Éditeur indépendant.</p>
   </div>
 
   <div class="flex items-center justify-center p-6 sm:p-12">

@@ -33,7 +33,7 @@
 
 <PageHead eyebrow="Boutique" title="Finaliser la commande" width="max-w-4xl" />
 
-<div class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+<div class="max-w-4xl py-10" style="padding-inline: var(--page-gutter)">
   <a href="/panier" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Panier</a>
 
   {#if form?.error}<p class="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}

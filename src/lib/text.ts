@@ -45,3 +45,40 @@ export function accentRegex(qRaw: string): string {
   });
   return `(?i)${out}`;
 }
+
+/**
+ * Termine proprement un texte déjà tronqué (ou le tronque à `max`).
+ *
+ * L'import WordPress coupait les extraits à 220 caractères pile, donc en plein
+ * mot : « …la bousculade et la rancune médiatique qui en découlent, m'en ». On
+ * recule jusqu'à la dernière frontière de mot et on pose des points de suspension.
+ * Un texte qui se termine déjà sur une ponctuation forte est laissé intact — il
+ * s'agit alors d'un chapô rédigé, pas d'une troncature.
+ */
+export function extraitPropre(texte?: string | null, max?: number): string | undefined {
+  const s = (texte ?? '').replace(/\s+/g, ' ').trim();
+  if (!s) return undefined;
+  const coupe = max != null && s.length > max ? s.slice(0, max) : s;
+  const tronque = coupe.length < s.length;
+  if (!tronque && /[.!?…»)\]]$/.test(coupe)) return coupe;
+  // Recule au dernier espace pour ne pas laisser un mot amputé.
+  const espace = coupe.lastIndexOf(' ');
+  const base = espace > coupe.length * 0.5 ? coupe.slice(0, espace) : coupe;
+  return base.replace(/[\s,;:–—-]+$/, '') + '…';
+}
+
+/**
+ * Retire les <script> d'un HTML éditorial hérité de WordPress.
+ *
+ * POURQUOI CE N'EST PAS COSMÉTIQUE : `{@html}` recopie ces balises dans un
+ * template cloné, et un script cloné n'est PAS marqué « déjà démarré » — il
+ * s'exécute donc pour de bon. Le code d'intégration Instagram collé dans une
+ * présentation de livre chargeait ainsi `embed.js` (script Meta, dépôt de
+ * cookies) en contournant notre bannière de consentement. Le chargement passe
+ * désormais par $lib/client/embeds, qui attend l'accord « marketing ».
+ * Accessoirement, cela ferme la porte à tout script arrivé par la base.
+ */
+export function sansScripts(html?: string | null): string | undefined {
+  if (!html) return undefined;
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '').replace(/<script\b[^>]*\/?>/gi, '');
+}

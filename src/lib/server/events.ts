@@ -3,6 +3,7 @@
  * Les lieux sont des `venue` réutilisables et géolocalisés.
  */
 import { query, recId } from './surreal';
+import { sansScripts } from '$lib/text';
 import { uniqueSlug } from './slug';
 import { geocodeAddress } from './geocode';
 import { GeometryPoint } from 'surrealdb';
@@ -94,7 +95,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
     id: e.pid,
     title: e.title,
     slug: e.slug,
-    body_html: e.body_html ?? undefined,
+    body_html: sansScripts(e.body_html),
     cover_url: e.cover_url ?? undefined,
     start_at: e.start_at ?? undefined,
     end_at: e.end_at ?? undefined,
@@ -140,6 +141,26 @@ export async function searchVenues(qRaw: string): Promise<{ id: string; name: st
 }
 
 /** Affine la position d'un lieu existant (lat/lng + point geo). */
+/**
+ * Contact d'un lieu (téléphone, site, description). Le lieu étant PARTAGÉ entre
+ * rencontres, la saisie depuis une fiche rencontre modifie bien le lieu pour
+ * toutes — c'est voulu : ces informations décrivent le lieu, pas l'événement.
+ * Un champ laissé vide efface la valeur (l'utilisateur voit ce qu'il enregistre).
+ */
+export async function updateVenueContact(
+  venueId: string,
+  d: { phone?: string; website?: string; description?: string }
+): Promise<void> {
+  const set: string[] = [];
+  const vars: Record<string, unknown> = {};
+  for (const champ of ['phone', 'website', 'description'] as const) {
+    const v = d[champ]?.trim();
+    if (v) { vars[champ] = v; set.push(`${champ} = $${champ}`); }
+    else set.push(`${champ} = NONE`);
+  }
+  await query(`UPDATE $id SET ${set.join(', ')}`, { ...vars, id: recId('venue', venueId) });
+}
+
 export async function updateVenuePosition(venueId: string, lat: number, lng: number): Promise<void> {
   await query(`UPDATE $id SET lat = $lat, lng = $lng, geo = $geo`, {
     id: recId('venue', venueId),
@@ -162,6 +183,9 @@ export interface EventEdit {
   venue_label?: string;
   venue_lat?: number;
   venue_lng?: number;
+  venue_phone?: string;
+  venue_website?: string;
+  venue_description?: string;
   authors: { id: string; label: string }[];
   books: { id: string; label: string }[];
 }
@@ -172,6 +196,8 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
         cover AS cover_ref, cover.url AS cover_url, start_at, end_at,
         venue AS venue_ref, venue.name AS venue_name, venue.city AS venue_city,
         venue.lat AS venue_lat, venue.lng AS venue_lng,
+        venue.phone AS venue_phone, venue.website AS venue_website,
+        venue.description AS venue_description,
         authors.{ id: id, label: full_name } AS authors,
         books.{ id: id, label: title } AS books
       FROM event WHERE id = $id LIMIT 1`,
@@ -192,6 +218,9 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
     venue_label: e.venue_name ? `${e.venue_name}${e.venue_city ? `, ${e.venue_city}` : ''}` : undefined,
     venue_lat: e.venue_lat ?? undefined,
     venue_lng: e.venue_lng ?? undefined,
+    venue_phone: e.venue_phone ?? undefined,
+    venue_website: e.venue_website ?? undefined,
+    venue_description: e.venue_description ?? undefined,
     authors: (e.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' })),
     books: (e.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' }))
   };
@@ -204,7 +233,8 @@ export interface EventInput {
   start_at?: string; // ISO
   end_at?: string; // ISO
   venueId?: string;
-  newVenue?: { name: string; street?: string; city?: string; post_code?: string; country?: string; lat?: number; lng?: number };
+  newVenue?: { name: string; street?: string; city?: string; post_code?: string; country?: string; lat?: number; lng?: number;
+    phone?: string; website?: string; description?: string };
   authorIds: string[];
   bookIds: string[];
 }
@@ -227,6 +257,9 @@ async function resolveVenueId(input: EventInput): Promise<string | undefined> {
     city: v.city?.trim() || undefined,
     post_code: v.post_code?.trim() || undefined,
     country: v.country?.trim() || undefined,
+    phone: v.phone?.trim() || undefined,
+    website: v.website?.trim() || undefined,
+    description: v.description?.trim() || undefined,
     address: [v.street, v.post_code, v.city, v.country].map((x) => x?.trim()).filter(Boolean).join(', ') || undefined,
     lat: v.lat, lng: v.lng
   };
@@ -265,4 +298,77 @@ export async function saveEvent(id: string | null, input: EventInput): Promise<s
 
 export async function deleteEvent(id: string): Promise<void> {
   await query(`DELETE $id`, { id: recId('event', id) });
+}
+
+// ── AGENDA DÉPLIANT DE L'ACCUEIL ──────────────────────────────────────────
+// La section Rencontres de l'accueil porte TOUTES les rencontres à venir, la
+// liste et la carte se répondant : ouvrir une fiche zoome la carte, cliquer un
+// point ouvre la fiche. Elle a donc besoin du détail du lieu D'EMBLÉE — un
+// aller-retour serveur par clic ferait clignoter la carte pour rien.
+
+export interface UpcomingEntry {
+  slug: string;
+  title: string;
+  start_at?: string;
+  end_at?: string;
+  excerpt?: string;
+  author_names: string[];
+  venue?: {
+    name?: string;
+    address?: string;
+    city?: string;
+    post_code?: string;
+    country?: string;
+    phone?: string;
+    website?: string;
+    description?: string;
+    lat?: number;
+    lng?: number;
+  };
+}
+
+/** Texte nu d'un corps HTML, tronqué proprement sur un mot. */
+function extraitTexte(html: string | undefined, max = 260): string | undefined {
+  if (!html) return undefined;
+  const nu = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!nu) return undefined;
+  if (nu.length <= max) return nu;
+  const coupe = nu.slice(0, max);
+  const espace = coupe.lastIndexOf(' ');
+  return (espace > 60 ? coupe.slice(0, espace) : coupe) + '…';
+}
+
+export async function listUpcomingWithVenues(): Promise<UpcomingEntry[]> {
+  const rows = await query<any>(
+    `SELECT title, slug, start_at, end_at, body_html,
+        venue.name AS v_name, venue.address AS v_address, venue.city AS v_city,
+        venue.post_code AS v_post_code, venue.country AS v_country,
+        venue.phone AS v_phone, venue.website AS v_website,
+        venue.description AS v_description,
+        venue.lat AS v_lat, venue.lng AS v_lng,
+        authors.full_name AS author_names
+      FROM event WHERE start_at != NONE AND start_at >= time::now() ORDER BY start_at ASC`
+  );
+  return rows.map((r) => ({
+    slug: r.slug,
+    title: r.title,
+    start_at: r.start_at ?? undefined,
+    end_at: r.end_at ?? undefined,
+    excerpt: extraitTexte(r.body_html ?? undefined),
+    author_names: (r.author_names ?? []).filter(Boolean),
+    venue: r.v_name
+      ? {
+          name: r.v_name ?? undefined,
+          address: r.v_address ?? undefined,
+          city: r.v_city ?? undefined,
+          post_code: r.v_post_code ?? undefined,
+          country: r.v_country ?? undefined,
+          phone: r.v_phone ?? undefined,
+          website: r.v_website ?? undefined,
+          description: r.v_description ?? undefined,
+          lat: typeof r.v_lat === 'number' ? r.v_lat : undefined,
+          lng: typeof r.v_lng === 'number' ? r.v_lng : undefined
+        }
+      : undefined
+  }));
 }

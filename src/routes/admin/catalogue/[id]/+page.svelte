@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { beforeNavigate } from '$app/navigation';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import GalleryUpload from '$lib/components/GalleryUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
@@ -11,6 +12,13 @@
   const b = $derived(data.book);
   let dirty = $state(false);
   let saving = $state(false);
+
+  // La fiche contient des liens sortants (contributeurs) : on prévient avant de
+  // quitter avec des modifications non enregistrées.
+  beforeNavigate((nav) => {
+    if (!dirty || saving) return;
+    if (!confirm('Des modifications ne sont pas enregistrées. Quitter cette page ?')) nav.cancel();
+  });
 
   let coverId = $state<string | null>(null);
   let coverUrl = $state<string | null>(null);

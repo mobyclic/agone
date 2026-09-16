@@ -15,7 +15,7 @@
 
 <PageHead eyebrow="Boutique" title="Mon panier" width="max-w-5xl" />
 
-<div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+<div class="max-w-5xl py-10" style="padding-inline: var(--page-gutter)">
   {#if data.cart.lines.length === 0}
     <div class="mt-8 rounded-lg border border-border bg-card p-10 text-center">
       <p class="text-muted-foreground">Votre panier est vide.</p>

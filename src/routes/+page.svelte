@@ -1,9 +1,9 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
   import SectionHead from '$lib/components/SectionHead.svelte';
-  import EventsMap from '$lib/components/EventsMap.svelte';
+  import EventsExplorer from '$lib/components/EventsExplorer.svelte';
   import { authorList, isForthcoming } from '$lib/labels';
-  import { MapPin } from 'phosphor-svelte';
+  import { extraitPropre } from '$lib/text';
 
   let { data } = $props();
   const article = $derived(data.feature ?? data.articles[0]);
@@ -11,18 +11,16 @@
   const secondary = $derived((data.articles ?? []).filter((a) => a.slug !== article?.slug).slice(0, 3));
   const books = $derived(data.recent.slice(0, 6));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
-  const dayNum = (s?: string) => (s ? new Date(s).getDate() : '');
-  const monShort = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { month: 'short' }) : '');
 </script>
 
 <svelte:head>
-  <title>Agone — éditeur engagé</title>
-  <meta name="description" content="Éditions Agone — sciences sociales, histoire, littérature et critique du présent. Marseille." />
+  <title>Agone — Éditeur indépendant</title>
+  <meta name="description" content="Éditions Agone — Critique politique, sciences sociales & humaines. Marseille." />
 </svelte:head>
 
 <!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
-<section class="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
-  <div class="grid gap-x-10 gap-y-14 lg:grid-cols-2">
+<section class="pb-16 pt-10 lg:pt-14" style="padding-inline: var(--page-gutter)">
+  <div class="grid gap-y-14 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
 
     <!-- Manchette : le dernier article de L'Antichambre -->
     {#if article}
@@ -59,12 +57,15 @@
           <div class="mt-8 divide-y divide-border border-t-2 border-foreground">
             {#each secondary as a (a.slug)}
               <a href="/article/{a.slug}" class="group block py-3.5">
-                <div class="flex flex-wrap items-center gap-x-2 font-display text-[11px] uppercase tracking-wide">
+                <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
                   {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
                 <h3 class="display-title mt-1 text-xl leading-tight group-hover:text-link">{a.title}</h3>
                 {#if a.author}<p class="mt-0.5 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
+                {#if a.excerpt}
+                  <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>
+                {/if}
               </a>
             {/each}
           </div>
@@ -96,9 +97,9 @@
                 {/if}
               </div>
               <div class="mt-3">
-                <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground group-hover:text-link sm:text-[17px]">{book.title}</h3>
+                <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground transition-colors group-hover:text-link sm:text-[17px]">{book.title}</h3>
                 {#if book.subtitle}<p class="mt-px line-clamp-2 text-[13px] leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
-                {#if book.authors?.length}<p class="mt-px line-clamp-1 text-sm font-semibold uppercase tracking-wide text-link">{authorList(book.authors)}</p>{/if}
+                {#if book.authors?.length}<p class="mt-0.5 line-clamp-1 text-[13px] font-semibold tracking-wide text-link transition-colors group-hover:text-foreground">{authorList(book.authors)}</p>{/if}
               </div>
             </a>
           {/each}
@@ -110,8 +111,8 @@
 
 <!-- À PARAÎTRE + FOCUS -->
 {#if data.forthcoming.length || data.featured.length}
-  <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-    <div class="grid gap-x-10 gap-y-12 lg:grid-cols-2">
+  <section class="py-14" style="padding-inline: var(--page-gutter)">
+    <div class="grid gap-y-12 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
       {#if data.forthcoming.length}
         <div>
           <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
@@ -135,30 +136,9 @@
 <!-- RENCONTRES — carte de France (pastilles) + 6 prochaines rencontres -->
 {#if data.events.length}
   <section class="bg-background">
-    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
+    <div class="py-14" style="padding-inline: var(--page-gutter)">
       <SectionHead title="Rencontres" href="/rencontres" more="L’agenda" />
-      <div class="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-        <!-- Carte : toutes les prochaines rencontres géolocalisées -->
-        <div class="min-h-[380px] overflow-hidden">
-          <EventsMap pins={data.eventPins} />
-        </div>
-
-        <!-- Liste : les 6 prochaines rencontres -->
-        <div class="divide-y divide-border border-t border-border">
-          {#each data.events as e (e.slug)}
-            <a href="/rencontres/{e.slug}" class="group flex items-baseline gap-4 py-4">
-              <div class="flex w-12 shrink-0 flex-col font-display leading-none">
-                <span class="text-3xl font-bold">{dayNum(e.start_at)}</span>
-                <span class="mt-1 text-xs uppercase text-muted-foreground">{monShort(e.start_at)}</span>
-              </div>
-              <div class="min-w-0 flex-1">
-                <h3 class="font-display text-lg font-medium leading-tight group-hover:text-link">{e.title}</h3>
-                {#if e.venue_name}<p class="mt-1 text-xs text-muted-foreground"><MapPin size={12} class="mb-0.5 mr-0.5 inline" />{e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</p>{/if}
-              </div>
-            </a>
-          {/each}
-        </div>
-      </div>
+      <EventsExplorer events={data.events} />
     </div>
   </section>
 {/if}

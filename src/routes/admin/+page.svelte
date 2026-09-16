@@ -8,7 +8,7 @@
   const asOfLabel = $derived(new Date(data.asOf).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }));
 
   const y = $derived(data.ytd);
-  const barMax = $derived(Math.max(1, y.ca, y.prevCa));
+  const barMax = $derived(Math.max(1, y?.ca ?? 0, y?.prevCa ?? 0));
 
   const plural = (n: number, s: string, p = `${s}s`) => `${n.toLocaleString('fr-FR')} ${n > 1 ? p : s}`;
   const catalogueStats = $derived([
@@ -73,7 +73,8 @@
 </div>
 
 <!-- Ventes + catalogue en bref -->
-<div class="grid gap-4 lg:grid-cols-3">
+<div class="grid gap-4 {data.isAdmin ? 'lg:grid-cols-3' : ''}">
+  {#if data.isAdmin && y}
   <!-- Ventes année en cours vs N-1 à date -->
   <section class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -108,6 +109,7 @@
     </div>
     <p class="mt-2.5 text-xs text-muted-foreground">{y.prevYear} à la même date · {y.prevOrders.toLocaleString('fr-FR')} commandes{#if data.pending} · <a href="/admin/commandes?status=pending" class="text-link hover:underline">{data.pending} en attente</a>{/if}</p>
   </section>
+  {/if}
 
   <!-- Catalogue en bref (compact) -->
   <section class="rounded-lg border border-border bg-card p-2">
@@ -173,7 +175,9 @@
   <section class="rounded-lg border border-border bg-card p-4">
     <p class="eyebrow mb-2">Raccourcis</p>
     <div class="grid gap-2">
-      <a href="/admin/commandes/nouvelle" class="flex items-center gap-2.5 rounded-md border-2 border-foreground px-3 py-2 text-sm font-semibold hover:bg-foreground hover:text-background"><Receipt size={17} /> Nouvelle commande</a>
+      {#if data.isAdmin}
+        <a href="/admin/commandes/nouvelle" class="flex items-center gap-2.5 rounded-md border-2 border-foreground px-3 py-2 text-sm font-semibold hover:bg-foreground hover:text-background"><Receipt size={17} /> Nouvelle commande</a>
+      {/if}
       <a href="/admin/catalogue/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><BookOpen size={17} /> Nouveau livre</a>
       <a href="/admin/auteurs/nouveau" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><PenNib size={17} /> Nouvel auteur</a>
       <a href="/admin/rencontres/nouvelle" class="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm font-medium hover:border-primary hover:bg-muted/40"><CalendarDots size={17} /> Nouvelle rencontre</a>
@@ -183,6 +187,7 @@
 </div>
 
 <!-- Dernières commandes -->
+{#if data.isAdmin}
 <div class="mt-8">
   <div class="mb-3 flex items-center justify-between">
     <h3 class="text-base font-semibold">Dernières commandes</h3>
@@ -216,3 +221,4 @@
     </table>
   </div>
 </div>
+{/if}

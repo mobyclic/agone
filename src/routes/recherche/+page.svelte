@@ -10,7 +10,7 @@
 
 <PageHead title="Recherche" subtitle={data.q ? `Résultats pour « ${data.q} »` : undefined} width="max-w-6xl" />
 
-<div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+<div class="py-10" style="padding-inline: var(--page-gutter)">
   <form method="GET" class="relative max-w-2xl">
     <MagnifyingGlass size={20} class="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
     <input
@@ -48,7 +48,7 @@
 
     {#if data.articles.length}
       <section class="mt-10">
-        <h2 class="text-lg font-bold">L’Antichambre</h2>
+        <h2 class="text-lg font-bold">Antichambre</h2>
         <ul class="mt-4 divide-y divide-border border-y border-border">
           {#each data.articles as a (a.slug)}
             <li><a href="/article/{a.slug}" class="block py-3 font-medium hover:text-link">{a.title}</a></li>

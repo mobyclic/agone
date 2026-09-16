@@ -1,7 +1,7 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
-import { getEventForEdit, saveEvent, deleteEvent, updateVenuePosition, type EventInput } from '$lib/server/events';
+import { getEventForEdit, saveEvent, deleteEvent, updateVenuePosition, updateVenueContact, type EventInput } from '$lib/server/events';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -54,7 +54,10 @@ export const actions: Actions = {
               post_code: S('venuePostcode') || undefined,
               country: S('venueCountry') || undefined,
               lat: numOrU(S('venueLat')),
-              lng: numOrU(S('venueLng'))
+              lng: numOrU(S('venueLng')),
+              phone: S('venuePhone') || undefined,
+              website: S('venueWebsite') || undefined,
+              description: S('venueDescription') || undefined
             }
           : undefined,
       authorIds: ids(fd.get('authorIds')),
@@ -66,6 +69,12 @@ export const actions: Actions = {
       const la = numOrU(S('venueLat'));
       const ln = numOrU(S('venueLng'));
       if (la != null && ln != null) await updateVenuePosition(S('venueId'), la, ln);
+    }
+    // Contact du lieu : partagé entre toutes ses rencontres (cf. updateVenueContact).
+    if (venueMode === 'existing' && S('venueId')) {
+      await updateVenueContact(S('venueId'), {
+        phone: S('venuePhone'), website: S('venueWebsite'), description: S('venueDescription')
+      });
     }
 
     const editId = params.id && params.id !== 'nouvelle' ? params.id : null;

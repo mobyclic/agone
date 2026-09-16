@@ -16,12 +16,12 @@
 </script>
 
 <footer class="border-t border-border bg-secondary/40">
-  <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
+  <div class="py-14" style="padding-inline: var(--page-gutter)">
     <div class="grid gap-10 lg:grid-cols-5">
       <div class="lg:col-span-2">
         <a href="/" class="inline-flex text-foreground" aria-label="Agone — accueil"><Wordmark /></a>
         <p class="mt-4 max-w-xs text-sm text-muted-foreground">
-          Agone — éditeur engagé. Sciences sociales, histoire, littérature et critique du présent.
+          Agone — Éditeur indépendant. Critique politique, sciences sociales & humaines.
         </p>
         <div class="mt-5 flex items-center gap-1">
           {#each socials as s (s.name)}
@@ -38,7 +38,7 @@
           <li><a class="text-muted-foreground hover:text-foreground" href="/catalogue">Catalogue</a></li>
           <li><a class="text-muted-foreground hover:text-foreground" href="/auteurs">Auteurs</a></li>
           <li><a class="text-muted-foreground hover:text-foreground" href="/rencontres">Rencontres</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/antichambre">L’Antichambre</a></li>
+          <li><a class="text-muted-foreground hover:text-foreground" href="/antichambre">Antichambre</a></li>
         </ul>
       </div>
 
@@ -53,7 +53,7 @@
 
       <div>
         <div class="eyebrow mb-3">Lettre d’information</div>
-        <p class="mb-3 text-sm text-muted-foreground">Nouveautés, rencontres et textes de L’Antichambre.</p>
+        <p class="mb-3 text-sm text-muted-foreground">Nouveautés, rencontres et textes d’Antichambre.</p>
         {#if subscribed}
           <p class="text-sm text-success">Merci, votre inscription est prise en compte.</p>
         {:else}

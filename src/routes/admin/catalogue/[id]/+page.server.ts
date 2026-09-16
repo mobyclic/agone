@@ -16,6 +16,7 @@ export const load: PageServerLoad = async ({ params }) => {
   const contributors = (data.contributors ?? []).map((c: any) => ({
     authorId: String(c.author_id),
     authorName: c.author_name,
+    authorSlug: c.author_slug,
     role: c.role,
     share: c.share ?? 100
   }));

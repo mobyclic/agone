@@ -24,6 +24,7 @@ export const actions: Actions = {
     const id = await saveCollection(editId, {
       name: S('name'),
       slug: S('slug') || undefined,
+      subtitle: S('subtitle') || undefined,
       description: S('description') || undefined
     });
     throw redirect(303, withFlash(`/admin/collections/${id}`, 'Collection enregistrée.', 'success'));

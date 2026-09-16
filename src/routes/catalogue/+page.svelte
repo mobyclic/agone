@@ -1,7 +1,7 @@
 <script lang="ts">
   import BookCard from '$lib/components/BookCard.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
-  import { MagnifyingGlass, ArrowRight } from 'phosphor-svelte';
+  import { ArrowRight } from 'phosphor-svelte';
 
   let { data } = $props();
   const pageCount = $derived(data.mode === 'search' ? Math.max(1, Math.ceil(data.total / data.limit)) : 1);
@@ -20,25 +20,16 @@
 
 <PageHead title="Le catalogue" />
 
-<section class="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
-  <form method="GET" class="flex flex-wrap items-center gap-3">
-    <div class="relative min-w-[220px] flex-1">
-      <MagnifyingGlass size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-      <input name="q" value={data.q ?? ''} placeholder="Rechercher un titre…"
-        class="h-11 w-full border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-foreground" />
-    </div>
-    <button type="submit" class="btn-brand h-11 px-5 font-display text-sm font-medium uppercase tracking-wide">Rechercher</button>
-    {#if data.mode === 'search'}<a href="/catalogue" class="link h-11 self-center font-display text-sm uppercase tracking-wide">← Collections</a>{/if}
-  </form>
-</section>
-
 {#if data.mode === 'search'}
   <!-- Résultats de recherche -->
-  <section class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+  <section class="py-10" style="padding-inline: var(--page-gutter)">
     {#if data.books.length === 0}
       <p class="py-16 text-center text-muted-foreground">Aucun livre ne correspond à votre recherche.</p>
     {:else}
-      <p class="mb-6 text-sm text-muted-foreground">{data.total} résultat{data.total > 1 ? 's' : ''} pour « {data.q} »</p>
+      <p class="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <span>{data.total} résultat{data.total > 1 ? 's' : ''} pour « {data.q} »</span>
+        <a href="/catalogue" class="link font-display uppercase tracking-wide">← Collections</a>
+      </p>
       <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {#each data.books as book (book.slug)}<BookCard {book} />{/each}
       </div>
@@ -53,28 +44,33 @@
   </section>
 {:else}
   <!-- Vitrine par collections -->
-  <div class="mx-auto max-w-7xl px-4 sm:px-6">
-    {#each data.collections as c, i (c.slug)}
+  <div style="padding-inline: var(--page-gutter)">
+    {#each data.collections as c (c.slug)}
       {@const single = c.book_count === 1 ? c.books[0] : null}
       {@const target = single ? `/livre/${single.slug}` : `/collections/${c.slug}`}
       <section class="border-t border-border py-12 first:border-t-0">
-        <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
+        <!-- Texte sur deux tiers, ferré à gauche ; couvertures en face sur le
+             tiers restant. Pas d'alternance : la lecture descend en colonne. -->
+        <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-14">
           <!-- Texte -->
-          <div class={i % 2 === 1 ? 'lg:order-2' : ''}>
+          <div>
             <a href={target} class="group inline-block">
               <h2 class="display-title text-3xl leading-none group-hover:text-link sm:text-4xl lg:text-5xl">{c.name}</h2>
             </a>
             {#if c.description_html}
-              <div class="prose-agone mt-4 line-clamp-5 max-w-prose text-[15px] leading-relaxed text-muted-foreground">{@html c.description_html}</div>
+              <!-- Le texte occupe les deux tiers : plus de `max-w-prose`, qui le bridait à
+                   ~550 px et creusait un vide avant les couvertures. Corps relevé d'un
+                   cran pour tenir la lecture sur des lignes plus longues. -->
+              <div class="prose-agone texte-justifie mt-4 text-base leading-relaxed text-muted-foreground">{@html c.description_html}</div>
             {/if}
             <a href={target} class="link mt-5 inline-flex items-center gap-1.5 font-display text-sm font-semibold uppercase tracking-wide">
               {single ? 'En savoir plus' : 'Voir la collection'} <ArrowRight size={15} />
             </a>
           </div>
-          <!-- Couvertures -->
-          <div class={i % 2 === 1 ? 'lg:order-1' : ''}>
+          <!-- Couvertures : une seule rangée, en regard du texte. -->
+          <div>
             <div class="grid grid-cols-3 gap-3 sm:gap-4">
-              {#each c.books.slice(0, 6) as book (book.slug)}
+              {#each c.books.slice(0, 3) as book (book.slug)}
                 <a href="/livre/{book.slug}" class="group block">
                   <div class="aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">
                     {#if book.cover_url}

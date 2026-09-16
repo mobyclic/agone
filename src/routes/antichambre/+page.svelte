@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { extraitPropre } from '$lib/text';
   import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
@@ -13,19 +14,19 @@
   }
 </script>
 
-<svelte:head><title>L’Antichambre · Agone</title></svelte:head>
+<svelte:head><title>Antichambre · Agone</title></svelte:head>
 
-<PageHead eyebrow={active ? 'Antichambre' : undefined} title={active?.name ?? 'Antichambre'} subtitle={active ? undefined : 'Textes, inactualités et critiques — au-delà des livres.'} />
+<PageHead eyebrow={active ? 'Antichambre' : undefined} title={active?.name ?? 'Antichambre'} subtitle={active ? active.subtitle || undefined : 'Réflexions & digressions — au-delà des livres.'} />
 
-<section class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-  <div class="grid gap-8 lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-12">
+<section class="py-10" style="padding-inline: var(--page-gutter)">
+  <div class="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-12">
     <!-- Sous-nav rubriques : colonne de gauche (collante en desktop). -->
     <aside class="lg:sticky lg:top-24 lg:self-start">
       <nav class="flex flex-col gap-0.5 font-display">
-        <a href="/antichambre" class="flex items-center justify-between border-l-2 px-3 py-1.5 text-sm uppercase tracking-wide {!data.rubrique ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}">Antichambre</a>
+        <a href="/antichambre" class="flex items-center justify-between border-l-2 px-3 py-2 text-base uppercase tracking-wide {!data.rubrique ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}">Antichambre</a>
         {#each data.rubriques as r (r.slug)}
-          <a href="/antichambre{qs({ rubrique: r.slug, page: undefined })}" class="flex items-center justify-between gap-2 border-l-2 px-3 py-1.5 text-sm uppercase tracking-wide {data.rubrique === r.slug ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}">
-            <span>{r.name}</span><span class="text-xs opacity-60">{r.count}</span>
+          <a href="/antichambre{qs({ rubrique: r.slug, page: undefined })}" class="flex items-center justify-between gap-3 border-l-2 px-3 py-2 text-base uppercase tracking-wide {data.rubrique === r.slug ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}">
+            <span>{r.name}</span><span class="shrink-0 text-sm opacity-60">{r.count}</span>
           </a>
         {/each}
       </nav>
@@ -36,18 +37,19 @@
       {#if data.articles.length === 0}
         <p class="py-16 text-center text-muted-foreground">Aucun article.</p>
       {:else}
-        <div class="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
+        <!-- Même gabarit que la liste de l'accueil : rubrique · date, titre,
+             auteur, début du texte. Mesure de lecture bornée : la page est en
+             pleine largeur, une ligne de 1200 px serait illisible. -->
+        <div class="max-w-4xl divide-y divide-border border-t-2 border-foreground">
           {#each data.articles as a (a.slug)}
-            <a href="/article/{a.slug}" class="group flex flex-col">
-              {#if a.cover_url}
-                <div class="mb-3 aspect-[16/10] overflow-hidden rounded-lg border border-border bg-muted">
-                  <img src={a.cover_url} alt="" loading="lazy" class="size-full object-cover transition-transform group-hover:scale-[1.03]" />
-                </div>
-              {/if}
-              {#if a.rubrique_name}<span class="eyebrow">{a.rubrique_name}</span>{/if}
-              <h2 class="mt-1 line-clamp-2 font-semibold leading-snug group-hover:text-link">{a.title}</h2>
-              {#if a.excerpt}<p class="mt-1 line-clamp-2 text-sm text-muted-foreground">{a.excerpt}</p>{/if}
-              <span class="mt-2 text-xs text-muted-foreground">{fmt(a.published_at)}</span>
+            <a href="/article/{a.slug}" class="group block py-4">
+              <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
+                {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
+                <span class="text-muted-foreground">{fmt(a.published_at)}</span>
+              </div>
+              <h2 class="display-title mt-1 text-xl leading-tight group-hover:text-link">{a.title}</h2>
+              {#if a.author}<p class="mt-0.5 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
+              {#if a.excerpt}<p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>{/if}
             </a>
           {/each}
         </div>

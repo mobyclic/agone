@@ -1,18 +1,18 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff, requireAdmin } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getSetting, setSetting } from '$lib/server/site';
 import { getCompany } from '$lib/server/invoice';
 import { wpConfigured } from '$lib/server/wp-db';
 import {
   importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents,
-  type ImportResult
+  type ImportResult, type ImportOpts
 } from '$lib/server/migration';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
-  const [contact, banner, company, tracking] = await Promise.all([
-    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking')
+  const [contact, banner, company, tracking, syncState] = await Promise.all([
+    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking'), getSetting('sync_state')
   ]);
   const c = (contact ?? {}) as Record<string, any>;
   const b = (banner ?? {}) as Record<string, any>;
@@ -27,18 +27,47 @@ export const load: PageServerLoad = async () => {
       variant: typeof b.variant === 'string' ? b.variant : 'info'
     },
     tracking: { gtm_id: String(t.gtm_id ?? ''), ga_id: String(t.ga_id ?? ''), meta_pixel_id: String(t.meta_pixel_id ?? '') },
+    syncState: (syncState ?? {}) as Record<string, any>,
     company
   };
 };
 
+/**
+ * Import incrémental : on repart du curseur mémorisé (`sync_state`), sauf demande
+ * explicite de tout réimporter. Le curseur n'est réécrit qu'après un import réel
+ * et réussi — jamais en simulation, jamais s'il reculerait.
+ */
 async function runSync(
-  fn: (o: { limit?: number; dryRun?: boolean }) => Promise<ImportResult>,
+  key: string,
+  fn: (o: ImportOpts) => Promise<ImportResult>,
   fd: FormData
 ) {
-  const limit = Math.max(1, Math.min(5000, Number(fd.get('limit') ?? 200) || 200));
+  const limit = Math.max(1, Math.min(5000, Number(fd.get('limit') ?? 500) || 500));
   const dryRun = fd.get('dryRun') === 'on';
+  const full = fd.get('full') === 'on';
+
+  const state = ((await getSetting('sync_state')) ?? {}) as Record<string, any>;
+  const prev = state[key]?.watermark ? new Date(String(state[key].watermark)) : null;
+  const since = full ? null : prev;
+
   try {
-    const result = await fn({ limit, dryRun });
+    const result = await fn({ limit, dryRun, since });
+    if (!dryRun) {
+      const next = result.watermark ?? state[key]?.watermark;
+      // Un lot vide laisse le curseur intact ; il ne recule jamais.
+      const keep = prev && next && new Date(next) < prev ? prev.toISOString() : next;
+      await setSetting('sync_state', {
+        ...state,
+        [key]: {
+          at: new Date().toISOString(),
+          watermark: keep ?? null,
+          fetched: result.fetched,
+          created: result.created,
+          updated: result.updated,
+          full_scan: result.fullScan === true
+        }
+      });
+    }
     return { sync: result };
   } catch (e) {
     return fail(500, { syncError: e instanceof Error ? e.message : 'Échec de la synchronisation.' });
@@ -47,7 +76,7 @@ async function runSync(
 
 export const actions: Actions = {
   contact: async ({ request, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     await setSetting('contact', {
       email: String(fd.get('email') ?? '').trim(),
@@ -69,7 +98,7 @@ export const actions: Actions = {
   },
 
   banner: async ({ request, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     await setSetting('banner', {
       active: fd.get('active') === 'on',
@@ -97,10 +126,10 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/parametres', 'Informations de facturation enregistrées.', 'success'));
   },
 
-  syncUsers: async ({ request, locals }) => { requireStaff(locals); return runSync(importUsers, await request.formData()); },
-  syncOrders: async ({ request, locals }) => { requireStaff(locals); return runSync(importOrders, await request.formData()); },
-  syncAuthors: async ({ request, locals }) => { requireStaff(locals); return runSync(importAuthors, await request.formData()); },
-  syncArticles: async ({ request, locals }) => { requireStaff(locals); return runSync(importArticles, await request.formData()); },
-  syncBooks: async ({ request, locals }) => { requireStaff(locals); return runSync(importBooks, await request.formData()); },
-  syncEvents: async ({ request, locals }) => { requireStaff(locals); return runSync(importEvents, await request.formData()); }
+  syncUsers: async ({ request, locals }) => { requireAdmin(locals); return runSync('users', importUsers, await request.formData()); },
+  syncOrders: async ({ request, locals }) => { requireAdmin(locals); return runSync('orders', importOrders, await request.formData()); },
+  syncAuthors: async ({ request, locals }) => { requireAdmin(locals); return runSync('authors', importAuthors, await request.formData()); },
+  syncArticles: async ({ request, locals }) => { requireAdmin(locals); return runSync('articles', importArticles, await request.formData()); },
+  syncBooks: async ({ request, locals }) => { requireAdmin(locals); return runSync('books', importBooks, await request.formData()); },
+  syncEvents: async ({ request, locals }) => { requireAdmin(locals); return runSync('events', importEvents, await request.formData()); }
 };

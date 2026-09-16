@@ -1,12 +1,12 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getPromoForEdit, savePromo, deletePromo } from '$lib/server/promo';
 import { allCollections } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   const collections = await allCollections();
   if (params.id === 'nouveau') return { isNew: true, promo: null, collections };
   const promo = await getPromoForEdit(params.id);
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 export const actions: Actions = {
   save: async ({ request, params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
     const N = (k: string) => { const v = S(k); return v === '' ? undefined : Number(v.replace(',', '.')); };
@@ -45,7 +45,7 @@ export const actions: Actions = {
   },
 
   delete: async ({ params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const id = params.id;
     if (id && id !== 'nouveau') await deletePromo(id);
     throw redirect(303, withFlash('/admin/promos', 'Code supprimé.', 'success'));

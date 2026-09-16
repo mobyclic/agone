@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ajouterFondDeCarte } from '$lib/client/map-tiles';
   import { onMount } from 'svelte';
 
   // Carte éditable : marqueur déplaçable + clic pour (re)positionner.
@@ -42,7 +43,7 @@
       const la = Number(lat), ln = Number(lng);
       const has = String(lat) && String(lng) && !Number.isNaN(la) && !Number.isNaN(ln);
       map = L.map(el, { scrollWheelZoom: false }).setView(has ? [la, ln] : [46.6, 2.4], has ? 15 : 5);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+      ajouterFondDeCarte(L, map, { maxZoom: 19 });
       if (has) place(la, ln);
       map.on('click', (e: any) => {
         place(e.latlng.lat, e.latlng.lng);

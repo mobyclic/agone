@@ -1,9 +1,14 @@
 /**
  * Import pré-production depuis l'ancien WordPress/WooCommerce (LECTURE SEULE).
  *
- * Objectif : « récupérer les derniers X » avant la bascule en prod, sans re-migrer
- * tout le catalogue. Idempotent : chaque enregistrement est apparié par `legacy_wp_id`
- * (= ID du post/utilisateur WordPress). Ré-exécutable sans doublon.
+ * Objectif : rapatrier ce qui a changé côté WordPress avant la bascule en prod,
+ * sans re-migrer tout le catalogue. Idempotent : chaque enregistrement est apparié
+ * par `legacy_wp_id` (= ID du post/utilisateur WordPress). Ré-exécutable sans doublon.
+ *
+ * INCRÉMENTAL : `since` filtre sur `post_modified_gmt`, et chaque import renvoie le
+ * `watermark` (date de modification la plus récente traitée) que l'appelant stocke
+ * pour la fois suivante. Les posts sont parcourus du plus ANCIEN modifié au plus
+ * récent : une exécution tronquée par `limit` avance donc le curseur sans trou.
  *
  * Ne fait QUE des SELECT côté WordPress (via wp-db.ts). N'écrit que dans Surreal.
  * Un mode `dryRun` calcule ce qui serait créé/mis à jour sans rien écrire.
@@ -13,6 +18,7 @@ import { query, recId } from './surreal';
 import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
 import { wpautop } from './wpautop';
+import { extraitPropre } from '$lib/text';
 
 export interface ImportResult {
   type: string;
@@ -22,6 +28,39 @@ export interface ImportResult {
   skipped: number;
   warnings: string[];
   dryRun: boolean;
+  /** Modification la plus récente traitée (ISO) — curseur du prochain import. */
+  watermark?: string;
+  /** true si la source n'expose pas de date de modification (utilisateurs WP). */
+  fullScan?: boolean;
+}
+
+export interface ImportOpts {
+  limit?: number;
+  dryRun?: boolean;
+  /** Ne reprendre que les posts modifiés après cette date (import incrémental). */
+  since?: Date | null;
+}
+
+/**
+ * Filtre incrémental sur `post_modified_gmt`. On recule de 2 secondes : MySQL
+ * stocke la seconde, et un lot tronqué pourrait sinon sauter les enregistrements
+ * partageant la seconde du curseur. Le recouvrement est sans effet (upserts).
+ */
+function sinceClause(since?: Date | null): { sql: string; params: string[] } {
+  if (!since || Number.isNaN(since.getTime())) return { sql: '', params: [] };
+  const d = new Date(since.getTime() - 2000);
+  const iso = d.toISOString().slice(0, 19).replace('T', ' ');
+  return { sql: ' AND post_modified_gmt > ?', params: [iso] };
+}
+
+/** Plus grande date de modification d'un lot (curseur à mémoriser). */
+function maxModified(rows: { post_modified_gmt?: unknown }[]): string | undefined {
+  let best = 0;
+  for (const r of rows) {
+    const t = r.post_modified_gmt ? new Date(r.post_modified_gmt as any).getTime() : NaN;
+    if (!Number.isNaN(t) && t > best) best = t;
+  }
+  return best ? new Date(best).toISOString() : undefined;
 }
 
 /* ————————————————————— helpers ————————————————————— */
@@ -102,7 +141,12 @@ async function findUserId(wpId: number, email: string): Promise<string | null> {
   return byEmail[0]?.pid ?? null;
 }
 
-export async function importUsers(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+/**
+ * `wp_users` n'expose AUCUNE date de modification (seulement `user_registered`) :
+ * cet import reste donc un balayage complet, borné par `limit`. Il est signalé
+ * comme tel dans l'interface (`fullScan`).
+ */
+export async function importUsers(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
   const p = wpPrefix();
@@ -174,7 +218,7 @@ export async function importUsers(opts: { limit?: number; dryRun?: boolean } = {
     }
   }
 
-  return { type: 'users', fetched: users.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+  return { type: 'users', fetched: users.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, fullScan: true };
 }
 
 /* ————————————————————— Commandes ————————————————————— */
@@ -202,19 +246,21 @@ function invoiceNumber(serialized: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export async function importOrders(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+export async function importOrders(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
+  const inc = sinceClause(opts.since);
   const p = wpPrefix();
   const warnings: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   const orders = await wpQuery<any>(
-    `SELECT ID, post_status, post_date_gmt FROM ${p}posts WHERE post_type = 'shop_order' ORDER BY ID DESC LIMIT ?`,
-    [limit]
+    `SELECT ID, post_status, post_date_gmt, post_modified_gmt FROM ${p}posts
+      WHERE post_type = 'shop_order'${inc.sql} ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
+    [...inc.params, limit]
   );
   const oids = orders.map((o) => Number(o.ID));
-  if (!oids.length) return { type: 'orders', fetched: 0, created, updated, skipped, warnings, dryRun };
+  if (!oids.length) return { type: 'orders', fetched: 0, created, updated, skipped, warnings, dryRun };  // rien de neuf : curseur inchangé
 
   const ometa = metaIndex(
     await wpQuery<any>(
@@ -363,7 +409,7 @@ export async function importOrders(opts: { limit?: number; dryRun?: boolean } = 
     }
   }
 
-  return { type: 'orders', fetched: orders.length, created, updated, skipped, warnings: warnings.slice(0, 30), dryRun };
+  return { type: 'orders', fetched: orders.length, created, updated, skipped, warnings: warnings.slice(0, 30), dryRun, watermark: maxModified(orders) };
 }
 
 /* ═════════════════════ Contenu : auteurs / articles / livres / rencontres ═════════════════════
@@ -404,6 +450,24 @@ function stripHtml(s: unknown): string {
 }
 
 /** Map legacy → id Surreal (plain) pour une table. */
+/**
+ * Carte term_id WordPress → rubrique Surreal, alias de fusion compris.
+ * Quand deux catégories WP sont fusionnées côté Agone, la rubrique cible garde
+ * leurs `legacy_term_ids` : sans ça, un re-sync ne retrouverait plus la rubrique
+ * de ces articles et la remettrait à NONE.
+ */
+async function rubriqueMap(): Promise<Map<number, string>> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS pid, legacy_term_id, legacy_term_ids FROM rubrique`
+  );
+  const m = new Map<number, string>();
+  for (const r of rows) {
+    if (r.legacy_term_id != null) m.set(Number(r.legacy_term_id), r.pid);
+    for (const alias of r.legacy_term_ids ?? []) m.set(Number(alias), r.pid);
+  }
+  return m;
+}
+
 async function legacyMap(table: string, field = 'legacy_wp_id'): Promise<Map<number, string>> {
   const rows = await query<any>(`SELECT meta::id(id) AS pid, ${field} AS k FROM ${table} WHERE ${field} != NONE`);
   const m = new Map<number, string>();
@@ -427,16 +491,19 @@ async function firstTermByPost(p: string, postIds: number[], taxonomy: string): 
 
 /* ————————————————————— Auteurs ————————————————————— */
 
-export async function importAuthors(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+export async function importAuthors(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
+  const inc = sinceClause(opts.since);
   const p = wpPrefix();
   const warnings: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   const posts = await wpQuery<any>(
-    `SELECT ID, post_title, post_name FROM ${p}posts WHERE post_type = 'auteurs' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
-    [limit]
+    `SELECT ID, post_title, post_name, post_modified_gmt FROM ${p}posts
+      WHERE post_type = 'auteurs' AND post_status IN ('publish','draft')${inc.sql}
+      ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
+    [...inc.params, limit]
   );
   const ids = posts.map((x) => Number(x.ID));
   const meta = ids.length ? metaIndex(await wpQuery<any>(
@@ -467,22 +534,24 @@ export async function importAuthors(opts: { limit?: number; dryRun?: boolean } =
       warnings.push(`Auteur WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
   }
-  return { type: 'authors', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+  return { type: 'authors', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
 }
 
 /* ————————————————————— Articles (L'Antichambre) ————————————————————— */
 
-export async function importArticles(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+export async function importArticles(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
+  const inc = sinceClause(opts.since);
   const p = wpPrefix();
   const warnings: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   const posts = await wpQuery<any>(
-    `SELECT ID, post_title, post_name, post_content, post_excerpt, post_status, post_date_gmt
-       FROM ${p}posts WHERE post_type = 'post' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
-    [limit]
+    `SELECT ID, post_title, post_name, post_content, post_excerpt, post_status, post_date_gmt, post_modified_gmt
+       FROM ${p}posts WHERE post_type = 'post' AND post_status IN ('publish','draft')${inc.sql}
+      ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
+    [...inc.params, limit]
   );
   const ids = posts.map((x) => Number(x.ID));
   const meta = ids.length ? metaIndex(await wpQuery<any>(
@@ -496,7 +565,7 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
     const vr = await wpQuery<any>(`SELECT id, count FROM ${p}post_views WHERE type = 4 AND period = 'total' AND id IN (${ids.map(() => '?').join(',')})`, [...ids]);
     for (const r of vr) viewsMap.set(Number(r.id), Number(r.count) || 0);
   }
-  const [authMap, rubMap, bookMap] = await Promise.all([legacyMap('author'), legacyMap('rubrique', 'legacy_term_id'), legacyMap('book')]);
+  const [authMap, rubMap, bookMap] = await Promise.all([legacyMap('author'), rubriqueMap(), legacyMap('book')]);
 
   for (const a of posts) {
     const wpId = Number(a.ID);
@@ -504,7 +573,9 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
     const authorIds = parseWpIds(m.auteurs_associes).map((x) => authMap.get(x)).filter(Boolean) as string[];
     const bookIds = parseWpIds(m.livres_associes).map((x) => bookMap.get(x)).filter(Boolean) as string[];
     const rubPid = rubMap.get(catByPost.get(wpId) ?? -1);
-    const excerpt = stripHtml(a.post_excerpt) || stripHtml(a.post_content).slice(0, 220) || undefined;
+    // Chapô rédigé s'il existe, sinon début du corps coupé SUR UN MOT (un
+    // `slice` brut laissait « …qui en découlent, m'en » en fin d'extrait).
+    const excerpt = stripHtml(a.post_excerpt) || extraitPropre(stripHtml(a.post_content), 220);
     try {
       const ex = await query<any>(`SELECT meta::id(id) AS pid FROM article WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
       if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
@@ -521,7 +592,11 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
         views: viewsMap.get(wpId) ?? 0
       };
       if (ex[0]?.pid) {
-        const { sql, vars } = buildSet(fields);
+        // Catégorie WP sans rubrique correspondante : on laisse celle déjà en
+        // place plutôt que de la vider (`buildSet` traduit undefined en NONE).
+        const safe: Record<string, unknown> = { ...fields };
+        if (!rubPid) delete safe.rubrique;
+        const { sql, vars } = buildSet(safe);
         await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('article', ex[0].pid) });
         updated++;
       } else {
@@ -535,7 +610,7 @@ export async function importArticles(opts: { limit?: number; dryRun?: boolean } 
       warnings.push(`Article WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
   }
-  return { type: 'articles', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+  return { type: 'articles', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
 }
 
 /* ————————————————————— Livres (+ contributions) ————————————————————— */
@@ -551,17 +626,19 @@ const ROLE_FIELDS: [string, string][] = [
   ['livre_auteurs_preface', 'preface'], ['livre_auteurs_postface', 'postface'], ['livre_auteurs_divers', 'other']
 ];
 
-export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
+  const inc = sinceClause(opts.since);
   const p = wpPrefix();
   const warnings: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   const posts = await wpQuery<any>(
-    `SELECT ID, post_title, post_name, post_content, post_status FROM ${p}posts
-       WHERE post_type = 'livres' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
-    [limit]
+    `SELECT ID, post_title, post_name, post_content, post_status, post_modified_gmt FROM ${p}posts
+       WHERE post_type = 'livres' AND post_status IN ('publish','draft')${inc.sql}
+      ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
+    [...inc.params, limit]
   );
   const ids = posts.map((x) => Number(x.ID));
   const meta = ids.length ? metaIndex(await wpQuery<any>(
@@ -625,7 +702,7 @@ export async function importBooks(opts: { limit?: number; dryRun?: boolean } = {
       warnings.push(`Livre WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
   }
-  return { type: 'books', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+  return { type: 'books', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
 }
 
 /* ————————————————————— Rencontres (+ lieux) ————————————————————— */
@@ -667,17 +744,19 @@ async function ensureVenue(lieu: string | undefined, cache: Map<string, string>)
   return pid;
 }
 
-export async function importEvents(opts: { limit?: number; dryRun?: boolean } = {}): Promise<ImportResult> {
+export async function importEvents(opts: ImportOpts = {}): Promise<ImportResult> {
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
   const dryRun = !!opts.dryRun;
+  const inc = sinceClause(opts.since);
   const p = wpPrefix();
   const warnings: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   const posts = await wpQuery<any>(
-    `SELECT ID, post_title, post_name, post_content FROM ${p}posts
-       WHERE post_type = 'rencontres' AND post_status IN ('publish','draft') ORDER BY ID DESC LIMIT ?`,
-    [limit]
+    `SELECT ID, post_title, post_name, post_content, post_modified_gmt FROM ${p}posts
+       WHERE post_type = 'rencontres' AND post_status IN ('publish','draft')${inc.sql}
+      ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
+    [...inc.params, limit]
   );
   const ids = posts.map((x) => Number(x.ID));
   const meta = ids.length ? metaIndex(await wpQuery<any>(
@@ -720,5 +799,5 @@ export async function importEvents(opts: { limit?: number; dryRun?: boolean } = 
       warnings.push(`Rencontre WP #${wpId} ignorée : ${err instanceof Error ? err.message.split('\n')[0] : 'erreur'}`);
     }
   }
-  return { type: 'events', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun };
+  return { type: 'events', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
 }

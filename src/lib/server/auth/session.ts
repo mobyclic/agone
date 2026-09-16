@@ -59,3 +59,19 @@ export async function destroySession(token: string) {
 export async function purgeExpiredSessions() {
   await query('DELETE session WHERE expires_at < time::now()');
 }
+
+/**
+ * Révoque toutes les sessions d'un utilisateur (après changement de mot de passe).
+ * `exceptToken` préserve la session courante — utile quand un admin modifie son
+ * propre compte et ne doit pas se déconnecter lui-même.
+ */
+export async function destroyUserSessions(userId: string, exceptToken?: string) {
+  if (exceptToken) {
+    await query('DELETE session WHERE user = $u AND id != $keep', {
+      u: recId('user', userId),
+      keep: new RecordId('session', exceptToken)
+    });
+  } else {
+    await query('DELETE session WHERE user = $u', { u: recId('user', userId) });
+  }
+}

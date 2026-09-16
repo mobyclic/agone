@@ -29,7 +29,7 @@
 
 <svelte:head><title>Commande n°{o.number} · Agone</title></svelte:head>
 
-<div class="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+<div class="max-w-2xl py-12" style="padding-inline: var(--page-gutter)">
   <div class="text-center">
     {#if paid}
       <CheckCircle size={48} class="mx-auto text-success" weight="fill" />

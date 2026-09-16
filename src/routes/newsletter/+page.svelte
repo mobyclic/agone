@@ -7,9 +7,9 @@
 
 <svelte:head><title>Lettre d’information · Agone</title></svelte:head>
 
-<PageHead eyebrow="Rester en lien" title="Lettre d’information" subtitle="Nouveautés, rencontres et textes de L’Antichambre — quelques envois par mois, jamais de spam." />
+<PageHead eyebrow="Rester en lien" title="Lettre d’information" subtitle="Nouveautés, rencontres et textes d’Antichambre — quelques envois par mois, jamais de spam." />
 
-<section class="mx-auto max-w-xl px-4 py-14 sm:px-6">
+<section class="max-w-xl py-14" style="padding-inline: var(--page-gutter)">
   {#if done}
     <div class="border-l-2 border-link bg-secondary/40 p-6">
       <h2 class="display-title text-2xl">Merci !</h2>

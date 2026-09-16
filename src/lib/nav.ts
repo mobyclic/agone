@@ -5,6 +5,8 @@ export interface NavItem {
   label: string;
   href: string;
   icon?: string; // nom d'icône phosphor (ex: 'BookOpen')
+  /** Entrée réservée aux admins : masquée aux autres pour ne pas offrir un lien en 403. */
+  adminOnly?: boolean;
 }
 
 /** Groupe de navigation (titre de section optionnel). */
@@ -18,7 +20,7 @@ export const PUBLIC_NAV: NavItem[] = [
   { label: 'Catalogue', href: '/catalogue', icon: 'BookOpen' },
   { label: 'Auteurs', href: '/auteurs', icon: 'Users' },
   { label: 'Rencontres', href: '/rencontres', icon: 'CalendarDots' },
-  { label: 'L’Antichambre', href: '/antichambre', icon: 'Article' },
+  { label: 'Antichambre', href: '/antichambre', icon: 'Article' },
   { label: 'À propos', href: '/a-propos', icon: 'Info' }
 ];
 
@@ -51,20 +53,20 @@ export const ADMIN_NAV: NavSection[] = [
   {
     title: 'Boutique',
     items: [
-      { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt' },
-      { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users' },
-      { label: 'Codes promo', href: '/admin/promos', icon: 'Percent' },
-      { label: 'Livraison', href: '/admin/livraison', icon: 'Truck' },
-      { label: 'Facturation', href: '/admin/factures', icon: 'Invoice' },
-      { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar' }
+      { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt', adminOnly: true },
+      { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users', adminOnly: true },
+      { label: 'Codes promo', href: '/admin/promos', icon: 'Percent', adminOnly: true },
+      { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
+      { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true },
+      { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar', adminOnly: true }
     ]
   },
   {
     title: 'Outils',
     items: [
       { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
-      { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins' },
-      { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix' }
+      { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins', adminOnly: true },
+      { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix', adminOnly: true }
     ]
   }
 ];

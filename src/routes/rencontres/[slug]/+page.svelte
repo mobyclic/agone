@@ -28,7 +28,7 @@
 
 <svelte:head><title>{e.title} · Rencontres Agone</title></svelte:head>
 
-<PageHead eyebrow="Rencontres" title={e.title} width="max-w-7xl" inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'} />
+<PageHead eyebrow="Rencontres" title={e.title} inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'} />
 
 {#if isStaff}
   <div class="fixed bottom-6 right-6 z-40">
@@ -36,8 +36,8 @@
   </div>
 {/if}
 
-<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}">
+<div class="py-10" style="padding-inline: var(--page-gutter)">
+  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[2fr_1fr]' : ''}">
     <div class="min-w-0 {data.books.length ? '' : 'max-w-4xl'}">
   {#if isPast}<span class="mb-3 inline-block rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Rencontre passée</span>{/if}
 

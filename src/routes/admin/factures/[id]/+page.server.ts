@@ -1,11 +1,11 @@
 import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff, requireAdmin } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getInvoice, createManualInvoice } from '$lib/server/invoice';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   const invoice = await getInvoice(params.id);
   if (!invoice) throw error(404, { message: 'Facture introuvable' });
   return { invoice };

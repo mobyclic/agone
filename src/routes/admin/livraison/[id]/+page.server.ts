@@ -1,11 +1,11 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getShipZoneForEdit, saveShipZone, deleteShipZone } from '$lib/server/shipping';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  requireStaff(locals);
+  requireAdmin(locals);
   if (params.id === 'nouvelle') return { isNew: true, zone: null };
   const zone = await getShipZoneForEdit(params.id);
   if (!zone) throw error(404, { message: 'Zone introuvable' });
@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 export const actions: Actions = {
   save: async ({ request, params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
     const N = (k: string) => { const v = S(k); return v === '' ? undefined : Number(v.replace(',', '.')); };
@@ -34,7 +34,7 @@ export const actions: Actions = {
   },
 
   delete: async ({ params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const id = params.id;
     if (id && id !== 'nouvelle') await deleteShipZone(id);
     throw redirect(303, withFlash('/admin/livraison', 'Zone supprimée.', 'success'));

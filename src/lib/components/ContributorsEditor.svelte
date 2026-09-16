@@ -2,13 +2,13 @@
   import { ROLE_LABEL } from '$lib/labels';
   import { MagnifyingGlass, X, DotsSixVertical } from 'phosphor-svelte';
 
-  interface Row { authorId: string; authorName: string; role: string; share: number }
+  interface Row { authorId: string; authorName: string; authorSlug?: string; role: string; share: number }
   let { initial = [] }: { initial?: Row[] } = $props();
 
   let rows = $state<Row[]>([]);
   $effect(() => { rows = (initial ?? []).map((r) => ({ ...r, share: r.share ?? 100 })); });
   let q = $state('');
-  let results = $state<{ id: string; full_name: string }[]>([]);
+  let results = $state<{ id: string; full_name: string; slug?: string }[]>([]);
   let open = $state(false);
   let timer: ReturnType<typeof setTimeout>;
 
@@ -23,8 +23,8 @@
       open = results.length > 0;
     }, 220);
   }
-  function add(a: { id: string; full_name: string }) {
-    if (!rows.some((r) => r.authorId === a.id)) rows = [...rows, { authorId: a.id, authorName: a.full_name, role: 'author', share: 100 }];
+  function add(a: { id: string; full_name: string; slug?: string }) {
+    if (!rows.some((r) => r.authorId === a.id)) rows = [...rows, { authorId: a.id, authorName: a.full_name, authorSlug: a.slug, role: 'author', share: 100 }];
     q = ''; results = []; open = false;
   }
   const remove = (i: number) => (rows = rows.filter((_, j) => j !== i));
@@ -40,7 +40,15 @@
   {#each rows as row, i (row.authorId)}
     <div class="flex items-center gap-2 rounded-md border border-border bg-background p-2">
       <DotsSixVertical size={16} class="text-muted-foreground" />
-      <span class="min-w-0 flex-1 truncate text-sm font-medium">{row.authorName}</span>
+      {#if row.authorSlug}
+        <a
+          href="/admin/auteurs/{row.authorSlug}"
+          title="Ouvrir la fiche de {row.authorName}"
+          class="min-w-0 flex-1 truncate text-sm font-medium hover:text-link hover:underline"
+        >{row.authorName}</a>
+      {:else}
+        <span class="min-w-0 flex-1 truncate text-sm font-medium">{row.authorName}</span>
+      {/if}
       <select bind:value={row.role} class="h-8 rounded-md border border-border bg-background px-2 text-xs">
         {#each ROLES as r (r)}<option value={r}>{ROLE_LABEL[r]}</option>{/each}
       </select>

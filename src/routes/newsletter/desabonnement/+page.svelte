@@ -7,7 +7,7 @@
 
 <PageHead eyebrow="Lettre d’information" title="Désabonnement" />
 
-<section class="mx-auto max-w-xl px-4 py-14 sm:px-6">
+<section class="max-w-xl py-14" style="padding-inline: var(--page-gutter)">
   {#if data.done}
     <div class="border-l-2 border-link bg-secondary/40 p-6">
       <h2 class="display-title text-2xl">C’est fait</h2>

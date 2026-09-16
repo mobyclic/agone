@@ -21,10 +21,10 @@
   const rubriques = $derived(nav?.rubriques ?? []);
 </script>
 
-<header class="nav-base-size sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: calc((100vw - min(100vw, 80rem)) / 2 + 1.5rem)">
+<header class="nav-base-size sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: var(--page-gutter)">
   <div class="flex h-16 items-stretch">
     <!-- Logo : bande noire pleine du bord gauche, englobant le logo (aligné au contenu) -->
-    <a href={logoHref} class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: var(--gutter)" aria-label="Agone — accueil">
+    <a href={logoHref} class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: calc(var(--gutter) + var(--logo-extra, 0px))" aria-label="Agone — accueil">
       <Wordmark />
     </a>
 
@@ -42,7 +42,7 @@
           <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each rubriques as r (r.slug)}
-                <a href="/antichambre?rubrique={r.slug}" class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{r.name}</a>
+                <a href="/antichambre?rubrique={r.slug}" class="block px-4 py-1.5 font-display text-[17px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{r.name}</a>
               {/each}
             </div>
           </div>
@@ -59,7 +59,7 @@
           <div class="invisible absolute left-0 top-full z-50 -translate-y-1 opacity-0 transition-all duration-150 group-hover/drop:visible group-hover/drop:translate-y-0 group-hover/drop:opacity-100">
             <div class="min-w-[280px] bg-popover py-2 text-popover-foreground shadow-2xl">
               {#each collections as c (c.slug)}
-                <a href={c.href} class="block px-4 py-1.5 font-display text-[15px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{c.name}</a>
+                <a href={c.href} class="block px-4 py-1.5 font-display text-[17px] font-medium uppercase tracking-tight text-white hover:bg-white/10">{c.name}</a>
               {/each}
             </div>
           </div>
@@ -98,9 +98,9 @@
     <div class="border-t border-border bg-background xl:hidden">
       <nav class="px-4 py-3 font-display uppercase tracking-wide sm:px-6">
         <a href="/antichambre" onclick={() => (open = false)} class="block py-2 font-medium">Antichambre</a>
-        {#each rubriques as r (r.slug)}<a href="/antichambre?rubrique={r.slug}" onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{r.name}</a>{/each}
+        {#each rubriques as r (r.slug)}<a href="/antichambre?rubrique={r.slug}" onclick={() => (open = false)} class="block py-1 pl-4 text-base text-muted-foreground">{r.name}</a>{/each}
         <a href="/catalogue" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Catalogue</a>
-        {#each collections as c (c.slug)}<a href={c.href} onclick={() => (open = false)} class="block py-1 pl-4 text-sm text-muted-foreground">{c.name}</a>{/each}
+        {#each collections as c (c.slug)}<a href={c.href} onclick={() => (open = false)} class="block py-1 pl-4 text-base text-muted-foreground">{c.name}</a>{/each}
         <a href="/auteurs" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Auteurs</a>
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
         <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>

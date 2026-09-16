@@ -8,7 +8,7 @@
 
 <PageHead eyebrow="Catalogue" title="À paraître" subtitle="Les prochains titres des Éditions Agone." />
 
-<section class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+<section class="py-10" style="padding-inline: var(--page-gutter)">
   {#if data.books.length === 0}
     <p class="py-16 text-center text-muted-foreground">Aucun titre à paraître pour le moment.</p>
   {:else}

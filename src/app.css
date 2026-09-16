@@ -14,6 +14,16 @@
    ============================================================ */
 
 :root {
+
+  /* Gouttière horizontale de TOUTES les pages publiques : le contenu occupe la
+     largeur de l'écran et se ferre à gauche sur cette marge. En-tête, contenu et
+     pied de page la partagent, donc tout reste aligné. */
+  --page-gutter: clamp(1rem, 3.5vw, 4rem);
+  /* Rallonge de la bande noire du logo. Nulle en dessous de lg (le logo doit
+     rester au bord sur mobile) ; au-delà, elle pousse le logo vers la droite et
+     la bande vient se ferrer à peu près sur la fin du titre de page — écart
+     mesuré à 174 px, identique à 1440 et 1920, d'où 11rem. */
+  --logo-extra: 0px;
   /* — Encre & liens — */
   --ink: #141414;
   --link: #d4211c;
@@ -80,6 +90,10 @@
 
   /* Angles DROITS partout (charte éditoriale, filets & géométrie). */
   --radius: 0;
+}
+
+@media (min-width: 1024px) {
+  :root { --logo-extra: 11rem; }
 }
 
 .dark {
@@ -221,11 +235,14 @@
   --text-9xl: 8.125rem;  /* 128 → 130 */
 }
 .nav-base-size {
+  /* La nav ne suit pas le +2px du contenu, mais reste un cran au-dessus des
+     valeurs Tailwind par défaut sur les tailles qu'elle utilise réellement
+     (items de nav en text-xl, bouton compte en text-sm). */
   --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
+  --text-sm: 0.9375rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
+  --text-xl: 1.4375rem;
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
   --text-4xl: 2.25rem;
@@ -294,9 +311,25 @@
   -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 78%);
 }
 
+/* Corps de texte justifié (articles, présentations de livres). La césure est
+   INDISPENSABLE avec `justify` : sans elle, les mots longs du français
+   creusent des rivières de blanc entre les mots. `lang="fr"` sur <html> fournit
+   le dictionnaire de coupure au navigateur. */
+.texte-justifie p,
+.texte-justifie li {
+  text-align: justify;
+  text-wrap: pretty;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
 /* — Leaflet — */
 .leaflet-container { font: inherit; z-index: 0; }
-.ag-map-gray .leaflet-tile { filter: grayscale(1) contrast(0.9) brightness(1.05); }
+/* Le fond Plan IGN est déjà gris et délavé (cf. $lib/client/map-tiles) : aucun
+   filtre à empiler dessus, il ne ferait que l'assombrir. Le filtre ne vise donc
+   que le SOCLE OSM, visible dans les seuls trous de couverture hors de France,
+   pour qu'il se fonde avec le vectoriel au lieu de trancher en couleurs. */
+.ag-map-gray .leaflet-tile { filter: grayscale(1) brightness(1.12) contrast(0.88); }
 
 /* — Accroche de la manchette d'accueil : s'adapte à l'espace laissé par le titre —
    Mobile : clamp à 7 lignes. Desktop (lg) : remplit la hauteur de la colonne

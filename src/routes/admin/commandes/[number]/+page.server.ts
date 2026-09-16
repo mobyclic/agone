@@ -1,6 +1,6 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { requireStaff } from '$lib/server/access';
+import { requireAdmin } from '$lib/server/access';
 import { getOrderByNumber, setOrderStatus, ORDER_STATUSES } from '$lib/server/order';
 import { getInvoiceIdForOrder, createInvoiceForOrder } from '$lib/server/invoice';
 import { withFlash } from '$lib/toasts';
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 export const actions: Actions = {
   status: async ({ request, params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const fd = await request.formData();
     const status = String(fd.get('status') ?? '');
     if (!(ORDER_STATUSES as readonly string[]).includes(status)) return fail(400, { error: 'Statut invalide.' });
@@ -25,7 +25,7 @@ export const actions: Actions = {
   },
 
   generate_invoice: async ({ params, locals }) => {
-    requireStaff(locals);
+    requireAdmin(locals);
     const order = await getOrderByNumber(Number(params.number));
     if (order) await createInvoiceForOrder(bareId(order.id));
     throw redirect(303, withFlash(`/admin/commandes/${params.number}`, 'Facture générée.', 'success'));

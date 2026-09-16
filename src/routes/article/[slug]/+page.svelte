@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { embedsSociaux } from '$lib/client/embeds';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
@@ -15,12 +16,11 @@
   });
 </script>
 
-<svelte:head><title>{a.title} · L’Antichambre — Agone</title></svelte:head>
+<svelte:head><title>{a.title} · Antichambre — Agone</title></svelte:head>
 
 <PageHead
   eyebrow={a.rubrique_name ? `Antichambre / ${a.rubrique_name}` : 'Antichambre'}
   title={a.title}
-  width="max-w-7xl"
   inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'}
 >
   <!-- Date & auteur, juste sous le titre, en petit (minuscules). -->
@@ -43,15 +43,15 @@
   </div>
 {/if}
 
-<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}">
+<div class="py-10" style="padding-inline: var(--page-gutter)">
+  <div class="grid gap-10 lg:items-start {data.books.length ? 'lg:grid-cols-[2fr_1fr]' : ''}">
     <article class="min-w-0 {data.books.length ? '' : 'max-w-4xl'}">
   {#if a.cover_url}
     <img src={a.cover_url} alt="" class="mt-6 w-full rounded-lg border border-border" />
   {/if}
 
   {#if a.body_html}
-    <div class="prose-agone mt-8 max-w-none text-[16px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_img]:my-4 [&_img]:rounded-lg [&_p]:mb-4">
+    <div use:embedsSociaux class="prose-agone texte-justifie mt-8 max-w-none text-[16px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_img]:my-4 [&_img]:rounded-lg [&_p]:mb-4">
       {@html a.body_html}
     </div>
   {/if}

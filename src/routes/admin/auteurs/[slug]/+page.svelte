@@ -3,8 +3,8 @@
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Coins, Warning, Eye, Spinner } from 'phosphor-svelte';
-  import { euros } from '$lib/labels';
+  import { ArrowLeft, FloppyDisk, Trash, Coins, Warning, Eye, Spinner, Books } from 'phosphor-svelte';
+  import { euros, CONTENT_STATUS_LABEL } from '$lib/labels';
 
   let { data, form } = $props();
   const a = $derived(data.author);
@@ -69,13 +69,15 @@
         {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="10rem" onchange={() => (dirty = true)} />{/key}
       </div>
 
-      <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow mb-3">Identité fiscale (paiement des droits — confidentiel)</h3>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class={label}>Nom légal <input name="legal_name" value={a?.legal_name ?? ''} class={input} /></label>
-          <label class={label}>SIRET <input name="siret" value={a?.siret ?? ''} class={input} /></label>
+      {#if data.canSeeRoyalties}
+        <div class="rounded-lg border border-border bg-card p-4">
+          <h3 class="eyebrow mb-3">Identité fiscale (paiement des droits — confidentiel)</h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class={label}>Nom légal <input name="legal_name" value={a?.legal_name ?? ''} class={input} /></label>
+            <label class={label}>SIRET <input name="siret" value={a?.siret ?? ''} class={input} /></label>
+          </div>
         </div>
-      </div>
+      {/if}
     </div>
 
     <div class="space-y-5">
@@ -105,7 +107,42 @@
 </form>
 
 {#if !data.isNew}
-  <!-- Droits d'auteur par année (admin) -->
+  <!-- Titres du contributeur — l'inverse du bloc « Contributeurs » de la fiche livre. -->
+  <div class="mt-8 max-w-3xl">
+    <h3 class="mb-3 flex items-center gap-2 text-base font-semibold"><Books size={17} /> Titres ({data.books.length})</h3>
+    {#if data.books.length}
+      <div class="space-y-2">
+        {#each data.books as b, i (b.book_id + ':' + b.role + ':' + i)}
+          <a href="/admin/catalogue/{b.book_id}" class="flex items-center gap-3 rounded-lg border border-border bg-card p-3 hover:bg-muted/30">
+            {#if b.cover_url}
+              <img src={b.cover_url} alt="" class="h-14 w-10 shrink-0 rounded object-cover" loading="lazy" />
+            {:else}
+              <div class="h-14 w-10 shrink-0 rounded bg-muted"></div>
+            {/if}
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-semibold">{b.title}</div>
+              <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{b.year ?? '—'}</span>
+                {#if b.status !== 'published'}
+                  <span class="rounded bg-secondary px-1.5 py-0.5">{CONTENT_STATUS_LABEL[b.status] ?? b.status}</span>
+                {/if}
+              </div>
+            </div>
+            <span class="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs">{b.role_label}</span>
+            <span class="w-14 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{b.share != null ? b.share + ' %' : '—'}</span>
+          </a>
+        {/each}
+      </div>
+      <p class="mt-2 text-sm text-muted-foreground">Le rôle et le % de part se modifient depuis la fiche du livre, bloc « Contributeurs ».</p>
+    {:else}
+      <p class="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+        Aucun titre. Les contributions se définissent depuis la fiche d'un livre, bloc « Contributeurs ».
+      </p>
+    {/if}
+  </div>
+
+  <!-- Droits d'auteur par année — admins uniquement. -->
+  {#if data.canSeeRoyalties}
   <div class="mt-8 max-w-3xl">
     <h3 class="mb-3 flex items-center gap-2 text-base font-semibold"><Coins size={17} /> Droits d'auteur par année</h3>
     {#if byYear.length}
@@ -137,6 +174,7 @@
       </p>
     {/if}
   </div>
+  {/if}
 
   <!-- Suppression -->
   <div class="mt-8 max-w-3xl border-t border-border pt-4">

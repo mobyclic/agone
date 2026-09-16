@@ -34,6 +34,7 @@
     <div class="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
       <label class={label}>Nom <input name="name" value={c?.name ?? ''} class={input} /></label>
       <label class={label}>Slug (URL) <input name="slug" value={c?.slug ?? ''} placeholder="auto depuis le nom" class={input} /></label>
+      <label class="{label} sm:col-span-2">Sous-titre <input name="subtitle" value={c?.subtitle ?? ''} placeholder="affiché sous le nom sur la page publique" class={input} /></label>
     </div>
 
     <div class="rounded-lg border border-border bg-card p-4">

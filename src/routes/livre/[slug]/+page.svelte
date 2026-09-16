@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { embedsSociaux } from '$lib/client/embeds';
   import { enhance } from '$app/forms';
   import { invalidate } from '$app/navigation';
   import { page } from '$app/state';
@@ -77,20 +78,22 @@
 <svelte:head><title>{b.title} · Agone</title></svelte:head>
 
 <!-- Fiche livre : PAS de gros header (exception) — le titre vit dans la colonne de contenu. -->
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+<div class="py-8" style="padding-inline: var(--page-gutter)">
   {#if isStaff}
     <div class="fixed bottom-6 right-6 z-40">
       <Button href="/admin/catalogue/{bookId}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
     </div>
   {/if}
 
-  <div class="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)_240px] lg:gap-10">
+  <!-- Deux tiers : couverture + contenu. Un tiers : colonne latérale. -->
+  <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
+    <div class="grid gap-8 sm:grid-cols-[minmax(0,340px)_minmax(0,1fr)] sm:items-start">
     <!-- Couverture + infos annexes -->
     <div>
       {#if b.cover_url}
         <button type="button" onclick={() => openLightbox(0)} class="group block w-full cursor-zoom-in" aria-label="Agrandir la couverture">
-          <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40">
-            <img src={b.cover_url} alt={b.title} class="size-full object-cover" />
+          <div class="relative overflow-hidden border border-border bg-secondary/40">
+            <img src={b.cover_url} alt={b.title} class="block h-auto w-full" />
             <span class="absolute right-2 top-2 grid size-8 place-items-center bg-background/85 text-foreground opacity-0 transition-opacity group-hover:opacity-100"><MagnifyingGlassPlus size={16} /></span>
           </div>
         </button>
@@ -167,7 +170,7 @@
       {/if}
 
       {#if b.description_html}
-        <div class="prose-agone mt-7 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
+        <div use:embedsSociaux class="prose-agone texte-justifie mt-7 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
           {@html b.description_html}
         </div>
       {/if}
@@ -176,30 +179,87 @@
       {/if}
     </div>
 
-    <!-- Sidebar : du même auteur / même collection -->
+    </div>
+
+    <!-- Sidebar : du même auteur / dans la même collection -->
     <aside class="space-y-8">
       {#if data.sameAuthor.length}
         <div>
           <div class="tick-label mb-3">Du même auteur</div>
-          <ul class="space-y-3">
+          <!-- Couvertures seules, sur deux colonnes : l'auteur étant le même que
+               celui de la fiche, répéter son nom n'apprendrait rien. Le titre
+               revient en surimpression au survol (et au focus clavier). -->
+          <!-- Largeur bornée : sur un écran large, deux colonnes libres donnaient des
+               couvertures de 380 px, hors de proportion avec la colonne. ~190 px,
+               soit le double des vignettes de « Dans la même collection ». -->
+          <ul class="grid max-w-[400px] grid-cols-2 gap-3">
             {#each data.sameAuthor as s (s.slug)}
-              <li><a href="/livre/{s.slug}" class="group flex gap-2.5">
-                <span class="h-20 w-14 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
-                <span class="min-w-0"><span class="line-clamp-2 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{s.title}</span></span>
-              </a></li>
+              <li>
+                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
+                  {#if s.cover_url}
+                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                  {:else}
+                    <span class="flex aspect-[2/3] items-end bg-ink p-2"><span class="font-display text-xs uppercase leading-tight text-white">{s.title}</span></span>
+                  {/if}
+                  <span
+                    class="pointer-events-none absolute inset-0 flex items-end bg-ink/75 p-2.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+                  >
+                    <span class="line-clamp-4 font-display text-sm font-medium uppercase leading-tight text-white">{s.title}</span>
+                  </span>
+                </a>
+              </li>
             {/each}
           </ul>
         </div>
       {/if}
+      {#if data.contributions.length}
+        <div>
+          <div class="tick-label mb-3">Ses autres contributions</div>
+          <!-- Préface, postface, traduction, illustration… Trois colonnes, donc
+               des couvertures plus petites que « Du même auteur » : ces titres
+               ne sont pas de lui, ils pèsent moins dans la page. -->
+          <ul class="grid max-w-[400px] grid-cols-3 gap-2.5">
+            {#each data.contributions as s (s.slug)}
+              <li>
+                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
+                  {#if s.cover_url}
+                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                  {:else}
+                    <span class="flex aspect-[2/3] items-end bg-ink p-1.5"><span class="font-display text-[10px] uppercase leading-tight text-white">{s.title}</span></span>
+                  {/if}
+                  <span class="pointer-events-none absolute inset-0 flex items-end bg-ink/75 p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <span class="line-clamp-4 font-display text-[11px] font-medium uppercase leading-tight text-white">{s.title}</span>
+                  </span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       {#if data.sameCollection.length}
         <div>
-          <div class="tick-label mb-3">Même collection</div>
-          <ul class="space-y-3">
+          <div class="tick-label mb-3">Dans la même collection</div>
+          <!-- Même grille que « Ses autres contributions ». L'auteur change d'un
+               titre à l'autre : il rejoint le titre dans la surimpression, pour
+               que passer en couvertures seules ne perde pas l'information. -->
+          <ul class="grid max-w-[400px] grid-cols-3 gap-2.5">
             {#each data.sameCollection as s (s.slug)}
-              <li><a href="/livre/{s.slug}" class="group flex gap-2.5">
-                <span class="h-20 w-14 shrink-0 overflow-hidden border border-border bg-muted">{#if s.cover_url}<img src={s.cover_url} alt="" class="size-full object-cover" />{/if}</span>
-                <span class="min-w-0"><span class="line-clamp-2 font-display text-sm font-medium uppercase leading-tight group-hover:text-link">{s.title}</span>{#if s.authors?.length}<span class="mt-0.5 block text-xs text-muted-foreground">{s.authors[0].name}</span>{/if}</span>
-              </a></li>
+              <li>
+                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
+                  {#if s.cover_url}
+                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                  {:else}
+                    <span class="flex aspect-[2/3] items-end bg-ink p-1.5"><span class="font-display text-[10px] uppercase leading-tight text-white">{s.title}</span></span>
+                  {/if}
+                  <span class="pointer-events-none absolute inset-0 flex flex-col justify-end gap-0.5 bg-ink/75 p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <span class="line-clamp-3 font-display text-[11px] font-medium uppercase leading-tight text-white">{s.title}</span>
+                    {#if s.authors?.length}
+                      <span class="line-clamp-1 font-display text-[10px] uppercase tracking-wide text-white/70">{s.authors[0].name}</span>
+                    {/if}
+                  </span>
+                </a>
+              </li>
             {/each}
           </ul>
         </div>

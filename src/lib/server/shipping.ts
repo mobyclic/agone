@@ -14,7 +14,9 @@ function normalizeRates(raw: any): { up_to: number | null; price: number }[] {
 /** Zones actives (pour le calcul public), triées. */
 export async function activeShipZones(): Promise<(ShipZone & { id: string })[]> {
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, name, countries, rest_of_world, rates, free_over
+    // `sort` doit figurer dans la projection : SurrealDB refuse un ORDER BY sur un
+    // champ absent de la sélection (« Missing order idiom »).
+    `SELECT meta::id(id) AS id, name, countries, rest_of_world, rates, free_over, sort
        FROM shipping_zone WHERE active = true ORDER BY sort ASC, name ASC`);
   return rows.map((z) => ({
     id: z.id, name: z.name, countries: (z.countries ?? []).map(String),

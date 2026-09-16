@@ -9,6 +9,16 @@
 
   let { name, value = '', minHeight = '12rem', onchange }: { name: string; value?: string; minHeight?: string; onchange?: () => void } = $props();
 
+  /**
+   * L'éditeur n'accepte que H2/H3 : sans ce recalage, un H1 hérité de WordPress
+   * retomberait en paragraphe et un H4+ perdrait aussi son statut de titre.
+   */
+  function normalizeHeadings(html: string): string {
+    return (html ?? '')
+      .replace(/<(\/?)h1(\s[^>]*)?>/gi, '<$1h2$2>')
+      .replace(/<(\/?)h[456](\s[^>]*)?>/gi, '<$1h3$2>');
+  }
+
   let element = $state<HTMLDivElement>();
   let editor: Editor | null = null;
   let html = $state('');
@@ -20,7 +30,7 @@
     editor = new Editor({
       element,
       extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, HTMLAttributes: { rel: 'noopener' } } })],
-      content: value || '',
+      content: normalizeHeadings(value) || '',
       onUpdate: ({ editor }) => { html = editor.isEmpty ? '' : editor.getHTML(); onchange?.(); },
       onSelectionUpdate: () => (tick++),
       onTransaction: () => (tick++)

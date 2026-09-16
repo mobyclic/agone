@@ -139,6 +139,7 @@ DEFINE INDEX OVERWRITE idx_setting_key ON site_setting FIELDS key UNIQUE;
 DEFINE TABLE OVERWRITE collection SCHEMAFULL;
 DEFINE FIELD OVERWRITE name        ON collection TYPE string;
 DEFINE FIELD OVERWRITE slug        ON collection TYPE string;
+DEFINE FIELD OVERWRITE subtitle    ON collection TYPE option<string>;
 DEFINE FIELD OVERWRITE description ON collection TYPE option<string>;
 DEFINE FIELD OVERWRITE sort        ON collection TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE legacy_term_id ON collection TYPE option<int>;
@@ -234,7 +235,12 @@ DEFINE FIELD OVERWRITE slug        ON rubrique TYPE string;
 DEFINE FIELD OVERWRITE kind        ON rubrique TYPE string
   ASSERT $value IN ['book','blog','both'] DEFAULT 'both';
 DEFINE FIELD OVERWRITE sort        ON rubrique TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE subtitle    ON rubrique TYPE option<string>;
 DEFINE FIELD OVERWRITE legacy_term_id ON rubrique TYPE option<int>;
+-- Catégories WordPress absorbées par cette rubrique (fusions). L'import consulte
+-- aussi cette liste, sinon un re-sync détacherait les articles fusionnés.
+DEFINE FIELD OVERWRITE legacy_term_ids ON rubrique TYPE array<int> DEFAULT [] VALUE $value ?? [];
+DEFINE FIELD OVERWRITE legacy_term_ids.* ON rubrique TYPE int;
 DEFINE FIELD OVERWRITE created_at  ON rubrique TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_rubrique_slug ON rubrique FIELDS slug UNIQUE;
 
@@ -253,6 +259,10 @@ DEFINE FIELD OVERWRITE lat          ON venue TYPE option<number>;
 DEFINE FIELD OVERWRITE lng          ON venue TYPE option<number>;
 DEFINE FIELD OVERWRITE geo          ON venue TYPE option<geometry<point>>;
 DEFINE FIELD OVERWRITE place_id     ON venue TYPE option<string>;      -- Google Place ID (clé de dédup)
+-- Contact du lieu : affiché dans la fiche dépliante de l'accueil.
+DEFINE FIELD OVERWRITE phone        ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE website      ON venue TYPE option<string>;
+DEFINE FIELD OVERWRITE description  ON venue TYPE option<string>;
 DEFINE FIELD OVERWRITE event_count  ON venue TYPE int DEFAULT 0;       -- nb de rencontres (dénormalisé)
 DEFINE FIELD OVERWRITE created_at   ON venue TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at   ON venue TYPE datetime DEFAULT time::now() VALUE time::now();
@@ -424,6 +434,9 @@ DEFINE INDEX OVERWRITE idx_statement_period ON royalty_statement FIELDS period_s
 
 -- COMMANDE
 DEFINE TABLE OVERWRITE order SCHEMAFULL;
+-- Les scalaires ci-dessous portent `VALUE $value ?? <défaut>` : DEFAULT ne vaut
+-- qu'à la création, donc un champ ajouté après coup reste NONE sur l'existant et
+-- ferait échouer toute mise à jour (table SCHEMAFULL : tous les champs revalidés).
 DEFINE FIELD OVERWRITE number       ON order TYPE int;                 -- séquentiel (compteur site_setting)
 DEFINE FIELD OVERWRITE customer     ON order TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE email        ON order TYPE option<string>;
@@ -433,18 +446,18 @@ DEFINE FIELD OVERWRITE status       ON order TYPE string
 -- sortie_editeur (expédition directe Agone → bon de livraison PDF).
 DEFINE FIELD OVERWRITE channel      ON order TYPE string
   ASSERT $value IN ['web','comptoir','vpc','sortie_editeur'] DEFAULT 'web';
-DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR';
+DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR' VALUE $value ?? 'EUR';
 DEFINE FIELD OVERWRITE billing      ON order TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE shipping     ON order TYPE option<object> FLEXIBLE;
-DEFINE FIELD OVERWRITE item_count   ON order TYPE int DEFAULT 0;
-DEFINE FIELD OVERWRITE subtotal     ON order TYPE number DEFAULT 0;
-DEFINE FIELD OVERWRITE shipping_total ON order TYPE number DEFAULT 0;
-DEFINE FIELD OVERWRITE discount_total ON order TYPE number DEFAULT 0;   -- remise code promo
+DEFINE FIELD OVERWRITE item_count   ON order TYPE int DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE subtotal     ON order TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE shipping_total ON order TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE discount_total ON order TYPE number DEFAULT 0 VALUE $value ?? 0;   -- remise code promo
 DEFINE FIELD OVERWRITE promo_code   ON order TYPE option<string>;       -- code promo appliqué
-DEFINE FIELD OVERWRITE tax_total    ON order TYPE number DEFAULT 0;
-DEFINE FIELD OVERWRITE total        ON order TYPE number DEFAULT 0;
-DEFINE FIELD OVERWRITE has_ebook    ON order TYPE bool DEFAULT false;
-DEFINE FIELD OVERWRITE has_physical ON order TYPE bool DEFAULT false;
+DEFINE FIELD OVERWRITE tax_total    ON order TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE total        ON order TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE has_ebook    ON order TYPE bool DEFAULT false VALUE $value ?? false;
+DEFINE FIELD OVERWRITE has_physical ON order TYPE bool DEFAULT false VALUE $value ?? false;
 DEFINE FIELD OVERWRITE stripe_session        ON order TYPE option<string>;
 DEFINE FIELD OVERWRITE stripe_payment_intent ON order TYPE option<string>;
 DEFINE FIELD OVERWRITE invoice_number ON order TYPE option<int>;
