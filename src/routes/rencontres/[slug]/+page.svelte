@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { colonneCollante } from '$lib/client/sticky';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import VenueMap from '$lib/components/VenueMap.svelte';
@@ -59,7 +60,7 @@
   {/if}
 
   {#if e.body_html}
-    <div class="prose-agone mt-6 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
+    <div class="prose-agone mt-6 max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
       {@html e.body_html}
     </div>
   {/if}
@@ -87,7 +88,7 @@
     </div>
 
     {#if data.books.length}
-      <aside class="lg:sticky lg:top-28">
+      <aside use:colonneCollante>
         <h2 class="eyebrow mb-4">{data.books.length > 1 ? 'Les livres' : 'Le livre'}</h2>
         <div class="space-y-6">
           {#each data.books as book (book.slug)}

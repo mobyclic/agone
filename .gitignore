@@ -19,3 +19,6 @@ scripts/backups/
 
 # Sauvegardes de fusion de rubriques (données, pas du code)
 scripts/.merge-rubriques-backup-*.json
+
+# Miroir local des médias R2 (travail hors connexion, cf. scripts/surreal-local.sh)
+static/_r2-local/

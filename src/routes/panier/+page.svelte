@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { colonneCollante } from '$lib/client/sticky';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import PageHead from '$lib/components/PageHead.svelte';
@@ -17,7 +18,7 @@
 
 <div class="max-w-5xl py-10" style="padding-inline: var(--page-gutter)">
   {#if data.cart.lines.length === 0}
-    <div class="mt-8 rounded-lg border border-border bg-card p-10 text-center">
+    <div class="rounded-lg border border-border bg-card p-10 text-center">
       <p class="text-muted-foreground">Votre panier est vide.</p>
       <Button href="/catalogue" variant="brand" class="mt-4"><BookOpen size={16} /> Parcourir le catalogue</Button>
     </div>
@@ -59,7 +60,7 @@
     </div>
 
       <!-- Récapitulatif — colonne latérale collante -->
-      <aside class="lg:sticky lg:top-28">
+      <aside use:colonneCollante>
         <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="eyebrow mb-3">Récapitulatif</h2>
           <div class="space-y-2 text-sm">

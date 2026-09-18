@@ -48,7 +48,7 @@
     {#each data.collections as c (c.slug)}
       {@const single = c.book_count === 1 ? c.books[0] : null}
       {@const target = single ? `/livre/${single.slug}` : `/collections/${c.slug}`}
-      <section class="border-t border-border py-12 first:border-t-0">
+      <section class="border-t border-border py-12 first:border-t-0 first:pt-10">
         <!-- Texte sur deux tiers, ferré à gauche ; couvertures en face sur le
              tiers restant. Pas d'alternance : la lecture descend en colonne. -->
         <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-14">

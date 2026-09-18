@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { colonneCollante } from '$lib/client/sticky';
   import { untrack, onMount } from 'svelte';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
@@ -38,7 +39,7 @@
 
   {#if form?.error}<p class="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
-  <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_320px]">
+  <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
     <form method="POST" use:enhance class="space-y-5">
       <div class="rounded-lg border border-border bg-card p-5">
         <h2 class="eyebrow mb-4">Coordonnées{data.cart.has_physical ? ' & livraison' : ''}</h2>
@@ -70,7 +71,7 @@
     </form>
 
     <!-- Récapitulatif -->
-    <aside class="h-fit rounded-lg border border-border bg-card p-5">
+    <aside use:colonneCollante class="h-fit rounded-lg border border-border bg-card p-5">
       <h2 class="eyebrow mb-3">Votre commande</h2>
       <ul class="space-y-2 text-sm">
         {#each data.cart.lines as l (l.id + l.format)}

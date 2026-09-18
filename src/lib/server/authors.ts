@@ -111,11 +111,17 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
     { id: recId('author', a.id) }
   );
 
+  // Préfaces et postfaces forment un seul groupe sur la fiche : même nature de
+  // contribution (un texte d'accompagnement), et séparées elles émiettaient la page.
+  const cle = (role: string) => (role === 'postface' ? 'preface' : role);
   const byRole = new Map<string, AuthorDetail['works'][number]['books']>();
   for (const w of works) {
     if (!w.title) continue;
-    if (!byRole.has(w.role)) byRole.set(w.role, []);
-    byRole.get(w.role)!.push({
+    const k = cle(w.role);
+    if (!byRole.has(k)) byRole.set(k, []);
+    // Préface ET postface du même livre : on ne le montre qu'une fois.
+    if (byRole.get(k)!.some((b) => b.slug === w.slug)) continue;
+    byRole.get(k)!.push({
       title: w.title,
       slug: w.slug,
       cover_url: w.cover_url ?? undefined,
@@ -125,7 +131,7 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
   }
   const worksGrouped = ROLE_ORDER.filter((r) => byRole.has(r)).map((role) => ({
     role,
-    role_label: ROLE_LABEL[role] ?? role,
+    role_label: role === 'preface' ? 'Préfaces & postfaces' : (ROLE_LABEL[role] ?? role),
     books: byRole.get(role)!.sort((x, y) => (y.year ?? 0) - (x.year ?? 0))
   }));
 

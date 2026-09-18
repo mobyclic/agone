@@ -27,13 +27,15 @@
 </script>
 
 <section bind:this={heroEl} class="bg-background text-foreground">
-  <div class="py-10 sm:py-14 {width}" style="padding-inline: var(--page-gutter)">
+  <!-- Pas de marge basse : le contenu qui suit porte la sienne. Les deux
+       s'additionnaient (≈ 96 à 140 px sous le titre selon les pages). -->
+  <div class="pt-10 sm:pt-14 {width}" style="padding-inline: var(--page-gutter)">
     <div class={inner}>
       {#if eyebrow}
         <p class="font-display text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
       {/if}
       <h1 class="display-title mt-2 text-4xl leading-[0.9] sm:text-5xl">{title}</h1>
-      {#if subtitle}<p class="mt-5 max-w-2xl text-lg leading-snug text-muted-foreground sm:text-xl">{subtitle}</p>{/if}
+      {#if subtitle}<p class="mt-5 max-w-5xl text-lg leading-snug text-muted-foreground sm:text-xl">{subtitle}</p>{/if}
       {#if meta}<p class="mt-4 text-sm text-muted-foreground/70">{meta}</p>{/if}
       {@render children?.()}
     </div>

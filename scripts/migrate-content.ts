@@ -5,7 +5,9 @@
 import { readFileSync } from 'node:fs';
 import { Surreal, RecordId } from 'surrealdb';
 
-for (const line of readFileSync('.env', 'utf8').split('\n')) {
+// .env.local d'abord : s'il existe (base SurrealDB locale, cf. scripts/surreal-local.sh),
+// ses valeurs l'emportent — la boucle ne remplit une variable que si elle est vide.
+for (const line of ['.env.local', '.env'].flatMap((f) => { try { return readFileSync(f, 'utf8').split('\n'); } catch { return []; } })) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?(.*?)"?\s*$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
 }

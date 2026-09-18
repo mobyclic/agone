@@ -41,7 +41,7 @@
 
 <PageHead eyebrow="Les auteurs" title="Autrices & auteurs" meta={metaText} />
 
-<section class="border-b border-border bg-secondary/40">
+<section class="mt-10 border-b border-border bg-secondary/40">
   <div class="py-6" style="padding-inline: var(--page-gutter)">
     <input
       bind:value={q}

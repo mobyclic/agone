@@ -36,7 +36,7 @@
     </div>
     <div>
       {#if a.bio_html}
-        <div class="prose-agone mt-4 max-w-2xl text-[15px] leading-relaxed text-foreground/90 [&_a]:text-link [&_p]:mb-3">
+        <div class="prose-agone mt-4 max-w-2xl text-[17px] leading-relaxed text-foreground/90 [&_a]:text-link [&_p]:mb-3">
           {@html a.bio_html}
         </div>
       {/if}
@@ -49,7 +49,11 @@
   {#each a.works as group (group.role)}
     <section class="mt-12">
       <h2 class="eyebrow mb-4 border-b border-border pb-2">{group.role_label}{group.books.length > 1 ? ` · ${group.books.length} titres` : ''}</h2>
-      <div class="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      <!-- Les livres dont la personne est l'auteur gardent la grande grille ;
+           ses contributions (préfaces, traductions…) passent deux fois plus petites. -->
+      <div class="grid {group.role === 'author'
+        ? 'grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+        : 'grid-cols-3 gap-x-4 gap-y-6 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10'}">
         {#each group.books as book (book.slug)}
           <BookCard {book} />
         {/each}

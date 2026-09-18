@@ -16,7 +16,9 @@
     "db:export:schema": "bun run scripts/db-export.ts --only-schemas",
     "db:import:cloud": "bun run scripts/db-import-cloud.ts",
     "schema": "bun run scripts/apply-schema.ts",
-    "seed": "bun run scripts/seed.ts"
+    "seed": "bun run scripts/seed.ts",
+    "db:local": "sh scripts/surreal-local.sh start",
+    "db:local:pull": "sh scripts/surreal-local.sh pull"
   },
   "devDependencies": {
     "@fontsource-variable/oswald": "^5.3.0",

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { colonneCollante } from '$lib/client/sticky';
   import { extraitPropre } from '$lib/text';
   import PageHead from '$lib/components/PageHead.svelte';
   let { data } = $props();
@@ -21,7 +22,7 @@
 <section class="py-10" style="padding-inline: var(--page-gutter)">
   <div class="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-12">
     <!-- Sous-nav rubriques : colonne de gauche (collante en desktop). -->
-    <aside class="lg:sticky lg:top-24 lg:self-start">
+    <aside use:colonneCollante class="lg:self-start">
       <nav class="flex flex-col gap-0.5 font-display">
         <a href="/antichambre" class="flex items-center justify-between border-l-2 px-3 py-2 text-base uppercase tracking-wide {!data.rubrique ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'}">Antichambre</a>
         {#each data.rubriques as r (r.slug)}

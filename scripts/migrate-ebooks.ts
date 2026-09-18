@@ -9,7 +9,8 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { Surreal, RecordId } from 'surrealdb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-for (const l of readFileSync('.env', 'utf8').split('\n')) {
+// .env.local d'abord : s'il existe (base SurrealDB locale), ses valeurs l'emportent.
+for (const l of ['.env.local', '.env'].flatMap((f) => { try { return readFileSync(f, 'utf8').split('\n'); } catch { return []; } })) {
   const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*"?(.*?)"?\s*$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
 }
 const WP = process.env.WP_DIR, EPUB = process.env.EPUB_DIR;

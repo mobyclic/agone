@@ -1,6 +1,12 @@
 /**
  * Panier — stocké dans un cookie (léger, sans état serveur).
- * Item = { id: "book:xxx", format: 'papier'|'epab'|'souscription', qty }.
+ * Item = { id, format: 'papier'|'epub'|'souscription', qty }.
+ *
+ * L'IDENTIFIANT EST TOUJOURS RANGÉ NU (« xxx », sans « book: »). Les deux formes
+ * circulent : la fiche livre poste `b.id` (« book:xxx », normalisé par query()),
+ * d'autres appelants un id nu. Comparer l'une à l'autre échoue en silence — le
+ * panier paraissait vide alors qu'il ne l'était pas. `nu()` est appliqué à
+ * l'entrée (écriture, recherche) comme à la sortie (lecture du cookie).
  */
 import type { Cookies } from '@sveltejs/kit';
 import { query, recId } from './surreal';
@@ -8,6 +14,7 @@ import { query, recId } from './surreal';
 const CART_COOKIE = 'ag_cart';
 const PROMO_COOKIE = 'ag_promo';
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const nu = (id: unknown) => String(id ?? '').replace(/^book:/, '');
 
 // — Code promo appliqué (stocké tel quel ; la remise est recalculée à chaque affichage) —
 export function getPromoCode(cookies: Cookies): string | null {
@@ -34,7 +41,7 @@ export function readCart(cookies: Cookies): CartItem[] {
     const raw = cookies.get(CART_COOKIE);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter((x) => x?.id && x.qty > 0).map((x) => ({ id: String(x.id), format: String(x.format || 'papier'), qty: Math.max(1, Math.min(99, Number(x.qty) || 1)) })) : [];
+    return Array.isArray(arr) ? arr.filter((x) => x?.id && x.qty > 0).map((x) => ({ id: nu(x.id), format: String(x.format || 'papier'), qty: Math.max(1, Math.min(99, Number(x.qty) || 1)) })) : [];
   } catch { return []; }
 }
 
@@ -43,6 +50,7 @@ function write(cookies: Cookies, items: CartItem[]) {
 }
 
 export function addToCart(cookies: Cookies, id: string, format: string, qty = 1) {
+  id = nu(id);
   const items = readCart(cookies);
   const ex = items.find((i) => i.id === id && i.format === format);
   if (ex) ex.qty = Math.min(99, ex.qty + qty);
@@ -50,12 +58,14 @@ export function addToCart(cookies: Cookies, id: string, format: string, qty = 1)
   write(cookies, items);
 }
 export function setQty(cookies: Cookies, id: string, format: string, qty: number) {
+  id = nu(id);
   let items = readCart(cookies);
   if (qty <= 0) items = items.filter((i) => !(i.id === id && i.format === format));
   else { const ex = items.find((i) => i.id === id && i.format === format); if (ex) ex.qty = Math.min(99, qty); }
   write(cookies, items);
 }
 export function removeFromCart(cookies: Cookies, id: string, format: string) {
+  id = nu(id);
   write(cookies, readCart(cookies).filter((i) => !(i.id === id && i.format === format)));
 }
 export function clearCart(cookies: Cookies) {
@@ -89,9 +99,8 @@ export async function cartDetails(cookies: Cookies): Promise<CartDetails> {
        FROM book WHERE id IN $ids`,
     { ids: ids.map((x) => recId('book', x)) }
   );
-  // `query()` normalise les RecordId en « book:xxx » alors que le cookie ne stocke
-  // que l'identifiant nu : on retire le préfixe de table avant d'indexer.
-  const byId = new Map(books.map((b) => [String(b.id).replace(/^book:/, ''), b]));
+  // Clés nues des deux côtés (cf. en-tête) : `query()` renvoie « book:xxx ».
+  const byId = new Map(books.map((b) => [nu(b.id), b]));
   const lines: CartLine[] = [];
   let subtotal = 0, item_count = 0, has_ebook = false, has_physical = false, total_weight = 0;
   for (const it of items) {

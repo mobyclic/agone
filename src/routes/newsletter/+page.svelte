@@ -9,7 +9,7 @@
 
 <PageHead eyebrow="Rester en lien" title="Lettre d’information" subtitle="Nouveautés, rencontres et textes d’Antichambre — quelques envois par mois, jamais de spam." />
 
-<section class="max-w-xl py-14" style="padding-inline: var(--page-gutter)">
+<section class="max-w-xl py-10" style="padding-inline: var(--page-gutter)">
   {#if done}
     <div class="border-l-2 border-link bg-secondary/40 p-6">
       <h2 class="display-title text-2xl">Merci !</h2>

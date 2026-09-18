@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { colonneCollante } from '$lib/client/sticky';
   import { embedsSociaux } from '$lib/client/embeds';
   import { enhance } from '$app/forms';
   import { invalidate } from '$app/navigation';
@@ -88,8 +89,8 @@
   <!-- Deux tiers : couverture + contenu. Un tiers : colonne latérale. -->
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
     <div class="grid gap-8 sm:grid-cols-[minmax(0,340px)_minmax(0,1fr)] sm:items-start">
-    <!-- Couverture + infos annexes -->
-    <div>
+    <!-- Couverture + infos annexes — ferrée au défilement comme la colonne de droite. -->
+    <div use:colonneCollante>
       {#if b.cover_url}
         <button type="button" onclick={() => openLightbox(0)} class="group block w-full cursor-zoom-in" aria-label="Agrandir la couverture">
           <div class="relative overflow-hidden border border-border bg-secondary/40">
@@ -170,7 +171,7 @@
       {/if}
 
       {#if b.description_html}
-        <div use:embedsSociaux class="prose-agone texte-justifie mt-7 max-w-none text-[15px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
+        <div use:embedsSociaux class="prose-agone texte-justifie mt-7 max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
           {@html b.description_html}
         </div>
       {/if}
@@ -182,7 +183,7 @@
     </div>
 
     <!-- Sidebar : du même auteur / dans la même collection -->
-    <aside class="space-y-8">
+    <aside use:colonneCollante class="space-y-8">
       {#if data.sameAuthor.length}
         <div>
           <div class="tick-label mb-3">Du même auteur</div>

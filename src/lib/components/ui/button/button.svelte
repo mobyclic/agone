@@ -27,7 +27,7 @@
 				default: "h-10 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
 				xs: "h-7 gap-1 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3",
 				sm: "h-8 gap-1.5 px-3 text-[0.8rem] [&_svg:not([class*='size-'])]:size-3.5",
-				lg: "h-12 gap-2 px-6 text-[15px]",
+				lg: "h-12 gap-2 px-6 text-[17px]",
 				icon: "size-10",
 				"icon-xs": "size-7 [&_svg:not([class*='size-'])]:size-3",
 				"icon-sm": "size-8",

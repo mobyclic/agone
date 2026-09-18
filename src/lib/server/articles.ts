@@ -393,3 +393,62 @@ export async function reorderRubriques(orderedIds: string[]): Promise<void> {
     await query(`UPDATE $id SET sort = $s`, { id: recId('rubrique', orderedIds[i]), s: i });
   }
 }
+
+// ── ÉCHELLE DE LECTURE ────────────────────────────────────────────────────
+// Sur une page article, la colonne de droite montre l'article courant au milieu
+// de ses voisins chronologiques dans l'Antichambre : les plus récents au-dessus,
+// les plus anciens en dessous — le même ordre que la liste de l'Antichambre.
+
+export interface LadderRung extends ArticleCard {
+  current: boolean;
+}
+
+/**
+ * `autour` articles de chaque côté de l'article courant (par date de parution,
+ * publiés seulement). En bout de chronologie, le côté manquant est COMPLÉTÉ par
+ * l'autre : l'échelle garde toujours ses 2×autour+1 barreaux quand le fonds le
+ * permet, au lieu de s'amputer sur le premier ou le dernier article.
+ */
+export async function articleLadder(current: ArticleCard, autour = 2): Promise<LadderRung[]> {
+  // Champs de carte seulement : `current` peut être un ArticleDetail, et l'étaler
+  // tel quel renverrait tout le corps de l'article une seconde fois au client.
+  const soi: LadderRung = {
+    title: current.title, slug: current.slug, excerpt: undefined,
+    published_at: current.published_at, cover_url: undefined,
+    rubrique_name: current.rubrique_name, rubrique_slug: current.rubrique_slug,
+    author: current.author, is_newsletter_issue: current.is_newsletter_issue,
+    views: current.views, current: true
+  };
+  if (!current.published_at) return [soi];
+  const vars = { d: current.published_at, s: current.slug, n: autour * 2 };
+  const [recents, anciens] = await Promise.all([
+    query<any>(
+      `SELECT ${CARD} FROM article
+         WHERE status = 'published' AND slug != $s AND published_at != NONE AND published_at > type::datetime($d)
+         ORDER BY published_at ASC LIMIT $n`,
+      vars
+    ),
+    query<any>(
+      `SELECT ${CARD} FROM article
+         WHERE status = 'published' AND slug != $s
+           -- NONE < datetime est VRAI en SurrealQL : sans ce garde, un article non
+           -- daté se classait parmi les plus anciens de n'importe quelle échelle.
+           AND published_at != NONE AND published_at < type::datetime($d)
+         ORDER BY published_at DESC LIMIT $n`,
+      vars
+    )
+  ]);
+  const total = autour * 2;
+  let nRecents = Math.min(autour, recents.length);
+  let nAnciens = Math.min(autour, anciens.length);
+  // Complément : ce qui manque d'un côté est pris de l'autre.
+  nRecents = Math.min(recents.length, total - nAnciens);
+  nAnciens = Math.min(anciens.length, total - nRecents);
+
+  return [
+    // Récupérés du plus proche au plus lointain : on inverse pour lire du plus récent au plus ancien.
+    ...recents.slice(0, nRecents).map(toCard).reverse().map((c) => ({ ...c, current: false })),
+    soi,
+    ...anciens.slice(0, nAnciens).map(toCard).map((c) => ({ ...c, current: false }))
+  ];
+}

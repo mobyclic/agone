@@ -22,7 +22,10 @@ bun run check      # svelte-check (DOIT rester à 0 erreur)
 bun run schema     # applique src/lib/server/schema.surql au cloud (idempotent)
 bun run seed       # compte admin + collections de référence
 bun run build
+bun run db:local       # SurrealDB local hors connexion (cf. docs/LOCAL-DB.md)
+bun run db:local:pull  # recopie la base cloud en local (écrase le local)
 ```
+**`.env.local` présent ⇒ tout vise la base LOCALE** (site et scripts). Aucune synchro local → cloud.
 Admin de dev (seed) : `alistair.marca@gmail.com` / `agone2026` (rôle `admin`).
 
 ## Rôles & accès — `src/lib/roles.ts` + `src/lib/server/access.ts`
