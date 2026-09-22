@@ -4,7 +4,7 @@
    * ~400 titres : chaque clic répond instantanément, compteurs compris.
    *
    * Facettes : Parutions (nouveautés / fond / à paraître / souscription),
-   * Auteur (combobox), Collections, Mots-clés. Au sein d'une facette les choix
+   * Collections, Mots-clés, précédées d'une recherche libre « titre ou auteur ». Au sein d'une facette les choix
    * s'additionnent (OU) ; d'une facette à l'autre ils se combinent (ET). Le
    * compteur de chaque option tient compte des AUTRES facettes, pour qu'il dise
    * toujours combien de titres ce clic afficherait.
@@ -14,10 +14,9 @@
   import { page } from '$app/state';
   import BookCard from '$lib/components/BookCard.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
-  import SearchSelect from '$lib/components/SearchSelect.svelte';
   import { colonneCollante } from '$lib/client/sticky';
   import { deburr } from '$lib/text';
-  import { X, SlidersHorizontal } from 'phosphor-svelte';
+  import { X, SlidersHorizontal, MagnifyingGlass } from 'phosphor-svelte';
   import type { CatalogueBook } from '$lib/server/catalogue';
 
   let { data } = $props();
@@ -44,7 +43,11 @@
   }
   // Pré-calculs par livre (une fois).
   const livres = $derived(
-    data.books.map((b) => ({ b, parutions: parutionsDe(b), auteurs: b.authors.map((a) => a.slug), mots: b.keywords }))
+    data.books.map((b) => ({
+      b, parutions: parutionsDe(b), auteurs: b.authors.map((a) => a.slug), mots: b.keywords,
+      // Texte de recherche : titre, sous-titre et auteurs, sans accents ni casse.
+      texte: deburr([b.title, b.subtitle, ...b.authors.map((a) => a.name)].filter(Boolean).join(' '))
+    }))
   );
 
   // ── État des filtres (initialisé depuis l'URL) ───────────────────────────
@@ -53,6 +56,8 @@
   let parutions = $state<string[]>(liste('parution'));
   let collections = $state<string[]>(liste('collection'));
   let mots = $state<string[]>(liste('mot'));
+  let q = $state(sp.get('q') ?? '');
+  // Filtre par auteur (slug) : conservé pour les liens directs (?auteur=…), sans champ dédié.
   let auteur = $state<string | null>(sp.get('auteur') || null);
   let tri = $state<'recent' | 'ancien' | 'titre' | 'auteur'>((sp.get('tri') as any) || 'recent');
   let filtresOuverts = $state(false);
@@ -62,7 +67,9 @@
     parution: (l: Livre) => !parutions.length || l.parutions.some((p) => parutions.includes(p)),
     collection: (l: Livre) => !collections.length || (!!l.b.collection && collections.includes(l.b.collection.slug)),
     mot: (l: Livre) => !mots.length || l.mots.some((m) => mots.includes(m)),
-    auteur: (l: Livre) => !auteur || l.auteurs.includes(auteur)
+    auteur: (l: Livre) => !auteur || l.auteurs.includes(auteur),
+    // Chaque mot saisi doit se retrouver dans le titre, le sous-titre ou un auteur.
+    q: (l: Livre) => deburr(q.trim()).split(/\s+/).filter(Boolean).every((m) => l.texte.includes(m))
   };
   type Facette = keyof typeof tests;
   /** Livres passant tous les filtres SAUF celui de `sauf` (base des compteurs de cette facette). */
@@ -102,26 +109,14 @@
     return [...n.entries()].map(([m, c]) => ({ m, n: c })).sort((a, b) => b.n - a.n || a.m.localeCompare(b.m, 'fr'));
   });
   let tousLesMots = $state(false);
-  const optionsAuteurs = $derived.by(() => {
-    const n = new Map<string, { id: string; label: string; cle: string; c: number }>();
-    for (const l of sans('auteur'))
-      for (const a of l.b.authors) {
-        const e = n.get(a.slug) ?? { id: a.slug, label: a.name, cle: deburr(`${a.last_name ?? a.name} ${a.first_name ?? ''}`), c: 0 };
-        e.c++;
-        n.set(a.slug, e);
-      }
-    return [...n.values()]
-      .sort((a, b) => a.cle.localeCompare(b.cle, 'fr'))
-      .map((e) => ({ id: e.id, label: e.label, hint: String(e.c) }));
-  });
   const auteurChoisi = $derived.by(() => {
     if (!auteur) return null;
     for (const l of livres) for (const a of l.b.authors) if (a.slug === auteur) return { id: a.slug, label: a.name };
     return { id: auteur, label: auteur };
   });
 
-  const actifs = $derived(parutions.length + collections.length + mots.length + (auteur ? 1 : 0));
-  function toutEffacer() { parutions = []; collections = []; mots = []; auteur = null; }
+  const actifs = $derived(parutions.length + collections.length + mots.length + (auteur ? 1 : 0) + (q.trim() ? 1 : 0));
+  function toutEffacer() { parutions = []; collections = []; mots = []; auteur = null; q = ''; }
   const bascule = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
   // ── URL ↔ état ───────────────────────────────────────────────────────────
@@ -131,6 +126,7 @@
     if (collections.length) p.set('collection', collections.join(','));
     if (mots.length) p.set('mot', mots.join(','));
     if (auteur) p.set('auteur', auteur);
+    if (q.trim()) p.set('q', q.trim());
     if (tri !== 'recent') p.set('tri', tri);
     const s = p.toString();
     untrack(() => { try { replaceState(`/catalogue${s ? `?${s}` : ''}`, {}); } catch { /* routeur pas prêt */ } });
@@ -184,17 +180,21 @@
 
       <div class="{filtresOuverts ? 'mt-6 block' : 'hidden'} space-y-8 lg:mt-0 lg:block">
         <div>
+          <label class={titreFacette + ' block'} for="recherche-catalogue">Recherche</label>
+          <div class="relative">
+            <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input id="recherche-catalogue" type="search" bind:value={q} placeholder="Titre ou auteur…" autocomplete="off"
+              class="h-10 w-full border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground" />
+          </div>
+        </div>
+
+        <div>
           <p class={titreFacette}>Parutions</p>
           <ul>
             {#each PARUTIONS as p (p.id)}
               {@render case_(parutions.includes(p.id), p.label, compteParution[p.id] ?? 0, () => (parutions = bascule(parutions, p.id)))}
             {/each}
           </ul>
-        </div>
-
-        <div>
-          <p class={titreFacette}>Auteur</p>
-          <SearchSelect options={optionsAuteurs} value={auteurChoisi} placeholder="Nom de l’auteur…" onselect={(v) => (auteur = v?.id ?? null)} />
         </div>
 
         <div>
@@ -237,6 +237,9 @@
           {#each parutions as p (p)}
             <button type="button" onclick={() => (parutions = bascule(parutions, p))} class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium hover:bg-muted/70">{PARUTIONS.find((x) => x.id === p)?.label ?? p} <X size={11} /></button>
           {/each}
+          {#if q.trim()}
+            <button type="button" onclick={() => (q = '')} class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium hover:bg-muted/70">« {q.trim()} » <X size={11} /></button>
+          {/if}
           {#if auteurChoisi}
             <button type="button" onclick={() => (auteur = null)} class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium hover:bg-muted/70">{auteurChoisi.label} <X size={11} /></button>
           {/if}
