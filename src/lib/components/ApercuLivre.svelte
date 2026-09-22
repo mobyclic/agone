@@ -11,13 +11,14 @@
   import { enhance } from '$app/forms';
   import { invalidate } from '$app/navigation';
   import { fade, fly, scale } from 'svelte/transition';
-  import { authorList, euros, isForthcoming } from '$lib/labels';
+  import { authorList, euros, isForthcoming, formatsEnVente, estEpuise } from '$lib/labels';
   import { trackAddToCart, itemId } from '$lib/analytics';
   import { X, CaretLeft, CaretRight, BookOpen, FileText, HandCoins, CheckCircle, CircleNotch } from 'phosphor-svelte';
 
   interface Livre {
     id: string; slug: string; title: string; subtitle?: string; cover_url?: string;
     price_paper?: number; price_ebook?: number; subscription_price?: number; subscription_end?: string;
+    stock_qty?: number; has_ebook_file?: boolean;
     status?: string; published_at?: string;
     authors: { name: string; slug: string; first_name?: string; last_name?: string }[];
     collection?: { slug: string; name: string };
@@ -70,18 +71,9 @@
   });
 
   // ── Achat ────────────────────────────────────────────────────────────────
-  const formats = $derived.by(() => {
-    if (!livre) return [];
-    if (isForthcoming(livre)) {
-      return livre.subscription_price != null && livre.subscription_end
-        ? [{ key: 'souscription', label: 'Souscrire', price: livre.subscription_price }]
-        : [];
-    }
-    return [
-      livre.price_paper != null ? { key: 'papier', label: 'Papier', price: livre.price_paper } : null,
-      livre.price_ebook != null ? { key: 'epub', label: 'ePub', price: livre.price_ebook } : null
-    ].filter((x): x is { key: string; label: string; price: number } => x !== null);
-  });
+  // Règles de vente communes (stock, prix > 0, fichier ebook déposé) — cf. $lib/labels.
+  const formats = $derived(livre ? formatsEnVente(livre) : []);
+  const epuise = $derived(livre ? estEpuise(livre) : false);
   let enCours = $state('');
   let ajoute = $state('');
   function ajouter({ formData }: { formData: FormData }) {
@@ -155,6 +147,9 @@
 
             <!-- Achat + accès à la fiche, sur une même ligne -->
             <div class="mt-5 flex flex-wrap items-center gap-2.5">
+              {#if epuise}
+                <span class="border-2 border-border px-3.5 py-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">Épuisé</span>
+              {/if}
               {#each formats as f (f.key)}
                   <form method="POST" action="/panier?/add" use:enhance={ajouter}>
                     <input type="hidden" name="id" value={livre.id} />

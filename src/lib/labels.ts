@@ -93,3 +93,44 @@ export function authorLabel(a: { name?: string; first_name?: string; last_name?:
 export function authorList(authors?: { name?: string; first_name?: string; last_name?: string }[]): string {
   return (authors ?? []).map(authorLabel).filter(Boolean).join(', ');
 }
+
+/** Livre tel que l'affichage en a besoin pour décider de ce qui est en vente. */
+export interface LivreVendable {
+  status?: string;
+  published_at?: string | null;
+  price_paper?: number | null;
+  price_ebook?: number | null;
+  subscription_price?: number | null;
+  subscription_end?: string | null;
+  stock_qty?: number | null;
+  /** Un fichier ePub/PDF est déposé et disponible. */
+  has_ebook_file?: boolean;
+}
+
+export interface FormatVente { key: 'papier' | 'epub' | 'souscription'; label: string; price: number }
+
+/**
+ * Formats réellement achetables — MÊMES RÈGLES partout (fiche, aperçu, panier,
+ * commande), pour ne jamais proposer un achat que le serveur refusera :
+ *  - à paraître : rien, sauf souscription ouverte (prix + date) ;
+ *  - papier : prix > 0 ET stock disponible (plus de stock = épuisé) ;
+ *  - ePub : prix > 0 ET fichier déposé (un prix à 0 n'est pas une vente).
+ */
+export function formatsEnVente(b: LivreVendable): FormatVente[] {
+  if (isForthcoming(b)) {
+    return b.subscription_price != null && b.subscription_price > 0 && b.subscription_end
+      ? [{ key: 'souscription', label: 'Souscription', price: b.subscription_price }]
+      : [];
+  }
+  const out: FormatVente[] = [];
+  if (b.price_paper != null && b.price_paper > 0 && (b.stock_qty ?? 0) > 0)
+    out.push({ key: 'papier', label: 'Papier', price: b.price_paper });
+  if (b.price_ebook != null && b.price_ebook > 0 && b.has_ebook_file)
+    out.push({ key: 'epub', label: 'ePub', price: b.price_ebook });
+  return out;
+}
+
+/** Épuisé : en vente papier sur le principe, mais sans stock. */
+export function estEpuise(b: LivreVendable): boolean {
+  return !isForthcoming(b) && b.price_paper != null && b.price_paper > 0 && (b.stock_qty ?? 0) <= 0;
+}

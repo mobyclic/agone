@@ -6,7 +6,7 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner, Lock, LockOpen, Warning } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner, Lock, LockOpen, Warning, FileArrowUp, FileText, Info } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const b = $derived(data.book);
@@ -55,6 +55,11 @@
     data.book?.published_at ? Math.floor((Date.now() - new Date(data.book.published_at).getTime()) / 86400e3) : null
   );
   const livreAncien = $derived(joursDepuisParution != null && joursDepuisParution > 60);
+
+  // Fichiers ebook : formulaire distinct (envoi de fichier), donc hors du
+  // formulaire principal — les formulaires ne s'imbriquent pas.
+  let envoiEbook = $state(false);
+  const poids = (o?: number) => (o == null ? '' : o > 1048576 ? `${(o / 1048576).toFixed(1)} Mo` : `${Math.round(o / 1024)} Ko`);
 
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
@@ -215,6 +220,52 @@
 </form>
 
 {#if !data.isNew}
+  <!-- Fichiers ebook : déposés sur le stockage privé, servis seulement aux acheteurs
+       (cf. /api/ebook/[id]/download) et à l'équipe. -->
+  <section class="mb-8 rounded-lg border border-border bg-card p-4 lg:max-w-3xl">
+    <h3 class="eyebrow mb-1">Fichier ebook</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      ePub ou PDF, 60 Mo maximum. Le fichier n'est jamais public : il n'est téléchargeable que depuis la
+      bibliothèque des clients qui l'ont acheté. Sans fichier déposé, le format numérique n'est pas mis en vente.
+    </p>
+
+    {#if (form as any)?.ebookError}
+      <p class="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{(form as any).ebookError}</p>
+    {/if}
+
+    {#if data.ebooks.length}
+      <ul class="mb-3 divide-y divide-border rounded-md border border-border">
+        {#each data.ebooks as f (f.id)}
+          <li class="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+            <FileText size={18} class="shrink-0 text-muted-foreground" />
+            <span class="min-w-0 flex-1 truncate font-medium">{f.filename ?? f.id}</span>
+            <span class="shrink-0 text-xs uppercase text-muted-foreground">{f.format}{f.size ? ` · ${poids(f.size)}` : ''}</span>
+            <span class="shrink-0 rounded px-2 py-0.5 text-xs {f.status === 'available' ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}">{f.status === 'available' ? 'Disponible' : f.status}</span>
+            <form method="POST" action="?/ebookSupprimer" use:enhance class="shrink-0"
+              onsubmit={(e) => { if (!confirm('Retirer ce fichier ? Les clients qui l’ont acheté n’y auront plus accès.')) e.preventDefault(); }}>
+              <input type="hidden" name="assetId" value={f.id} />
+              <button type="submit" class="grid size-8 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-destructive" aria-label="Retirer le fichier"><Trash size={15} /></button>
+            </form>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="mb-3 flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <Info size={15} /> Aucun fichier déposé{b?.price_ebook ? ' — le prix numérique est renseigné, mais le livre n’est pas vendable en ePub.' : '.'}
+      </p>
+    {/if}
+
+    <form method="POST" action="?/ebook" enctype="multipart/form-data"
+      use:enhance={() => { envoiEbook = true; return async ({ update }) => { await update({ reset: true }); envoiEbook = false; }; }}
+      class="flex flex-wrap items-center gap-3">
+      <input type="file" name="file" accept=".epub,.pdf,application/epub+zip,application/pdf" required
+        class="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted" />
+      <Button type="submit" variant="outline" disabled={envoiEbook}>
+        {#if envoiEbook}<Spinner size={16} class="animate-spin" /> Dépôt…{:else}<FileArrowUp size={16} /> Déposer{/if}
+      </Button>
+    </form>
+  </section>
+
   <form method="POST" action="?/delete" use:enhance class="border-t border-border pt-4 pb-24">
     <Button type="submit" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10"
       onclick={(e: Event) => { if (!confirm('Supprimer définitivement ce livre ?')) e.preventDefault(); }}>

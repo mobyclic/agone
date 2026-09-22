@@ -7,7 +7,8 @@ import { uniqueSlug, slugify } from './slug';
 import { accentRegex } from '$lib/text';
 import { wpautop } from './wpautop';
 import { sansScripts, notesDeBasDePage } from '$lib/text';
-import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
+import { uploadBuffer, deleteFile } from './storage';
+import { ROLE_ORDER, ROLE_LABEL, formatsEnVente, estEpuise } from '$lib/labels';
 export { ROLE_LABEL };
 
 export interface BookCard {
@@ -23,6 +24,9 @@ export interface BookCard {
   published_at?: string;
   featured: boolean;
   cover_url?: string;
+  stock_qty: number;
+  /** Un fichier ebook disponible est déposé (condition de vente du format ePub). */
+  has_ebook_file: boolean;
   authors: { name: string; slug: string; first_name?: string; last_name?: string }[];
 }
 
@@ -44,6 +48,8 @@ function toCard(r: any): BookCard {
     published_at: r.published_at ?? undefined,
     featured: r.featured ?? false,
     cover_url: r.cover_url ?? undefined,
+    stock_qty: r.stock_qty ?? 0,
+    has_ebook_file: !!r.has_ebook_file,
     authors: names
       .map((name, i) => ({ name, slug: slugs[i] ?? '', first_name: firsts[i] ?? undefined, last_name: lasts[i] ?? undefined }))
       .filter((a) => a.name)
@@ -52,6 +58,8 @@ function toCard(r: any): BookCard {
 
 const CARD_FIELDS = `
   id, title, subtitle, slug, price_paper, price_ebook, subscription_price, subscription_end, status, featured, published_at,
+  stock_qty,
+  count((SELECT id FROM ebook_asset WHERE book = $parent.id AND status = 'available')) > 0 AS has_ebook_file,
   cover.url AS cover_url,
   ->contributed_by[WHERE role = 'author']->author.full_name AS a_names,
   ->contributed_by[WHERE role = 'author']->author.slug AS a_slugs,
@@ -252,6 +260,7 @@ export async function resoudreLivreAdmin(param: string): Promise<{ id: string; s
 export async function getBookBySlug(slug: string, apercu = false): Promise<BookDetail | null> {
   const rows = await query<any>(
     `SELECT *, cover.url AS cover_url, gallery.url AS gallery_urls,
+       count((SELECT id FROM ebook_asset WHERE book = $parent.id AND status = 'available')) > 0 AS has_ebook_file,
        collections.{ name: name, slug: slug } AS collection_refs
      FROM book WHERE slug = $slug LIMIT 1`,
     { slug }
@@ -638,4 +647,79 @@ export async function catalogueComplet(): Promise<CatalogueBook[]> {
     collection: r.c_slug ? { slug: r.c_slug, name: r.c_name } : undefined,
     keywords: (r.keywords ?? []).filter(Boolean)
   }));
+}
+
+/**
+ * Le format demandé est-il réellement en vente ? Mêmes règles que l'affichage
+ * (cf. formatsEnVente dans $lib/labels), appliquées côté serveur : un panier
+ * rempli depuis un onglet resté ouvert, ou à la main, ne doit pas passer.
+ */
+export async function formatVendable(bookId: string, format: string): Promise<{ ok: true } | { ok: false; raison: string }> {
+  const rows = await query<any>(
+    `SELECT title, status, published_at, price_paper, price_ebook, subscription_price, subscription_end, stock_qty,
+        count((SELECT id FROM ebook_asset WHERE book = $parent.id AND status = 'available')) > 0 AS has_ebook_file
+       FROM $id`,
+    { id: recId('book', String(bookId).replace(/^book:/, '')) }
+  );
+  const b = rows[0];
+  if (!b) return { ok: false, raison: 'Ce livre n’existe plus.' };
+  if (b.status !== 'published') return { ok: false, raison: `« ${b.title} » n’est pas en vente.` };
+  const ok = formatsEnVente(b).some((f) => f.key === format);
+  if (ok) return { ok: true };
+  if (format === 'papier' && estEpuise(b)) return { ok: false, raison: `« ${b.title} » est épuisé.` };
+  if (format === 'epub') return { ok: false, raison: `La version numérique de « ${b.title} » n’est pas disponible.` };
+  return { ok: false, raison: `Ce format n’est pas disponible pour « ${b.title} ».` };
+}
+
+/* ————————————————————— Fichiers ebook (back-office) ————————————————————— */
+
+export interface EbookAssetRow {
+  id: string; format: string; filename?: string; size?: number; status: string; created_at?: string;
+}
+
+/** Fichiers ebook d'un livre (back-office). */
+export async function ebookAssetsForBook(bookId: string): Promise<EbookAssetRow[]> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, format, filename, size, status, created_at
+       FROM ebook_asset WHERE book = $b ORDER BY created_at DESC`,
+    { b: recId('book', bookId) }
+  );
+  return rows.map((r) => ({
+    id: r.id, format: r.format, filename: r.filename ?? undefined,
+    size: r.size ?? undefined, status: r.status, created_at: r.created_at ?? undefined
+  }));
+}
+
+/**
+ * Dépose un fichier ebook sur R2 et l'enregistre. Le fichier N'EST PAS public :
+ * sa clé porte un identifiant aléatoire et il n'est servi que par
+ * /api/ebook/[id]/download, qui vérifie l'achat.
+ */
+export async function ajouterEbookAsset(bookId: string, file: File): Promise<string> {
+  const ext = (file.name.split('.').pop() ?? 'epub').toLowerCase();
+  const format = ext === 'pdf' ? 'pdf' : 'epub';
+  const key = `livres/ebooks/${crypto.randomUUID()}.${format}`;
+  await uploadBuffer({
+    key,
+    buffer: Buffer.from(await file.arrayBuffer()),
+    contentType: format === 'pdf' ? 'application/pdf' : 'application/epub+zip',
+    cacheControl: 'private, no-store'
+  });
+  const rows = await query<any>(`CREATE ebook_asset CONTENT $a`, {
+    a: {
+      book: recId('book', bookId), format, r2_key: key, filename: file.name,
+      size: file.size, content_type: format === 'pdf' ? 'application/pdf' : 'application/epub+zip',
+      status: 'available'
+    }
+  });
+  return String(rows[0].id).replace(/^ebook_asset:/, '');
+}
+
+/** Retire un fichier ebook (enregistrement + objet R2). Les achats déjà accordés le perdent. */
+export async function supprimerEbookAsset(assetId: string): Promise<void> {
+  const rows = await query<any>(`SELECT r2_key FROM $id`, { id: recId('ebook_asset', assetId) });
+  const key = rows[0]?.r2_key;
+  await query(`DELETE owns WHERE out = $id`, { id: recId('ebook_asset', assetId) });
+  await query(`DELETE $id`, { id: recId('ebook_asset', assetId) });
+  if (key) await deleteFile(String(key)).catch(() => {});
 }

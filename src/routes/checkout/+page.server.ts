@@ -7,6 +7,7 @@ import { activeShipZones } from '$lib/server/shipping';
 import { quoteShippingFor } from '$lib/shipping-calc';
 import { COUNTRIES } from '$lib/countries';
 import { createOrder } from '$lib/server/order';
+import { formatVendable } from '$lib/server/catalogue';
 import { isStripeEnabled, createPaymentCheckout } from '$lib/server/stripe';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
@@ -51,6 +52,12 @@ export const actions: Actions = {
       phone: g('ship_phone')
     };
     const values = { ...billing, ship_different: separee, ship: autre };
+
+    // Le panier a pu vieillir : un titre épuisé entre-temps ne doit pas être vendu.
+    for (const l of cart.lines) {
+      const v = await formatVendable(l.id, l.format);
+      if (!v.ok) return fail(400, { error: `${v.raison} Retirez-le du panier pour continuer.`, values });
+    }
     if (!billing.first_name || !billing.last_name || !billing.email)
       return fail(400, { error: 'Nom et email sont requis.', values });
     if (cart.has_physical && (!billing.address_1 || !billing.postcode || !billing.city))

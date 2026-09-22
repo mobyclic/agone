@@ -9,7 +9,7 @@
   import Lightbox from '$lib/components/Lightbox.svelte';
   import RencontresAVenir from '$lib/components/RencontresAVenir.svelte';
   import CouverturesGrille from '$lib/components/CouverturesGrille.svelte';
-  import { ROLE_LABEL, euros, isForthcoming } from '$lib/labels';
+  import { ROLE_LABEL, euros, isForthcoming, formatsEnVente, estEpuise } from '$lib/labels';
   import { trackAddToCart, itemId } from '$lib/analytics';
   import { BookOpen, FileText, HandCoins, PencilSimple, MagnifyingGlassPlus, CheckCircle, X, ShoppingCart, SquaresFour, CircleNotch } from 'phosphor-svelte';
 
@@ -56,17 +56,9 @@
 
   const forthcoming = $derived(isForthcoming(b));
   // À paraître → aucun bouton d'achat, sauf souscription (prix + date de souscription).
-  const formats = $derived.by(() => {
-    if (forthcoming) {
-      return b.subscription_price != null && b.subscription_end
-        ? [{ key: 'souscription', label: 'Souscription', price: b.subscription_price }]
-        : [];
-    }
-    return [
-      b.price_paper != null ? { key: 'papier', label: 'Papier', price: b.price_paper } : null,
-      b.price_ebook != null ? { key: 'epub', label: 'ePub', price: b.price_ebook } : null
-    ].filter((x): x is { key: string; label: string; price: number } => x !== null);
-  });
+  // Règles de vente communes (stock, prix > 0, fichier ebook déposé) — cf. $lib/labels.
+  const formats = $derived(formatsEnVente(b));
+  const epuise = $derived(estEpuise(b));
   const subEndLabel = $derived(b.subscription_end ? new Date(b.subscription_end).toLocaleDateString('fr-FR') : null);
 
   const mainAuthors = $derived((b.contributors ?? []).find((c: any) => c.role === 'author')?.people ?? []);
@@ -165,6 +157,8 @@
             </form>
           {/each}
         </div>
+      {:else if epuise}
+        <p class="mt-6 inline-block border-2 border-border px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">Épuisé</p>
       {:else if !forthcoming}
         <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
       {/if}

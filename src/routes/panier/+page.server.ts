@@ -5,6 +5,7 @@ import {
   getPromoCode, setPromoCode, clearPromoCode
 } from '$lib/server/cart';
 import { validatePromo } from '$lib/server/promo';
+import { formatVendable } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ cookies, locals }) => {
@@ -20,7 +21,11 @@ export const actions: Actions = {
     const id = String(fd.get('id') || '');
     const format = String(fd.get('format') || 'papier');
     const qty = Math.max(1, Number(fd.get('qty')) || 1);
-    if (id) addToCart(cookies, id, format, qty);
+    if (!id) throw redirect(303, '/panier');
+    // Dernier mot au serveur : stock épuisé, prix absent, fichier ebook manquant…
+    const v = await formatVendable(id, format);
+    if (!v.ok) throw redirect(303, withFlash('/panier', v.raison, 'error'));
+    addToCart(cookies, id, format, qty);
     throw redirect(303, withFlash('/panier', 'Ajouté au panier.', 'success'));
   },
   update: async ({ request, cookies }) => {

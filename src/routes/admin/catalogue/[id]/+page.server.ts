@@ -2,14 +2,15 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import {
-  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, resoudreLivreAdmin, type BookInput
+  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, resoudreLivreAdmin,
+  ebookAssetsForBook, ajouterEbookAsset, supprimerEbookAsset, type BookInput
 } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
   const [collections, rubriques, allKeywords] = await Promise.all([allCollections(), allRubriques(), allBookKeywords()]);
   if (params.id === 'nouveau') {
-    return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords };
+    return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords, ebooks: [] };
   }
   // Adresse lisible : /admin/catalogue/<slug>. Les anciens liens par id redirigent.
   const livre = await resoudreLivreAdmin(params.id);
@@ -24,7 +25,7 @@ export const load: PageServerLoad = async ({ params }) => {
     role: c.role,
     share: c.share ?? 100
   }));
-  return { isNew: false, book: data.book, contributors, collections, rubriques, allKeywords };
+  return { isNew: false, book: data.book, contributors, collections, rubriques, allKeywords, ebooks: await ebookAssetsForBook(livre.id) };
 };
 
 export const actions: Actions = {
@@ -88,6 +89,31 @@ export const actions: Actions = {
 
     const apres = await resoudreLivreAdmin(id);
     throw redirect(303, withFlash(`/admin/catalogue/${apres?.slug ?? id}`, 'Livre enregistré.', 'success'));
+  },
+
+  /** Dépôt d'un fichier ebook (ePub/PDF) — servi uniquement aux acheteurs. */
+  ebook: async ({ request, params, locals }) => {
+    requireStaff(locals);
+    const livre = params.id && params.id !== 'nouveau' ? await resoudreLivreAdmin(params.id) : null;
+    if (!livre) return fail(404, { ebookError: 'Livre introuvable.' });
+    const fd = await request.formData();
+    const file = fd.get('file');
+    if (!(file instanceof File) || !file.size) return fail(400, { ebookError: 'Choisissez un fichier.' });
+    const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+    if (!['epub', 'pdf'].includes(ext)) return fail(400, { ebookError: 'Format accepté : .epub ou .pdf.' });
+    if (file.size > 60 * 1024 * 1024) return fail(400, { ebookError: 'Fichier trop lourd (60 Mo maximum).' });
+    await ajouterEbookAsset(livre.id, file);
+    throw redirect(303, withFlash(`/admin/catalogue/${livre.slug}`, 'Fichier ebook déposé.', 'success'));
+  },
+
+  /** Retrait d'un fichier ebook (les bibliothèques clientes perdent l'accès). */
+  ebookSupprimer: async ({ request, params, locals }) => {
+    requireStaff(locals);
+    const livre = params.id && params.id !== 'nouveau' ? await resoudreLivreAdmin(params.id) : null;
+    const fd = await request.formData();
+    const assetId = String(fd.get('assetId') ?? '');
+    if (assetId) await supprimerEbookAsset(assetId);
+    throw redirect(303, withFlash(`/admin/catalogue/${livre?.slug ?? params.id}`, 'Fichier ebook retiré.', 'success'));
   },
 
   delete: async ({ params, locals }) => {
