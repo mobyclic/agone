@@ -2,7 +2,7 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import {
-  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, type BookInput
+  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, resoudreLivreAdmin, type BookInput
 } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
@@ -11,7 +11,11 @@ export const load: PageServerLoad = async ({ params }) => {
   if (params.id === 'nouveau') {
     return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords };
   }
-  const data = await getBookAdmin(params.id);
+  // Adresse lisible : /admin/catalogue/<slug>. Les anciens liens par id redirigent.
+  const livre = await resoudreLivreAdmin(params.id);
+  if (!livre) throw error(404, { message: 'Livre introuvable' });
+  if (livre.slug && params.id !== livre.slug) throw redirect(301, `/admin/catalogue/${livre.slug}`);
+  const data = await getBookAdmin(livre.id);
   if (!data) throw error(404, { message: 'Livre introuvable' });
   const contributors = (data.contributors ?? []).map((c: any) => ({
     authorId: String(c.author_id),
@@ -65,6 +69,7 @@ export const actions: Actions = {
       weight_grams: N('weight_grams'),
       stock_qty: N('stock_qty') ?? 0,
       featured: fd.get('featured') === 'on',
+      slug: S('slug') || undefined,
       // « a, b ; c » → ['a','b','c'] (dédoublonné sans tenir compte de la casse).
       keywords: [...new Map(S('keywords').split(/[,;\n]/).map((k) => k.trim()).filter(Boolean).map((k) => [k.toLowerCase(), k])).values()],
       collectionIds: collectionId ? [collectionId] : [],
@@ -74,18 +79,21 @@ export const actions: Actions = {
       galleryIds
     };
 
-    const editId = params.id && params.id !== 'nouveau' ? params.id : null;
+    const editId = params.id && params.id !== 'nouveau' ? ((await resoudreLivreAdmin(params.id))?.id ?? null) : null;
+    if (params.id !== 'nouveau' && !editId) return fail(404, { error: 'Livre introuvable.' });
     const id = await upsertBook(editId, input);
     let contribs: { authorId: string; role: string; share?: number }[] = [];
     try { contribs = JSON.parse(S('contributors') || '[]'); } catch { /* noop */ }
     await setBookContributors(id, contribs);
 
-    throw redirect(303, withFlash(`/admin/catalogue/${id}`, 'Livre enregistré.', 'success'));
+    const apres = await resoudreLivreAdmin(id);
+    throw redirect(303, withFlash(`/admin/catalogue/${apres?.slug ?? id}`, 'Livre enregistré.', 'success'));
   },
 
   delete: async ({ params, locals }) => {
     requireStaff(locals);
-    if (params.id && params.id !== 'nouveau') await deleteBook(params.id);
+    const livre = params.id && params.id !== 'nouveau' ? await resoudreLivreAdmin(params.id) : null;
+    if (livre) await deleteBook(livre.id);
     throw redirect(303, withFlash('/admin/catalogue', 'Livre supprimé.', 'success'));
   }
 };

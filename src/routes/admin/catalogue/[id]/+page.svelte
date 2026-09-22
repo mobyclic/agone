@@ -6,7 +6,7 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner, Lock, LockOpen, Warning } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const b = $derived(data.book);
@@ -43,6 +43,18 @@
     motsCles = motsCles.trim() ? `${motsCles.replace(/[,;\s]+$/, '')}, ${k}` : k;
     dirty = true;
   }
+
+  // Slug : verrouillé par défaut. Le changer casse les liens déjà partagés (réseaux,
+  // newsletters, moteurs de recherche) ; l'ancien slug redirige, mais mieux vaut
+  // ne le faire que sur un livre récent.
+  let slugVerrouille = $state(true);
+  let slugAlerte = $state(false);
+  let slug = $state('');
+  $effect(() => { slug = data.book?.slug ?? ''; slugVerrouille = !data.isNew; slugAlerte = false; });
+  const joursDepuisParution = $derived(
+    data.book?.published_at ? Math.floor((Date.now() - new Date(data.book.published_at).getTime()) / 86400e3) : null
+  );
+  const livreAncien = $derived(joursDepuisParution != null && joursDepuisParution > 60);
 
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
@@ -92,6 +104,37 @@
         <label class="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" name="featured" checked={b?.featured} class="size-4 rounded border-border" /> Mettre en avant (à la une)
         </label>
+
+        <!-- Slug (adresse du livre), verrouillé -->
+        <div class="mt-4 border-t border-border pt-3">
+          <label class={label} for="slug">Adresse (slug)</label>
+          <div class="flex items-stretch">
+            <span class="flex items-center border border-r-0 border-border bg-muted px-2 text-xs text-muted-foreground">/livre/</span>
+            <input id="slug" name="slug" bind:value={slug} readonly={slugVerrouille} placeholder="généré depuis le titre"
+              class="h-10 min-w-0 flex-1 border border-border px-2 font-mono text-xs outline-none focus:border-primary {slugVerrouille ? 'bg-muted/50 text-muted-foreground' : 'bg-background'}" />
+            {#if !data.isNew}
+              <button type="button" onclick={() => (slugVerrouille ? (slugAlerte = !slugAlerte) : ((slugVerrouille = true), (slug = b?.slug ?? '')))}
+                title={slugVerrouille ? 'Déverrouiller pour modifier' : 'Reverrouiller (annule la modification)'}
+                class="grid w-10 shrink-0 place-items-center border border-l-0 border-border {slugVerrouille ? 'text-muted-foreground hover:text-foreground' : 'bg-warning/10 text-warning'}">
+                {#if slugVerrouille}<Lock size={16} weight="bold" />{:else}<LockOpen size={16} weight="bold" />{/if}
+              </button>
+            {/if}
+          </div>
+          {#if slugAlerte && slugVerrouille}
+            <div class="mt-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs leading-relaxed">
+              <p class="flex items-center gap-1.5 font-semibold text-warning"><Warning size={14} weight="bold" /> Modifier l'adresse d'un livre est toujours délicat</p>
+              <p class="mt-1">
+                Les liens déjà diffusés (réseaux sociaux, newsletters, librairies, moteurs de recherche) pointent sur l'adresse actuelle.
+                L'ancienne adresse redirigera vers la nouvelle, mais mieux vaut ne le faire que pour un livre <strong>récent</strong>.
+                {#if livreAncien}<br /><strong>Ce livre est paru il y a {joursDepuisParution} jours.</strong>{/if}
+              </p>
+              <div class="mt-2 flex gap-2">
+                <button type="button" onclick={() => { slugVerrouille = false; slugAlerte = false; }} class="rounded border border-warning bg-warning px-2.5 py-1 font-medium text-white hover:opacity-90">Modifier quand même</button>
+                <button type="button" onclick={() => (slugAlerte = false)} class="rounded border border-border bg-background px-2.5 py-1 hover:bg-muted">Annuler</button>
+              </div>
+            </div>
+          {/if}
+        </div>
       </div>
 
       <div class="rounded-lg border border-border bg-card p-4">

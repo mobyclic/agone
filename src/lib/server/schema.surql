@@ -234,6 +234,8 @@ DEFINE FIELD OVERWRITE primary_collection ON book TYPE option<record<collection>
 -- Mots-clés libres (facette du catalogue). VALUE auto-réparant : les livres
 -- existants (NONE) se remettent d'aplomb à leur prochaine écriture.
 DEFINE FIELD OVERWRITE keywords ON book TYPE array<string> DEFAULT [] VALUE $value ?? [];
+-- Anciens slugs : /livre/<ancien> redirige (301) vers le slug actuel après un renommage.
+DEFINE FIELD OVERWRITE old_slugs ON book TYPE array<string> DEFAULT [] VALUE $value ?? [];
 
 -- RUBRIQUE (thèmes/rayons — taxonomie partagée livres & blog)
 DEFINE TABLE OVERWRITE rubrique SCHEMAFULL;

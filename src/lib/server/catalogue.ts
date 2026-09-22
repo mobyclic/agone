@@ -3,7 +3,7 @@
  * Le graphe : book ->contributed_by-> author (typé par rôle).
  */
 import { query, recId } from './surreal';
-import { uniqueSlug } from './slug';
+import { uniqueSlug, slugify } from './slug';
 import { accentRegex } from '$lib/text';
 import { wpautop } from './wpautop';
 import { sansScripts, notesDeBasDePage } from '$lib/text';
@@ -231,6 +231,21 @@ export interface BookDetail extends BookCard {
   gallery: string[];
   collections: { name: string; slug: string }[];
   contributors: { role: string; people: { name: string; slug: string }[] }[];
+}
+
+/** Slug actuel d'un livre renommé, à partir d'un de ses anciens slugs (redirection). */
+export async function slugActuelLivre(ancien: string): Promise<string | null> {
+  const r = await query<string>(`SELECT VALUE slug FROM book WHERE $s INSIDE (old_slugs ?? []) LIMIT 1`, { s: ancien });
+  return r[0] ?? null;
+}
+
+/** Paramètre d'URL du back-office (slug, ou id brut des anciens liens) → id du livre. */
+export async function resoudreLivreAdmin(param: string): Promise<{ id: string; slug: string } | null> {
+  const parSlug = await query<any>(`SELECT meta::id(id) AS id, slug FROM book WHERE slug = $s LIMIT 1`, { s: param });
+  if (parSlug[0]) return parSlug[0];
+  if (!/^[a-z0-9]{10,}$/i.test(param)) return null;
+  const parId = await query<any>(`SELECT meta::id(id) AS id, slug FROM $id`, { id: recId('book', param) });
+  return parId[0]?.id ? parId[0] : null;
 }
 
 /** `apercu` (staff) : renvoie aussi brouillons et livres archivés, invisibles du public. */
@@ -510,6 +525,8 @@ export interface BookInput {
   price_paper?: number; price_ebook?: number; subscription_price?: number; subscription_end?: string;
   published_at?: string; page_count?: number; width_cm?: number; height_cm?: number; weight_grams?: number;
   stock_qty?: number; featured?: boolean; keywords?: string[];
+  /** Nouveau slug (édition) : l'ancien est gardé dans `old_slugs` pour la redirection. */
+  slug?: string;
   collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string; galleryIds?: string[];
 }
 
@@ -551,9 +568,20 @@ export async function upsertBook(id: string | null, d: BookInput): Promise<strin
 
   if (id) {
     await query(`UPDATE $id SET ${sql}, ${arraysSql}`, { ...vars, id: recId('book', id) });
+    if (d.slug?.trim()) {
+      const actuel = (await query<string>(`SELECT VALUE slug FROM $id`, { id: recId('book', id) }))[0];
+      const voulu = slugify(d.slug);
+      if (voulu && voulu !== actuel) {
+        const nouveau = await uniqueSlug('book', voulu, { excludeId: id });
+        await query(
+          `UPDATE $id SET slug = $s, old_slugs = array::distinct(array::append(old_slugs ?? [], $ancien))`,
+          { id: recId('book', id), s: nouveau, ancien: actuel }
+        );
+      }
+    }
     return id;
   }
-  const slug = await uniqueSlug('book', d.title);
+  const slug = await uniqueSlug('book', d.slug?.trim() || d.title);
   const rows = await query<any>(`CREATE book SET ${sql}, ${arraysSql}, slug = $slug`, { ...vars, slug });
   return String(rows[0].id).replace(/^book:/, '');
 }

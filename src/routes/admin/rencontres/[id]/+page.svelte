@@ -5,7 +5,9 @@
   import EntityPicker from '$lib/components/EntityPicker.svelte';
   import VenueMapPicker from '$lib/components/VenueMapPicker.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, FloppyDisk, Trash, MagnifyingGlass, X, Eye, MapPin, Spinner } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, MagnifyingGlass, X, Eye, MapPin, Spinner, Copy } from 'phosphor-svelte';
+  import { fade, scale } from 'svelte/transition';
+  import { dateVersHeureParis } from '$lib/dates';
 
   let { data, form } = $props();
   const ev = $derived(data.event);
@@ -13,12 +15,36 @@
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
 
-  function toLocal(isoStr?: string) {
-    if (!isoStr) return '';
-    const d = new Date(isoStr);
-    if (Number.isNaN(d.getTime())) return '';
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  // Champs datetime-local à l'heure de Paris (le serveur relit de même), quel que
+  // soit le fuseau du navigateur.
+  const toLocal = (isoStr?: string) => dateVersHeureParis(isoStr);
+
+  // ── Dupliquer : fenêtre pré-remplie (titre, dates, lieu, description) ───
+  let dupOuvert = $state(false);
+  let dupEnvoi = $state(false);
+  let dupTitre = $state('');
+  let dupStart = $state('');
+  let dupEnd = $state('');
+  let dupLieu = $state<{ id: string; label: string } | null>(null);
+  let dupQ = $state('');
+  let dupHits = $state<{ id: string; name: string; city?: string }[]>([]);
+  let dupTimer: ReturnType<typeof setTimeout>;
+  function ouvrirDuplication() {
+    dupTitre = data.event?.title ?? '';
+    dupStart = start;
+    dupEnd = end;
+    dupLieu = venue ? { ...venue } : null;
+    dupQ = ''; dupHits = [];
+    dupOuvert = true;
+  }
+  function dupChercher() {
+    clearTimeout(dupTimer);
+    const t = dupQ.trim();
+    if (t.length < 2) { dupHits = []; return; }
+    dupTimer = setTimeout(async () => {
+      const r = await fetch(`/admin/api/venues?q=${encodeURIComponent(t)}`);
+      dupHits = r.ok ? (await r.json()).results : [];
+    }, 200);
   }
 
   // Cover
@@ -97,7 +123,12 @@
 </a>
 
 <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="pb-24">
-  <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvelle rencontre' : ev?.title}</h2>
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <h2 class="text-xl font-bold">{data.isNew ? 'Nouvelle rencontre' : ev?.title}</h2>
+    {#if !data.isNew}
+      <Button type="button" variant="outline" onclick={ouvrirDuplication}><Copy size={16} /> Dupliquer</Button>
+    {/if}
+  </div>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
@@ -250,4 +281,66 @@
       <Trash size={15} /> Supprimer cette rencontre
     </Button>
   </form>
+{/if}
+
+<!-- Fenêtre « Dupliquer » : nouvelle rencontre avec les mêmes auteurs, livres et
+     couverture ; on ajuste le titre, les dates, le lieu et la description. -->
+{#if dupOuvert && ev}
+  <div class="fixed inset-0 z-[60] grid place-items-center p-4">
+    <button type="button" class="absolute inset-0 cursor-default bg-black/50" aria-label="Fermer" onclick={() => (dupOuvert = false)} transition:fade={{ duration: 150 }}></button>
+    <div class="relative z-10 max-h-[92svh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-background p-6 shadow-2xl" transition:scale={{ duration: 180, start: 0.96, opacity: 0 }}>
+      <button type="button" onclick={() => (dupOuvert = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
+      <h3 class="flex items-center gap-2 text-lg font-bold"><Copy size={18} /> Dupliquer la rencontre</h3>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Les auteurs ({ev.authors?.length ?? 0}), les livres ({ev.books?.length ?? 0}) et la couverture sont repris tels quels.
+      </p>
+      {#if (form as any)?.dupError}<p class="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{(form as any).dupError}</p>{/if}
+
+      <form method="POST" action="?/dupliquer" use:enhance={() => { dupEnvoi = true; return async ({ update }) => { await update(); dupEnvoi = false; }; }} class="mt-4 space-y-4">
+        <label class={label}>Titre <input name="title" bind:value={dupTitre} required class={input} /></label>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class={label}>Début <input name="start_at" type="datetime-local" bind:value={dupStart} class={input} /></label>
+          <label class={label}>Fin <input name="end_at" type="datetime-local" bind:value={dupEnd} class={input} /></label>
+        </div>
+
+        <div>
+          <span class={label}>Lieu</span>
+          <input type="hidden" name="venueId" value={dupLieu?.id ?? ''} />
+          {#if dupLieu}
+            <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+              <span class="flex items-center gap-1.5 text-sm font-medium"><MapPin size={15} class="text-muted-foreground" /> {dupLieu.label}</span>
+              <button type="button" class="text-sm text-link hover:underline" onclick={() => (dupLieu = null)}>Changer</button>
+            </div>
+          {:else}
+            <div class="relative">
+              <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input bind:value={dupQ} oninput={dupChercher} placeholder="Rechercher un lieu existant… (vide = sans lieu)" autocomplete="off" class="{input} pl-9" />
+            </div>
+            {#if dupHits.length}
+              <ul class="mt-1 divide-y divide-border overflow-hidden rounded-md border border-border">
+                {#each dupHits as v (v.id)}
+                  <li><button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/40" onclick={() => { dupLieu = { id: v.id, label: `${v.name}${v.city ? `, ${v.city}` : ''}` }; dupHits = []; dupQ = ''; }}>
+                    <span class="font-medium">{v.name}</span>{#if v.city}<span class="text-xs text-muted-foreground">{v.city}</span>{/if}
+                  </button></li>
+                {/each}
+              </ul>
+            {/if}
+            <p class="mt-1 text-xs text-muted-foreground">Un nouveau lieu se crée ensuite depuis la fiche dupliquée (« Nouveau »).</p>
+          {/if}
+        </div>
+
+        <div>
+          <span class={label}>Description</span>
+          <RichEditor name="body_html" value={ev.body_html ?? ''} minHeight="10rem" />
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" variant="outline" onclick={() => (dupOuvert = false)}>Annuler</Button>
+          <Button type="submit" variant="brand" disabled={dupEnvoi}>
+            {#if dupEnvoi}<Spinner size={16} class="animate-spin" /> Duplication…{:else}<Copy size={16} /> Créer la copie{/if}
+          </Button>
+        </div>
+      </form>
+    </div>
+  </div>
 {/if}

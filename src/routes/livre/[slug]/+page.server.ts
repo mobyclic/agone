@@ -1,6 +1,6 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getBookBySlug, booksByAuthorSlug, booksContributedBySlug, booksInCollectionSlug } from '$lib/server/catalogue';
+import { getBookBySlug, slugActuelLivre, booksByAuthorSlug, booksContributedBySlug, booksInCollectionSlug } from '$lib/server/catalogue';
 import { cartBookSlugs } from '$lib/server/cart';
 import { purchasedBookSlugs } from '$lib/server/order';
 import { isStaff } from '$lib/roles';
@@ -8,7 +8,12 @@ import { upcomingForBook } from '$lib/server/events';
 
 export const load: PageServerLoad = async ({ params, cookies, locals }) => {
   const book = await getBookBySlug(params.slug, !!locals.user && isStaff(locals.user.role));
-  if (!book) throw error(404, { message: 'Livre introuvable' });
+  if (!book) {
+    // Livre renommé : l'ancienne adresse redirige vers la nouvelle.
+    const actuel = await slugActuelLivre(params.slug);
+    if (actuel) throw redirect(301, `/livre/${actuel}`);
+    throw error(404, { message: 'Livre introuvable' });
+  }
 
   const authorSlug = book.authors?.[0]?.slug;
   const collSlug = book.collections?.[0]?.slug;

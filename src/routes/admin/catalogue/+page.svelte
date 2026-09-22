@@ -97,9 +97,9 @@
     <tbody class="divide-y divide-border">
       {#each data.books as b (b.id)}
         {@const etat = bookDerivedState(b)}
-        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/catalogue/${nu(b.id)}`); }}>
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/catalogue/${b.slug || nu(b.id)}`); }}>
           <td class="px-3 py-2.5">
-            <a href="/admin/catalogue/{nu(b.id)}" class="flex items-center gap-3">
+            <a href="/admin/catalogue/{b.slug || nu(b.id)}" class="flex items-center gap-3">
               <span class="h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-muted">
                 {#if b.cover_url}<img src={b.cover_url} alt="" class="size-full object-cover" />{/if}
               </span>
@@ -120,7 +120,8 @@
           <td class="px-3 py-2">
             {#if b.ebook_formats?.length}
               <span class="whitespace-nowrap text-xs font-medium uppercase">{[...new Set(b.ebook_formats)].join(' · ')}</span>
-              {#if b.price_ebook != null}<div class="whitespace-nowrap text-xs text-muted-foreground">{euro(b.price_ebook)}</div>{/if}
+              {#if b.price_ebook != null}<div class="whitespace-nowrap text-xs text-muted-foreground">{euro(b.price_ebook)}</div>
+              {:else}<div class="whitespace-nowrap text-xs text-warning" title="Fichier ebook présent mais aucun prix : non vendable">sans prix</div>{/if}
             {:else if b.price_ebook != null}
               <span class="whitespace-nowrap text-xs text-warning" title="Prix ebook renseigné mais aucun fichier">sans fichier</span>
             {:else}<span class="text-muted-foreground">—</span>{/if}

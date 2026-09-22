@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import { getEventForEdit, saveEvent, deleteEvent, updateVenuePosition, updateVenueContact, type EventInput } from '$lib/server/events';
 import { withFlash } from '$lib/toasts';
+import { heureParisVersDate } from '$lib/dates';
 
 export const load: PageServerLoad = async ({ params }) => {
   if (params.id === 'nouvelle') return { isNew: true, event: null };
@@ -11,11 +12,12 @@ export const load: PageServerLoad = async ({ params }) => {
   return { isNew: false, event };
 };
 
-const iso = (v: string) => {
-  if (!v) return undefined;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-};
+/**
+ * Champ datetime-local → ISO, lu à l'HEURE DE PARIS. `new Date(v)` le lisait dans
+ * le fuseau du serveur (UTC sur Railway) : une rencontre saisie à 20:30 était
+ * enregistrée à 20:30 UTC, soit 22:30 à Paris.
+ */
+const iso = (v: string) => (v ? heureParisVersDate(v)?.toISOString() : undefined);
 const ids = (v: FormDataEntryValue | null): string[] => {
   try {
     const a = JSON.parse(String(v ?? '[]'));
@@ -80,6 +82,30 @@ export const actions: Actions = {
     const editId = params.id && params.id !== 'nouvelle' ? params.id : null;
     const id = await saveEvent(editId, input);
     throw redirect(303, withFlash(`/admin/rencontres/${id}`, 'Rencontre enregistrée.', 'success'));
+  },
+
+  /**
+   * Duplique la rencontre : mêmes auteurs, livres et couverture ; titre, dates,
+   * lieu et description repris du formulaire de la fenêtre « Dupliquer ».
+   */
+  dupliquer: async ({ request, params, locals }) => {
+    requireStaff(locals);
+    const source = params.id && params.id !== 'nouvelle' ? await getEventForEdit(params.id) : null;
+    if (!source) return fail(404, { error: 'Rencontre introuvable.' });
+    const fd = await request.formData();
+    const S = (k: string) => String(fd.get(k) ?? '').trim();
+    if (!S('title')) return fail(400, { dupError: 'Le titre est requis.' });
+    const id = await saveEvent(null, {
+      title: S('title'),
+      body_html: S('body_html') || undefined,
+      coverId: source.cover_id ?? undefined,
+      start_at: iso(S('start_at')),
+      end_at: iso(S('end_at')),
+      venueId: S('venueId') || undefined,
+      authorIds: (source.authors ?? []).map((a: any) => String(a.id).replace(/^author:/, '')),
+      bookIds: (source.books ?? []).map((b: any) => String(b.id).replace(/^book:/, ''))
+    });
+    throw redirect(303, withFlash(`/admin/rencontres/${id}`, 'Rencontre dupliquée — vérifiez puis enregistrez si besoin.', 'success'));
   },
 
   delete: async ({ params, locals }) => {

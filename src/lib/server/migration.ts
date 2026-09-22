@@ -774,12 +774,23 @@ async function termsByPost(p: string, postIds: number[], taxonomy: string): Prom
  * téléchargée, optimisée en webp 800 px, déposée sur R2, rattachée via un `media`.
  */
 async function importerCouverture(bookPid: string, fichier: string, isbn: string | undefined, wpId: number, titre: string) {
+  const input = await telechargerCouverture(fichier);
+  const base = isbn && isbn.replace(/[^0-9Xx]/g, '') ? bookCoverKey(isbn) : `livres/couvertures/wp-${wpId}`;
+  const up = await uploadOptimizedImage({ keyBase: base, input, optim: { maxWidth: 800 } });
+  const rows = await query<any>(`CREATE media CONTENT $m`, {
+    m: { key: up.key, url: up.url, kind: 'cover', mime: up.mime, filename: up.key.split('/').pop(), size: up.size, alt: titre }
+  });
+  // query() rend l'id en « media:xxx » : il faut un RecordId pour le champ record<media>.
+  await query(`UPDATE $id SET cover = $m`, { id: recId('book', bookPid), m: recId('media', String(rows[0].id).replace(/^media:/, '')) });
+}
+
+/** Télécharge l'image à la une depuis agone.org et vérifie que c'est bien une image. */
+async function telechargerCouverture(fichier: string): Promise<Buffer> {
   const url = `https://agone.org/wp-content/uploads/${fichier.split('/').map(encodeURIComponent).join('/')}`;
-  // En-têtes de navigateur : sans eux, certains pare-feu applicatifs renvoient une
-  // page HTML (code 200) aux requêtes de serveurs — que sharp refusait ensuite
-  // (« unsupported image format »).
+  // User-Agent de navigateur ordinaire : un UA « robot » (compatible; …; +url) est
+  // refusé en 403 par l'hébergeur d'agone.org (SiteGround).
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgoneSync/1.0; +https://agone.org)', Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' }
+    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36', Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} sur ${fichier}`);
   const input = Buffer.from(await res.arrayBuffer());
@@ -789,16 +800,16 @@ async function importerCouverture(bookPid: string, fichier: string, isbn: string
   const image = sig[0] === 0x89 && sig[1] === 0x50 || sig[0] === 0xff && sig[1] === 0xd8 || sig.toString('ascii', 0, 3) === 'GIF'
     || sig.toString('ascii', 8, 12) === 'WEBP' || sig.toString('ascii', 4, 8) === 'ftyp';
   if (!image) {
+    const html = input.toString('utf8');
+    // Défi anti-robots de SiteGround (page ~235 octets avec meta refresh) : servi
+    // aux IP de serveurs comme celles de Railway, impossible à franchir d'ici.
+    if (/sgcaptcha|http-equiv=["']?refresh/i.test(html) || (type.includes('text/html') && input.length < 1000)) {
+      throw new Error(`agone.org bloque les serveurs (défi anti-robots SiteGround) — lancer « bun run covers » depuis un poste de travail`);
+    }
     const debut = input.subarray(0, 60).toString('utf8').replace(/\s+/g, ' ').trim();
     throw new Error(`réponse non-image pour ${fichier} (${type}, ${input.length} octets : « ${debut} »)`);
   }
-  const base = isbn && isbn.replace(/[^0-9Xx]/g, '') ? bookCoverKey(isbn) : `livres/couvertures/wp-${wpId}`;
-  const up = await uploadOptimizedImage({ keyBase: base, input, optim: { maxWidth: 800 } });
-  const rows = await query<any>(`CREATE media CONTENT $m`, {
-    m: { key: up.key, url: up.url, kind: 'cover', mime: up.mime, filename: up.key.split('/').pop(), size: up.size, alt: titre }
-  });
-  // query() rend l'id en « media:xxx » : il faut un RecordId pour le champ record<media>.
-  await query(`UPDATE $id SET cover = $m`, { id: recId('book', bookPid), m: recId('media', String(rows[0].id).replace(/^media:/, '')) });
+  return input;
 }
 
 /**
@@ -847,10 +858,16 @@ export async function importCoversEtCollections(opts: ImportOpts = {}): Promise<
       const fichier = fichiers.get(Number(m._thumbnail_id));
       if (fichier) {
         touche = true;
-        if (!dryRun) {
-          try { await importerCouverture(l.pid, fichier, l.isbn_paper ?? undefined, wpId, l.title); created++; }
-          catch (e) { skipped++; warnings.push(`« ${l.title} » : couverture non récupérée (${e instanceof Error ? e.message.split('\n')[0] : 'erreur'})`); }
-        } else created++;
+        try {
+          // Simulation : on télécharge quand même (sans convertir ni déposer), pour
+          // qu'un fichier inaccessible se voie AVANT l'import réel.
+          if (dryRun) await telechargerCouverture(fichier);
+          else await importerCouverture(l.pid, fichier, l.isbn_paper ?? undefined, wpId, l.title);
+          created++;
+        } catch (e) {
+          skipped++;
+          warnings.push(`« ${l.title} » : couverture non récupérée (${e instanceof Error ? e.message.split('\n')[0] : 'erreur'})`);
+        }
       }
     }
     if (l.sans_coll) {
@@ -869,7 +886,9 @@ export async function importCoversEtCollections(opts: ImportOpts = {}): Promise<
     }
     if (!touche) skipped++;
   }
-  warnings.unshift(`Créés = couvertures récupérées ; mis à jour = collections renseignées ; ignorés = rien à récupérer sur WordPress.`);
+  warnings.unshift(dryRun
+    ? `Simulation — créés = couvertures téléchargeables (rien n'a été enregistré) ; mis à jour = collections à renseigner ; ignorés = rien à récupérer ou échec.`
+    : `Créés = couvertures récupérées ; mis à jour = collections renseignées ; ignorés = rien à récupérer ou échec.`);
   return { type: 'covers', fetched: livres.length, created, updated, skipped, warnings: warnings.slice(0, 30), dryRun, fullScan: true };
 }
 
