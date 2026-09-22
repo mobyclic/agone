@@ -105,10 +105,17 @@
     <!-- Récapitulatif -->
     <aside use:colonneCollante class="h-fit rounded-lg border border-border bg-card p-5">
       <h2 class="eyebrow mb-3">Votre commande</h2>
-      <ul class="space-y-2 text-sm">
+      <ul class="space-y-3 text-sm">
         {#each data.cart.lines as l (l.id + l.format)}
-          <li class="flex justify-between gap-2">
-            <span class="min-w-0"><span class="line-clamp-1">{l.title}</span><span class="text-xs text-muted-foreground">{FORMAT[l.format] ?? l.format} × {l.qty}</span></span>
+          <li class="flex gap-3">
+            <a href="/livre/{l.slug}" class="block h-[4.5rem] w-12 shrink-0 overflow-hidden border border-border bg-muted">
+              {#if l.cover_url}<img src={l.cover_url} alt="" class="size-full object-cover" />{/if}
+            </a>
+            <span class="min-w-0 flex-1">
+              <span class="line-clamp-2 font-medium leading-snug">{l.title}</span>
+              {#if l.authors?.length}<span class="mt-0.5 block text-xs uppercase tracking-wide text-muted-foreground">{l.authors.join(', ')}</span>{/if}
+              <span class="mt-0.5 block text-xs text-muted-foreground">{FORMAT[l.format] ?? l.format} × {l.qty}</span>
+            </span>
             <span class="shrink-0 font-medium">{eur(l.line_total)}</span>
           </li>
         {/each}

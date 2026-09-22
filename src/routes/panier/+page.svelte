@@ -33,7 +33,7 @@
           </a>
           <div class="min-w-0 flex-1">
             <a href="/livre/{l.slug}" class="font-display font-semibold leading-snug hover:text-link">{l.title}</a>
-            {#if l.author}<p class="text-sm text-link">{l.author}</p>{/if}
+            {#if l.authors?.length}<p class="text-sm text-link">{l.authors.join(', ')}</p>{:else if l.author}<p class="text-sm text-link">{l.author}</p>{/if}
             <p class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{FORMAT[l.format] ?? l.format} · {eur(l.unit_price)}</p>
           </div>
 

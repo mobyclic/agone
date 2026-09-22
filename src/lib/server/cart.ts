@@ -29,7 +29,7 @@ export function clearPromoCode(cookies: Cookies) {
 
 export interface CartItem { id: string; format: string; qty: number }
 export interface CartLine {
-  id: string; slug: string; title: string; cover_url?: string; author?: string;
+  id: string; slug: string; title: string; cover_url?: string; author?: string; authors?: string[];
   format: string; qty: number; unit_price: number; line_total: number; weight?: number;
 }
 export interface CartDetails {
@@ -110,7 +110,7 @@ export async function cartDetails(cookies: Cookies): Promise<CartDetails> {
     if (unit == null) continue;
     const line_total = r2(unit * it.qty);
     const weight = it.format === 'epub' ? 0 : (b.weight_grams ?? 0);
-    lines.push({ id: it.id, slug: b.slug, title: b.title, cover_url: b.cover_url ?? undefined, author: (b.a_names ?? [])[0] ?? undefined, format: it.format, qty: it.qty, unit_price: unit, line_total, weight });
+    lines.push({ id: it.id, slug: b.slug, title: b.title, cover_url: b.cover_url ?? undefined, author: (b.a_names ?? [])[0] ?? undefined, authors: (b.a_names ?? []).filter(Boolean), format: it.format, qty: it.qty, unit_price: unit, line_total, weight });
     subtotal += line_total; item_count += it.qty;
     total_weight += weight * it.qty;
     if (it.format === 'epub') has_ebook = true; else has_physical = true;
