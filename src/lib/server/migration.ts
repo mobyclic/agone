@@ -19,6 +19,7 @@ import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
 import { wpautop } from './wpautop';
 import { extraitPropre } from '$lib/text';
+import { uploadOptimizedImage, bookCoverKey } from './storage';
 
 export interface ImportResult {
   type: string;
@@ -619,6 +620,8 @@ const BOOK_META = [
   'sous_titre', 'infos_additionnelles', 'titre_originale', 'langue_originale',
   'isbn_papier', 'isbn_digital', 'prix_papier', 'prix_digital', 'tarif_souscription',
   'nombre_de_pages', 'date_de_publication', 'qte_stock', 'focus',
+  'date_souscription', 'date_de_publication_originale', 'cover_largeur', 'cover_hauteur', 'titre_alternatif',
+  '_thumbnail_id', '_yoast_wpseo_primary_collection',
   'livre_auteurs', 'livre_traducteurs', 'livre_auteurs_preface', 'livre_auteurs_postface', 'livre_auteurs_divers'
 ];
 const ROLE_FIELDS: [string, string][] = [
@@ -646,11 +649,28 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
     [...ids, ...BOOK_META]
   ), 'post_id') : new Map();
   const authMap = await legacyMap('author');
+  const collMap = await legacyMap('collection', 'legacy_term_id');
+  const collTerms = await termsByPost(p, ids, 'collection');
+  // Couvertures : fichier de l'image à la une (pièce jointe WP) des livres du lot.
+  const thumbIds = [...new Set([...meta.values()].map((m) => Number(m._thumbnail_id)).filter((x) => x > 0))];
+  const fichiers = new Map<number, string>();
+  if (thumbIds.length) {
+    const rows = await wpQuery<any>(
+      `SELECT post_id, meta_value FROM ${p}postmeta WHERE meta_key = '_wp_attached_file' AND post_id IN (${thumbIds.map(() => '?').join(',')})`,
+      thumbIds
+    );
+    for (const r of rows) if (r.meta_value) fichiers.set(Number(r.post_id), String(r.meta_value));
+  }
+  let couvertures = 0;
 
   for (const b of posts) {
     const wpId = Number(b.ID);
     const m = meta.get(wpId) ?? {};
     const pubDate = wpDate8(m.date_de_publication);
+    // Collection : principale Yoast si renseignée, sinon la première du livre.
+    const colls = (collTerms.get(wpId) ?? []).map((t) => collMap.get(t)).filter((x): x is string => !!x);
+    const primTerm = collMap.get(Number(m._yoast_wpseo_primary_collection));
+    const primaire = primTerm && colls.includes(primTerm) ? primTerm : colls[0];
     const fields = {
       title: String(b.post_title || '').trim() || '(sans titre)',
       subtitle: (m.sous_titre || '').trim() || undefined,
@@ -668,7 +688,13 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
       published_at: pubDate,
       page_count: num(m.nombre_de_pages) != null ? Math.round(num(m.nombre_de_pages)!) : undefined,
       stock_qty: num(m.qte_stock) != null ? Math.round(num(m.qte_stock)!) : 0,
-      featured: ['1', 'true', 'yes', 'on'].includes(String(m.focus ?? '').toLowerCase())
+      featured: ['1', 'true', 'yes', 'on'].includes(String(m.focus ?? '').toLowerCase()),
+      // Champs que le premier import posait mais que la synchro oubliait.
+      subscription_end: wpDate8(m.date_souscription),
+      published_original: wpDate8(m.date_de_publication_originale),
+      width_cm: num(m.cover_largeur),
+      height_cm: num(m.cover_hauteur),
+      title_alt: (m.titre_alternatif || '').trim() || undefined
     };
     try {
       const ex = await query<any>(`SELECT meta::id(id) AS pid FROM book WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
@@ -686,6 +712,25 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
         bookPid = String(rows[0].id).replace(/^book:/, '');
         created++;
       }
+      // Collections : seulement si WordPress en donne (ne pas effacer une saisie faite ici).
+      if (colls.length) {
+        await query(`UPDATE $id SET collections = $c, primary_collection = $p`, {
+          id: recId('book', bookPid), c: colls.map((c) => recId('collection', c)), p: recId('collection', primaire!)
+        });
+      }
+      // Couverture : récupérée une seule fois (livre encore sans couverture).
+      const fichier = fichiers.get(Number(m._thumbnail_id));
+      if (fichier) {
+        const sans = await query<any>(`SELECT VALUE cover = NONE FROM $id`, { id: recId('book', bookPid) });
+        if (sans[0]) {
+          try {
+            await importerCouverture(bookPid, fichier, fields.isbn_paper, wpId, fields.title);
+            couvertures++;
+          } catch (e) {
+            warnings.push(`Couverture du livre WP #${wpId} non récupérée : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
+          }
+        }
+      }
       // Contributions (arêtes typées) : on resynchronise.
       await query(`DELETE contributed_by WHERE in = $b`, { b: recId('book', bookPid) });
       for (const [field, role] of ROLE_FIELDS) {
@@ -702,7 +747,115 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
       warnings.push(`Livre WP #${wpId} ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
     }
   }
+  if (couvertures) warnings.unshift(`${couvertures} couverture(s) récupérée(s).`);
   return { type: 'books', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
+}
+
+/** Termes d'une taxonomie par post (tous, pas seulement le premier). */
+async function termsByPost(p: string, postIds: number[], taxonomy: string): Promise<Map<number, number[]>> {
+  const out = new Map<number, number[]>();
+  if (!postIds.length) return out;
+  const rows = await wpQuery<any>(
+    `SELECT tr.object_id AS post_id, tt.term_id FROM ${p}term_relationships tr
+       JOIN ${p}term_taxonomy tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+      WHERE tt.taxonomy = ? AND tr.object_id IN (${postIds.map(() => '?').join(',')})`,
+    [taxonomy, ...postIds]
+  );
+  for (const r of rows) {
+    const k = Number(r.post_id);
+    if (!out.has(k)) out.set(k, []);
+    out.get(k)!.push(Number(r.term_id));
+  }
+  return out;
+}
+
+/**
+ * Couverture d'un livre depuis l'image à la une WordPress (publique sur agone.org) :
+ * téléchargée, optimisée en webp 800 px, déposée sur R2, rattachée via un `media`.
+ */
+async function importerCouverture(bookPid: string, fichier: string, isbn: string | undefined, wpId: number, titre: string) {
+  const res = await fetch(`https://agone.org/wp-content/uploads/${fichier.split('/').map(encodeURIComponent).join('/')}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const input = Buffer.from(await res.arrayBuffer());
+  const base = isbn && isbn.replace(/[^0-9Xx]/g, '') ? bookCoverKey(isbn) : `livres/couvertures/wp-${wpId}`;
+  const up = await uploadOptimizedImage({ keyBase: base, input, optim: { maxWidth: 800 } });
+  const rows = await query<any>(`CREATE media CONTENT $m`, {
+    m: { key: up.key, url: up.url, kind: 'cover', mime: up.mime, filename: up.key.split('/').pop(), size: up.size, alt: titre }
+  });
+  // query() rend l'id en « media:xxx » : il faut un RecordId pour le champ record<media>.
+  await query(`UPDATE $id SET cover = $m`, { id: recId('book', bookPid), m: recId('media', String(rows[0].id).replace(/^media:/, '')) });
+}
+
+/**
+ * Rattrapage : couvertures et collections des livres migrés qui n'en ont pas
+ * (livres importés par une synchro antérieure à leur prise en charge — le curseur
+ * les a déjà dépassés, un import incrémental ne les reverrait pas). Pas de curseur :
+ * on repart à chaque fois des livres encore incomplets.
+ */
+export async function importCoversEtCollections(opts: ImportOpts = {}): Promise<ImportResult> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 5000);
+  const dryRun = !!opts.dryRun;
+  const p = wpPrefix();
+  const warnings: string[] = [];
+  let created = 0, updated = 0, skipped = 0;
+
+  const livres = await query<any>(
+    `SELECT meta::id(id) AS pid, legacy_wp_id, title, isbn_paper, cover = NONE AS sans_couv, primary_collection = NONE AS sans_coll
+       FROM book WHERE legacy_wp_id != NONE AND (cover = NONE OR primary_collection = NONE) LIMIT $l`,
+    { l: limit }
+  );
+  const ids = livres.map((l) => Number(l.legacy_wp_id));
+  if (!ids.length) return { type: 'covers', fetched: 0, created, updated, skipped, warnings, dryRun, fullScan: true };
+
+  const meta = metaIndex(await wpQuery<any>(
+    `SELECT post_id, meta_key, meta_value FROM ${p}postmeta
+      WHERE post_id IN (${ids.map(() => '?').join(',')}) AND meta_key IN ('_thumbnail_id','_yoast_wpseo_primary_collection')`,
+    ids
+  ), 'post_id');
+  const thumbIds = [...new Set([...meta.values()].map((m) => Number(m._thumbnail_id)).filter((x) => x > 0))];
+  const fichiers = new Map<number, string>();
+  if (thumbIds.length) {
+    const rows = await wpQuery<any>(
+      `SELECT post_id, meta_value FROM ${p}postmeta WHERE meta_key = '_wp_attached_file' AND post_id IN (${thumbIds.map(() => '?').join(',')})`,
+      thumbIds
+    );
+    for (const r of rows) if (r.meta_value) fichiers.set(Number(r.post_id), String(r.meta_value));
+  }
+  const collMap = await legacyMap('collection', 'legacy_term_id');
+  const collTerms = await termsByPost(p, ids, 'collection');
+
+  for (const l of livres) {
+    const wpId = Number(l.legacy_wp_id);
+    const m = meta.get(wpId) ?? {};
+    let touche = false;
+    if (l.sans_couv) {
+      const fichier = fichiers.get(Number(m._thumbnail_id));
+      if (fichier) {
+        touche = true;
+        if (!dryRun) {
+          try { await importerCouverture(l.pid, fichier, l.isbn_paper ?? undefined, wpId, l.title); created++; }
+          catch (e) { skipped++; warnings.push(`« ${l.title} » : couverture non récupérée (${e instanceof Error ? e.message.split('\n')[0] : 'erreur'})`); }
+        } else created++;
+      }
+    }
+    if (l.sans_coll) {
+      const colls = (collTerms.get(wpId) ?? []).map((t) => collMap.get(t)).filter((x): x is string => !!x);
+      if (colls.length) {
+        touche = true;
+        const prim = collMap.get(Number(m._yoast_wpseo_primary_collection));
+        const primaire = prim && colls.includes(prim) ? prim : colls[0];
+        if (!dryRun) {
+          await query(`UPDATE $id SET collections = $c, primary_collection = $p`, {
+            id: recId('book', l.pid), c: colls.map((c) => recId('collection', c)), p: recId('collection', primaire)
+          });
+        }
+        updated++;
+      }
+    }
+    if (!touche) skipped++;
+  }
+  warnings.unshift(`Créés = couvertures récupérées ; mis à jour = collections renseignées ; ignorés = rien à récupérer sur WordPress.`);
+  return { type: 'covers', fetched: livres.length, created, updated, skipped, warnings: warnings.slice(0, 30), dryRun, fullScan: true };
 }
 
 /* ————————————————————— Rencontres (+ lieux) ————————————————————— */

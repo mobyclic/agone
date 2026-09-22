@@ -119,7 +119,7 @@
     <div class="grid gap-y-12 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
       {#if data.forthcoming.length}
         <div>
-          <SectionHead title="À paraître" href="/catalogue" more="Tous les livres" />
+          <SectionHead title="À paraître" href="/catalogue?parution=a-paraitre" more="Tous les livres" />
           <div class="grid grid-cols-3 gap-x-5 gap-y-8">
             {#each data.forthcoming.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
           </div>

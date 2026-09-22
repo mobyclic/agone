@@ -13,6 +13,7 @@
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import BookCard from '$lib/components/BookCard.svelte';
+  import ApercuLivre from '$lib/components/ApercuLivre.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import { colonneCollante } from '$lib/client/sticky';
   import { deburr } from '$lib/text';
@@ -147,6 +148,17 @@
     return () => io.disconnect();
   });
 
+  // Aperçu : un clic sur une couverture ouvre la fenêtre ; Ctrl/Cmd/Maj-clic ou
+  // clic milieu gardent le comportement normal du lien (ouvrir la fiche).
+  let apercu = $state<number | null>(null);
+  const livresAffiches = $derived(resultats.map((l) => l.b));
+  function ouvrirApercu(e: MouseEvent, i: number) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!(e.target as HTMLElement).closest('a')) return;
+    e.preventDefault();
+    apercu = i;
+  }
+
   const nomCollection = (slug: string) => optionsCollections.find((c) => c.slug === slug)?.name ?? slug;
   const titreFacette = 'mb-2.5 font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground';
 </script>
@@ -263,8 +275,9 @@
 
       {#if resultats.length}
         <div class="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {#each resultats.slice(0, affiches) as l (l.b.slug)}
-            <BookCard book={l.b} />
+          {#each resultats.slice(0, affiches) as l, i (l.b.slug)}
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <div onclick={(e) => ouvrirApercu(e, i)}><BookCard book={l.b} /></div>
           {/each}
         </div>
         {#if affiches < resultats.length}<div bind:this={sentinelle} class="h-px"></div>{/if}
@@ -277,3 +290,5 @@
     </div>
   </div>
 </section>
+
+<ApercuLivre livres={livresAffiches} bind:index={apercu} />

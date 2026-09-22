@@ -13,7 +13,7 @@
  */
 import { getSetting, setSetting } from './site';
 import {
-  importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents,
+  importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents, importCoversEtCollections,
   type ImportResult, type ImportOpts
 } from './migration';
 
@@ -21,7 +21,8 @@ import {
  * Ordre de synchronisation — il n'est PAS arbitraire : chaque étape s'appuie sur
  * ce que les précédentes ont posé.
  *   1. Auteurs      — aucune dépendance.
- *   2. Livres       — arêtes contributed_by → auteurs.
+ *   2. Livres       — arêtes contributed_by → auteurs ; couverture et collection.
+ *   2b. Couvertures & collections manquantes (rattrapage, sans curseur).
  *   3. Articles     — liés aux auteurs et aux livres.
  *   4. Rencontres   — auteurs, livres, lieux.
  *   5. Utilisateurs — comptes clients.
@@ -30,6 +31,8 @@ import {
 const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult>; limit?: number }[] = [
   { key: 'authors', label: 'Auteurs', fn: importAuthors },
   { key: 'books', label: 'Livres', fn: importBooks },
+  // Rattrapage des couvertures / collections manquantes (livres déjà dépassés par le curseur).
+  { key: 'covers', label: 'Couvertures & collections', fn: importCoversEtCollections, limit: 1000 },
   { key: 'articles', label: 'Articles', fn: importArticles },
   { key: 'events', label: 'Rencontres', fn: importEvents },
   // Comptes : WordPress ne date pas leurs modifications → balayage complet en un seul lot.

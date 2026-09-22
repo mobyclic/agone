@@ -4,7 +4,7 @@
   import { invalidateAll } from '$app/navigation';
   import type { JobSynchro } from '$lib/server/sync-job';
   import { Button } from '$lib/components/ui/button';
-  import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning, Spinner, CheckCircle, XCircle, ArrowRight } from 'phosphor-svelte';
+  import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning, Spinner, CheckCircle, XCircle, ArrowRight, Image as ImageIcon } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -41,10 +41,11 @@
     return { label: `Dernier import ${dateHeure(st.at)} : ${st.created} créé(s), ${st.updated} mis à jour${q}`, tone: 'text-muted-foreground' };
   }
 
-  // Même ordre que le serveur (ETAPES) : chaque étape s'appuie sur les précédentes.
+  // Même ordre que le serveur (ETAPES de sync-job.ts) : chaque étape s'appuie sur les précédentes.
   const etapes = [
     { key: 'authors', icon: UsersThree, title: 'Auteurs', desc: 'Prénom, nom, slug.' },
-    { key: 'books', icon: BookOpen, title: 'Livres', desc: 'Fiches (ISBN, prix, dates, stock) + contributions → auteurs.' },
+    { key: 'books', icon: BookOpen, title: 'Livres', desc: 'Fiches (ISBN, prix, dates, stock) + contributions → auteurs, couverture, collection.' },
+    { key: 'covers', icon: ImageIcon, title: 'Couvertures & collections', desc: 'Rattrapage : livres encore sans couverture ou sans collection.' },
     { key: 'articles', icon: Article, title: 'Articles', desc: 'Antichambre : corps, rubrique, auteurs, livres, LettrInfo.' },
     { key: 'events', icon: CalendarDots, title: 'Rencontres', desc: 'Lieux géolocalisés, auteurs et livres liés.' },
     { key: 'users', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes.' },
