@@ -13,7 +13,7 @@
   import { fade, fly, scale } from 'svelte/transition';
   import { authorList, euros, isForthcoming } from '$lib/labels';
   import { trackAddToCart, itemId } from '$lib/analytics';
-  import { X, CaretLeft, CaretRight, BookOpen, FileText, HandCoins, CheckCircle, CircleNotch, ArrowRight } from 'phosphor-svelte';
+  import { X, CaretLeft, CaretRight, BookOpen, FileText, HandCoins, CheckCircle, CircleNotch } from 'phosphor-svelte';
 
   interface Livre {
     id: string; slug: string; title: string; subtitle?: string; cover_url?: string;
@@ -109,17 +109,11 @@
   <div class="fixed inset-0 z-[70] grid place-items-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Aperçu : {livre.title}">
     <button type="button" class="absolute inset-0 cursor-default bg-black/60" aria-label="Fermer" onclick={fermer} transition:fade={{ duration: 150 }}></button>
 
-    <!-- Flèches (hors du cadre sur grand écran) -->
-    <button type="button" onclick={() => aller(-1)} disabled={index === 0} aria-label="Livre précédent"
-      class="absolute left-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center bg-background text-foreground shadow-lg transition-opacity hover:bg-foreground hover:text-background disabled:pointer-events-none disabled:opacity-0 sm:left-5 sm:size-12">
-      <CaretLeft size={22} weight="bold" />
-    </button>
-    <button type="button" onclick={() => aller(1)} disabled={index === livres.length - 1} aria-label="Livre suivant"
-      class="absolute right-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center bg-background text-foreground shadow-lg transition-opacity hover:bg-foreground hover:text-background disabled:pointer-events-none disabled:opacity-0 sm:right-5 sm:size-12">
-      <CaretRight size={22} weight="bold" />
-    </button>
-
-    <div class="relative z-10 max-h-[92svh] w-full max-w-4xl overflow-y-auto border border-border bg-background shadow-2xl"
+    <!-- Fiche encadrée de ses deux flèches (la première grisée sur le premier livre,
+         la dernière sur le dernier). -->
+    <div class="relative z-10 flex w-full max-w-[64rem] items-center gap-2 sm:gap-4">
+    {@render fleche(-1)}
+    <div class="relative max-h-[92svh] min-w-0 flex-1 overflow-y-auto border border-border bg-background shadow-2xl"
       transition:scale={{ duration: 200, start: 0.96, opacity: 0 }}>
       <button type="button" onclick={fermer} class="absolute right-3 top-3 z-10 grid size-9 place-items-center bg-background/90 text-muted-foreground hover:text-foreground" aria-label="Fermer">
         <X size={20} />
@@ -159,10 +153,9 @@
               {/if}
             </div>
 
-            <!-- Achat -->
-            {#if formats.length}
-              <div class="mt-5 flex flex-wrap gap-2.5">
-                {#each formats as f (f.key)}
+            <!-- Achat + accès à la fiche, sur une même ligne -->
+            <div class="mt-5 flex flex-wrap items-center gap-2.5">
+              {#each formats as f (f.key)}
                   <form method="POST" action="/panier?/add" use:enhance={ajouter}>
                     <input type="hidden" name="id" value={livre.id} />
                     <input type="hidden" name="format" value={f.key} />
@@ -178,19 +171,27 @@
                     </button>
                   </form>
                 {/each}
-              </div>
-              {#if ajoute}
-                <a href="/panier" class="link mt-2 inline-block text-sm">Voir mon panier →</a>
-              {/if}
+              <a href="/livre/{livre.slug}" class="inline-flex items-center border-2 border-foreground bg-foreground px-3.5 py-2 font-display text-sm font-bold uppercase tracking-wide text-background hover:border-link hover:bg-link">
+                Voir le livre
+              </a>
+            </div>
+            {#if ajoute}
+              <a href="/panier" class="link mt-2 inline-block text-sm">Voir mon panier →</a>
             {/if}
-
-            <a href="/livre/{livre.slug}" class="mt-6 inline-flex items-center gap-2 bg-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-background hover:bg-link">
-              Voir la fiche <ArrowRight size={16} weight="bold" />
-            </a>
             <p class="mt-4 text-xs text-muted-foreground">{(index ?? 0) + 1} / {livres.length} · ← → pour parcourir</p>
           </div>
         </div>
       {/key}
     </div>
+    {@render fleche(1)}
+    </div>
   </div>
 {/if}
+
+{#snippet fleche(delta: number)}
+  {@const off = delta < 0 ? index === 0 : index === livres.length - 1}
+  <button type="button" onclick={() => aller(delta)} disabled={off} aria-label={delta < 0 ? 'Livre précédent' : 'Livre suivant'}
+    class="grid size-10 shrink-0 place-items-center bg-background text-foreground shadow-lg transition-colors hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:bg-background/40 disabled:text-foreground/30 disabled:shadow-none sm:size-12">
+    {#if delta < 0}<CaretLeft size={22} weight="bold" />{:else}<CaretRight size={22} weight="bold" />{/if}
+  </button>
+{/snippet}
