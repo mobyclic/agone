@@ -774,9 +774,24 @@ async function termsByPost(p: string, postIds: number[], taxonomy: string): Prom
  * téléchargée, optimisée en webp 800 px, déposée sur R2, rattachée via un `media`.
  */
 async function importerCouverture(bookPid: string, fichier: string, isbn: string | undefined, wpId: number, titre: string) {
-  const res = await fetch(`https://agone.org/wp-content/uploads/${fichier.split('/').map(encodeURIComponent).join('/')}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const url = `https://agone.org/wp-content/uploads/${fichier.split('/').map(encodeURIComponent).join('/')}`;
+  // En-têtes de navigateur : sans eux, certains pare-feu applicatifs renvoient une
+  // page HTML (code 200) aux requêtes de serveurs — que sharp refusait ensuite
+  // (« unsupported image format »).
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgoneSync/1.0; +https://agone.org)', Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} sur ${fichier}`);
   const input = Buffer.from(await res.arrayBuffer());
+  const type = res.headers.get('content-type') ?? '?';
+  // Signatures PNG / JPEG / GIF / WebP / AVIF-HEIF : on ne passe à sharp qu'une vraie image.
+  const sig = input.subarray(0, 12);
+  const image = sig[0] === 0x89 && sig[1] === 0x50 || sig[0] === 0xff && sig[1] === 0xd8 || sig.toString('ascii', 0, 3) === 'GIF'
+    || sig.toString('ascii', 8, 12) === 'WEBP' || sig.toString('ascii', 4, 8) === 'ftyp';
+  if (!image) {
+    const debut = input.subarray(0, 60).toString('utf8').replace(/\s+/g, ' ').trim();
+    throw new Error(`réponse non-image pour ${fichier} (${type}, ${input.length} octets : « ${debut} »)`);
+  }
   const base = isbn && isbn.replace(/[^0-9Xx]/g, '') ? bookCoverKey(isbn) : `livres/couvertures/wp-${wpId}`;
   const up = await uploadOptimizedImage({ keyBase: base, input, optim: { maxWidth: 800 } });
   const rows = await query<any>(`CREATE media CONTENT $m`, {
