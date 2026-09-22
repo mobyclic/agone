@@ -197,9 +197,9 @@
       {/if}
 
       <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-4">
-        <label class="flex items-center gap-1.5 text-sm" title="Plafond de sécurité par étape : nombre maximum d’enregistrements traités en une fois.">
-          Max par étape
-          <input name="limit" type="number" value="2000" min="1" max="5000" disabled={enCours} class="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50" />
+        <label class="flex items-center gap-1.5 text-sm" title="Nombre d’enregistrements lus par lot ; les lots s’enchaînent jusqu’à tout avoir lu.">
+          Taille des lots
+          <input name="limit" type="number" value="1000" min="50" max="5000" disabled={enCours} class="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50" />
         </label>
         <label class="flex items-center gap-1.5 text-sm">
           <input type="checkbox" name="dryRun" checked disabled={enCours} class="size-4 rounded border-border" /> Simulation
@@ -215,7 +215,7 @@
     <p class="mt-3 max-w-3xl text-xs text-muted-foreground">
       Par défaut, seuls les enregistrements <strong>modifiés depuis le dernier import</strong> sont repris
       (date <span class="font-mono">post_modified_gmt</span> de WordPress ; les comptes, non datés, sont toujours balayés en entier).
-      « Max par étape » n'est qu'un plafond de sécurité : si une étape l'atteint, relancer reprend là où elle s'est arrêtée.
+      Chaque étape lit par lots successifs jusqu'à avoir tout parcouru (50 lots au plus par étape).
       En simulation, une étape ne voit pas ce que les précédentes <em>auraient</em> créé : les chiffres des étapes aval sont indicatifs.
     </p>
   {/if}

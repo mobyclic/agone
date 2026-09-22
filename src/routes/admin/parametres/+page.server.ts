@@ -42,12 +42,13 @@ export const load: PageServerLoad = async () => {
  *   5. Utilisateurs — comptes clients.
  *   6. Commandes    — rattachées aux comptes (5) et aux livres (2).
  */
-const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult> }[] = [
+const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult>; limit?: number }[] = [
   { key: 'authors', label: 'Auteurs', fn: importAuthors },
   { key: 'books', label: 'Livres', fn: importBooks },
   { key: 'articles', label: 'Articles', fn: importArticles },
   { key: 'events', label: 'Rencontres', fn: importEvents },
-  { key: 'users', label: 'Utilisateurs', fn: importUsers },
+  // Comptes : WordPress ne date pas leurs modifications → balayage complet en un seul lot.
+  { key: 'users', label: 'Utilisateurs', fn: importUsers, limit: 5000 },
   { key: 'orders', label: 'Commandes', fn: importOrders }
 ];
 
@@ -59,24 +60,48 @@ const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<Impor
 async function syncEtape(key: string, fn: (o: ImportOpts) => Promise<ImportResult>, opts: { limit: number; dryRun: boolean; full: boolean }) {
   const state = ((await getSetting('sync_state')) ?? {}) as Record<string, any>;
   const prev = state[key]?.watermark ? new Date(String(state[key].watermark)) : null;
-  const result = await fn({ limit: opts.limit, dryRun: opts.dryRun, since: opts.full ? null : prev });
+
+  // Lots successifs jusqu'à épuisement. Chaque import lit les enregistrements
+  // modifiés depuis le curseur, du plus ancien au plus récent, par lots de
+  // `limit` : un seul lot ne voyait donc que les PLUS ANCIENS — sans curseur
+  // mémorisé (premier import, ou simulation, qui n'enregistre jamais le sien),
+  // les 2000 premières commandes de 2015 revenaient à chaque fois, toutes déjà
+  // connues, et les nouvelles n'étaient jamais lues (« 0 créée »). Le curseur
+  // avance donc en mémoire de lot en lot, simulation comprise.
+  const MAX_LOTS = 50;
+  let curseur: Date | null = opts.full ? null : prev;
+  const total: ImportResult = { type: key, fetched: 0, created: 0, updated: 0, skipped: 0, warnings: [], dryRun: opts.dryRun };
+  for (let lot = 0; lot < MAX_LOTS; lot++) {
+    const r = await fn({ limit: opts.limit, dryRun: opts.dryRun, since: curseur });
+    total.type = r.type;
+    total.fetched += r.fetched; total.created += r.created; total.updated += r.updated; total.skipped += r.skipped;
+    for (const w of r.warnings) if (total.warnings.length < 200) total.warnings.push(w);
+    if (r.fullScan) total.fullScan = true;
+    if (r.watermark) total.watermark = r.watermark;
+    // Fin : lot incomplet, source sans date (balayage complet), ou curseur figé
+    // (plus de `limit` enregistrements modifiés dans la même seconde).
+    const suivant = r.watermark ? new Date(r.watermark) : null;
+    if (r.fetched < opts.limit || r.fullScan || !suivant || (curseur && suivant <= curseur)) break;
+    curseur = suivant;
+  }
+
   if (!opts.dryRun) {
-    const next = result.watermark ?? state[key]?.watermark;
-    // Un lot vide laisse le curseur intact ; il ne recule jamais.
+    const next = total.watermark ?? state[key]?.watermark;
+    // Un import vide laisse le curseur intact ; il ne recule jamais.
     const keep = prev && next && new Date(next) < prev ? prev.toISOString() : next;
     await setSetting('sync_state', {
       ...state,
       [key]: {
         at: new Date().toISOString(),
         watermark: keep ?? null,
-        fetched: result.fetched,
-        created: result.created,
-        updated: result.updated,
-        full_scan: result.fullScan === true
+        fetched: total.fetched,
+        created: total.created,
+        updated: total.updated,
+        full_scan: total.fullScan === true
       }
     });
   }
-  return result;
+  return total;
 }
 
 export const actions: Actions = {
@@ -136,14 +161,14 @@ export const actions: Actions = {
     requireAdmin(locals);
     const fd = await request.formData();
     const opts = {
-      limit: Math.max(1, Math.min(5000, Number(fd.get('limit') ?? 2000) || 2000)),
+      limit: Math.max(50, Math.min(5000, Number(fd.get('limit') ?? 1000) || 1000)),
       dryRun: fd.get('dryRun') === 'on',
       full: fd.get('full') === 'on'
     };
     const etapes: { key: string; label: string; result?: ImportResult; error?: string }[] = [];
     for (const e of ETAPES) {
       try {
-        etapes.push({ key: e.key, label: e.label, result: await syncEtape(e.key, e.fn, opts) });
+        etapes.push({ key: e.key, label: e.label, result: await syncEtape(e.key, e.fn, { ...opts, limit: e.limit ?? opts.limit }) });
       } catch (err) {
         // Les étapes suivantes dépendent de celle-ci : inutile (voire nuisible) de continuer.
         etapes.push({ key: e.key, label: e.label, error: err instanceof Error ? err.message : 'Échec.' });
