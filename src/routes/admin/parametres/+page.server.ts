@@ -4,10 +4,7 @@ import { requireAdmin } from '$lib/server/access';
 import { getSetting, setSetting } from '$lib/server/site';
 import { getCompany } from '$lib/server/invoice';
 import { wpConfigured } from '$lib/server/wp-db';
-import {
-  importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents,
-  type ImportResult, type ImportOpts
-} from '$lib/server/migration';
+import { lancerSynchro } from '$lib/server/sync-job';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
@@ -31,78 +28,6 @@ export const load: PageServerLoad = async () => {
     company
   };
 };
-
-/**
- * Ordre de synchronisation — il n'est PAS arbitraire : chaque étape s'appuie sur
- * ce que les précédentes ont posé.
- *   1. Auteurs      — aucune dépendance.
- *   2. Livres       — arêtes contributed_by → auteurs.
- *   3. Articles     — liés aux auteurs et aux livres.
- *   4. Rencontres   — auteurs, livres, lieux.
- *   5. Utilisateurs — comptes clients.
- *   6. Commandes    — rattachées aux comptes (5) et aux livres (2).
- */
-const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult>; limit?: number }[] = [
-  { key: 'authors', label: 'Auteurs', fn: importAuthors },
-  { key: 'books', label: 'Livres', fn: importBooks },
-  { key: 'articles', label: 'Articles', fn: importArticles },
-  { key: 'events', label: 'Rencontres', fn: importEvents },
-  // Comptes : WordPress ne date pas leurs modifications → balayage complet en un seul lot.
-  { key: 'users', label: 'Utilisateurs', fn: importUsers, limit: 5000 },
-  { key: 'orders', label: 'Commandes', fn: importOrders }
-];
-
-/**
- * Une étape, en incrémental : on repart du curseur mémorisé (`sync_state`), sauf
- * demande explicite de tout réimporter. Le curseur n'est réécrit qu'après un
- * import réel et réussi — jamais en simulation, jamais s'il reculerait.
- */
-async function syncEtape(key: string, fn: (o: ImportOpts) => Promise<ImportResult>, opts: { limit: number; dryRun: boolean; full: boolean }) {
-  const state = ((await getSetting('sync_state')) ?? {}) as Record<string, any>;
-  const prev = state[key]?.watermark ? new Date(String(state[key].watermark)) : null;
-
-  // Lots successifs jusqu'à épuisement. Chaque import lit les enregistrements
-  // modifiés depuis le curseur, du plus ancien au plus récent, par lots de
-  // `limit` : un seul lot ne voyait donc que les PLUS ANCIENS — sans curseur
-  // mémorisé (premier import, ou simulation, qui n'enregistre jamais le sien),
-  // les 2000 premières commandes de 2015 revenaient à chaque fois, toutes déjà
-  // connues, et les nouvelles n'étaient jamais lues (« 0 créée »). Le curseur
-  // avance donc en mémoire de lot en lot, simulation comprise.
-  const MAX_LOTS = 50;
-  let curseur: Date | null = opts.full ? null : prev;
-  const total: ImportResult = { type: key, fetched: 0, created: 0, updated: 0, skipped: 0, warnings: [], dryRun: opts.dryRun };
-  for (let lot = 0; lot < MAX_LOTS; lot++) {
-    const r = await fn({ limit: opts.limit, dryRun: opts.dryRun, since: curseur });
-    total.type = r.type;
-    total.fetched += r.fetched; total.created += r.created; total.updated += r.updated; total.skipped += r.skipped;
-    for (const w of r.warnings) if (total.warnings.length < 200) total.warnings.push(w);
-    if (r.fullScan) total.fullScan = true;
-    if (r.watermark) total.watermark = r.watermark;
-    // Fin : lot incomplet, source sans date (balayage complet), ou curseur figé
-    // (plus de `limit` enregistrements modifiés dans la même seconde).
-    const suivant = r.watermark ? new Date(r.watermark) : null;
-    if (r.fetched < opts.limit || r.fullScan || !suivant || (curseur && suivant <= curseur)) break;
-    curseur = suivant;
-  }
-
-  if (!opts.dryRun) {
-    const next = total.watermark ?? state[key]?.watermark;
-    // Un import vide laisse le curseur intact ; il ne recule jamais.
-    const keep = prev && next && new Date(next) < prev ? prev.toISOString() : next;
-    await setSetting('sync_state', {
-      ...state,
-      [key]: {
-        at: new Date().toISOString(),
-        watermark: keep ?? null,
-        fetched: total.fetched,
-        created: total.created,
-        updated: total.updated,
-        full_scan: total.fullScan === true
-      }
-    });
-  }
-  return total;
-}
 
 export const actions: Actions = {
   contact: async ({ request, locals }) => {
@@ -156,25 +81,19 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/parametres', 'Informations de facturation enregistrées.', 'success'));
   },
 
-  /** Tout synchroniser, dans l'ordre des dépendances ; arrêt à la première erreur. */
+  /**
+   * Tout synchroniser : lancé EN TÂCHE DE FOND (plusieurs minutes possibles — une
+   * requête qui attendait la fin se faisait couper par le proxy : « upstream error »).
+   * La page suit l'avancement via /admin/api/sync.
+   */
   syncTout: async ({ request, locals }) => {
     requireAdmin(locals);
     const fd = await request.formData();
-    const opts = {
+    const job = lancerSynchro({
       limit: Math.max(50, Math.min(5000, Number(fd.get('limit') ?? 1000) || 1000)),
       dryRun: fd.get('dryRun') === 'on',
       full: fd.get('full') === 'on'
-    };
-    const etapes: { key: string; label: string; result?: ImportResult; error?: string }[] = [];
-    for (const e of ETAPES) {
-      try {
-        etapes.push({ key: e.key, label: e.label, result: await syncEtape(e.key, e.fn, { ...opts, limit: e.limit ?? opts.limit }) });
-      } catch (err) {
-        // Les étapes suivantes dépendent de celle-ci : inutile (voire nuisible) de continuer.
-        etapes.push({ key: e.key, label: e.label, error: err instanceof Error ? err.message : 'Échec.' });
-        break;
-      }
-    }
-    return { syncTout: { dryRun: opts.dryRun, etapes } };
+    });
+    return { syncLancee: job.id };
   }
 };

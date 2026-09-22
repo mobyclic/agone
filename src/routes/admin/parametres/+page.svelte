@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
+  import type { JobSynchro } from '$lib/server/sync-job';
   import { Button } from '$lib/components/ui/button';
   import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning, Spinner, CheckCircle, XCircle, ArrowRight } from 'phosphor-svelte';
 
@@ -8,10 +11,23 @@
   const label = 'mb-1 block text-sm font-medium';
 
   /**
-   * Synchronisation en cours. Elle enchaîne six imports contre la base WordPress
-   * distante : sans témoin, rien ne distingue « lancé » de « pas cliqué ».
+   * Synchronisation : elle tourne en tâche de fond côté serveur (plusieurs
+   * minutes possibles) ; la page en suit l'avancement toutes les 2 s.
    */
-  let enCours = $state(false);
+  let job = $state<JobSynchro | null>(null);
+  let lancement = $state(false);
+  const enCours = $derived(lancement || !!job?.enCours);
+  let minuteur: ReturnType<typeof setTimeout> | undefined;
+  async function suivre() {
+    clearTimeout(minuteur);
+    try {
+      const r = await fetch('/admin/api/sync');
+      if (r.ok) job = await r.json();
+    } catch { /* réseau : on réessaie au prochain tour */ }
+    if (job?.enCours) minuteur = setTimeout(suivre, 2000);
+    else if (job?.fin) invalidateAll(); // rafraîchit les « dernier import » affichés
+  }
+  onMount(() => { suivre(); return () => clearTimeout(minuteur); });
 
   const dateHeure = (iso?: string) =>
     iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
@@ -34,7 +50,7 @@
     { key: 'users', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes.' },
     { key: 'orders', icon: Receipt, title: 'Commandes', desc: 'WooCommerce + lignes → comptes et livres.' }
   ];
-  const resultat = (key: string) => (form as any)?.syncTout?.etapes?.find((e: any) => e.key === key);
+  const resultat = (key: string) => job?.etapes.find((e) => e.key === key);
 </script>
 
 <svelte:head><title>Paramètres · Admin Agone</title></svelte:head>
@@ -148,8 +164,8 @@
       method="POST"
       action="?/syncTout"
       use:enhance={() => {
-        enCours = true;
-        return async ({ update }) => { await update({ reset: false }); enCours = false; };
+        lancement = true;
+        return async ({ update }) => { await update({ reset: false }); lancement = false; suivre(); };
       }}
       class="rounded-lg border border-border bg-card p-5"
     >
@@ -157,19 +173,25 @@
       <ol class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {#each etapes as t, i (t.key)}
           {@const r = resultat(t.key)}
-          <li class="flex gap-3 rounded-md border p-3 {r?.error ? 'border-destructive/40 bg-destructive/5' : r ? 'border-success/30 bg-success/5' : 'border-border'}">
+          <li class="flex gap-3 rounded-md border p-3 {r?.statut === 'erreur' ? 'border-destructive/40 bg-destructive/5' : r?.statut === 'fait' ? 'border-success/30 bg-success/5' : r?.statut === 'en_cours' ? 'border-link/40 bg-link/5' : 'border-border'}">
             <span class="grid size-7 shrink-0 place-items-center rounded-full bg-muted font-display text-sm font-bold">{i + 1}</span>
             <div class="min-w-0 flex-1">
               <p class="flex items-center gap-1.5 font-semibold"><t.icon size={16} class="text-link" /> {t.title}
-                {#if r?.error}<XCircle size={16} class="text-destructive" weight="fill" />{:else if r}<CheckCircle size={16} class="text-success" weight="fill" />{/if}
+                {#if r?.statut === 'erreur'}<XCircle size={16} class="text-destructive" weight="fill" />
+                {:else if r?.statut === 'fait'}<CheckCircle size={16} class="text-success" weight="fill" />
+                {:else if r?.statut === 'en_cours'}<Spinner size={15} class="animate-spin text-link" />{/if}
               </p>
               <p class="text-xs text-muted-foreground">{t.desc}</p>
-              {#if r?.error}
+              {#if r?.statut === 'erreur'}
                 <p class="mt-1 text-xs font-medium text-destructive">{r.error}</p>
+              {:else if r?.statut === 'annule'}
+                <p class="mt-1 text-xs text-muted-foreground">Non lancée (une étape précédente a échoué).</p>
+              {:else if r?.statut === 'attente' && job?.enCours}
+                <p class="mt-1 text-xs text-muted-foreground">En attente…</p>
               {:else if r?.result}
                 <p class="mt-1 text-xs font-medium">
                   {r.result.created} créé(s), {r.result.updated} mis à jour{#if r.result.skipped}, {r.result.skipped} ignoré(s){/if}
-                  <span class="text-muted-foreground">({r.result.fetched} lus)</span>
+                  <span class="text-muted-foreground">({r.result.fetched} lus{r.lots > 1 ? ` · ${r.lots} lots` : ''}{r.statut === 'en_cours' ? '…' : ''})</span>
                 </p>
                 {#if r.result.warnings.length}
                   <details class="mt-1 text-xs text-muted-foreground">
@@ -185,10 +207,14 @@
         {/each}
       </ol>
 
-      {#if (form as any)?.syncTout}
+      {#if job}
         <p class="mt-3 text-sm font-medium">
-          {(form as any).syncTout.dryRun ? 'Simulation terminée — rien n’a été écrit.' : 'Synchronisation terminée.'}
-          {#if (form as any).syncTout.etapes.some((e: any) => e.error)}<span class="text-destructive">Interrompue à l’étape en erreur (les suivantes en dépendent).</span>{/if}
+          {#if job.enCours}
+            {job.dryRun ? 'Simulation' : 'Synchronisation'} en cours — vous pouvez quitter la page, elle continue.
+          {:else}
+            {job.dryRun ? 'Simulation terminée — rien n’a été écrit.' : 'Synchronisation terminée.'}
+            {#if job.etapes.some((e) => e.statut === 'erreur')}<span class="text-destructive">Interrompue à l’étape en erreur (les suivantes en dépendent).</span>{/if}
+          {/if}
         </p>
       {/if}
 
