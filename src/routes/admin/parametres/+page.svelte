@@ -1,18 +1,17 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning, Spinner } from 'phosphor-svelte';
+  import { FloppyDisk, Users, UsersThree, Receipt, BookOpen, Article, CalendarDots, DownloadSimple, Warning, Spinner, CheckCircle, XCircle, ArrowRight } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
 
   /**
-   * Import en cours, par type. Un import parcourt jusqu'à 500 enregistrements
-   * contre la base WordPress distante : sans témoin, rien ne distingue « lancé »
-   * de « pas cliqué », et on relance à l'aveugle.
+   * Synchronisation en cours. Elle enchaîne six imports contre la base WordPress
+   * distante : sans témoin, rien ne distingue « lancé » de « pas cliqué ».
    */
-  let enCours = $state<Record<string, boolean>>({});
+  let enCours = $state(false);
 
   const dateHeure = (iso?: string) =>
     iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
@@ -26,14 +25,16 @@
     return { label: `Dernier import ${dateHeure(st.at)} : ${st.created} créé(s), ${st.updated} mis à jour${q}`, tone: 'text-muted-foreground' };
   }
 
-  const syncTypes = [
-    { action: 'syncUsers', key: 'users', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes (par e-mail / legacy_wp_id).' },
-    { action: 'syncOrders', key: 'orders', icon: Receipt, title: 'Commandes', desc: 'Commandes WooCommerce + lignes (livres par legacy, clients rattachés).' },
-    { action: 'syncBooks', key: 'books', icon: BookOpen, title: 'Livres', desc: 'Fiches livres (ISBN, prix, dates, stock) + contributions auteur/traducteur/préface.' },
-    { action: 'syncAuthors', key: 'authors', icon: UsersThree, title: 'Auteurs', desc: 'Auteurs (prénom / nom / slug).' },
-    { action: 'syncArticles', key: 'articles', icon: Article, title: 'Articles', desc: "Articles d'Antichambre (corps, rubrique, auteurs, LettrInfo)." },
-    { action: 'syncEvents', key: 'events', icon: CalendarDots, title: 'Rencontres', desc: 'Rencontres + lieux géolocalisés (dédupliqués), auteurs & livres liés.' }
+  // Même ordre que le serveur (ETAPES) : chaque étape s'appuie sur les précédentes.
+  const etapes = [
+    { key: 'authors', icon: UsersThree, title: 'Auteurs', desc: 'Prénom, nom, slug.' },
+    { key: 'books', icon: BookOpen, title: 'Livres', desc: 'Fiches (ISBN, prix, dates, stock) + contributions → auteurs.' },
+    { key: 'articles', icon: Article, title: 'Articles', desc: 'Antichambre : corps, rubrique, auteurs, livres, LettrInfo.' },
+    { key: 'events', icon: CalendarDots, title: 'Rencontres', desc: 'Lieux géolocalisés, auteurs et livres liés.' },
+    { key: 'users', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes.' },
+    { key: 'orders', icon: Receipt, title: 'Commandes', desc: 'WooCommerce + lignes → comptes et livres.' }
   ];
+  const resultat = (key: string) => (form as any)?.syncTout?.etapes?.find((e: any) => e.key === key);
 </script>
 
 <svelte:head><title>Paramètres · Admin Agone</title></svelte:head>
@@ -138,88 +139,84 @@
     Coche « Simulation » pour un aperçu sans écriture.
   </p>
 
-  {#if form?.syncError}
-    <p class="mb-4 flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-      <Warning size={16} /> {form.syncError}
-    </p>
-  {/if}
-  {#if form?.sync}
-    <div class="mb-4 rounded-md border border-success/30 bg-success/10 px-3 py-2.5 text-sm">
-      <p class="font-medium">
-        {form.sync.dryRun ? 'Simulation' : 'Import'} — {form.sync.type} :
-        {form.sync.created} créé(s), {form.sync.updated} mis à jour{#if form.sync.skipped}, {form.sync.skipped} ignoré(s){/if}
-        <span class="text-muted-foreground">({form.sync.fetched} lus)</span>
-      </p>
-      {#if form.sync.warnings.length}
-        <ul class="mt-1.5 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-5 text-xs text-muted-foreground">
-          {#each form.sync.warnings as w (w)}<li>{w}</li>{/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
-
   {#if !data.wpReady}
     <p class="flex items-center gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
       <Warning size={16} /> Connexion WordPress non configurée (<span class="font-mono text-xs">WP_DB_HOST / WP_DB_USER / WP_DB_PASS / WP_DB_NAME</span> dans .env).
     </p>
   {:else}
-    <div class="grid gap-4 sm:grid-cols-2">
-      {#each syncTypes as t (t.action)}
-        <form
-          method="POST"
-          action="?/{t.action}"
-          use:enhance={() => {
-            enCours = { ...enCours, [t.key]: true };
-            return async ({ update }) => {
-              await update({ reset: false });
-              enCours = { ...enCours, [t.key]: false };
-            };
-          }}
-          class="rounded-lg border border-border bg-card p-4"
-        >
-          <div class="mb-2 flex items-center gap-2">
-            <t.icon size={18} class="text-link" />
-            <h4 class="font-semibold">{t.title}</h4>
-          </div>
-          <p class="mb-2 text-xs text-muted-foreground">{t.desc}</p>
-          {#if enCours[t.key]}
-            <p class="mb-3 flex items-center gap-1.5 text-xs font-medium text-link">
-              <Spinner size={13} class="animate-spin" /> Import en cours — lecture de la base WordPress…
-            </p>
-            <div class="mb-3 h-0.5 w-full overflow-hidden rounded bg-muted">
-              <div class="ag-sync-bar h-full w-1/3 bg-link"></div>
+    <form
+      method="POST"
+      action="?/syncTout"
+      use:enhance={() => {
+        enCours = true;
+        return async ({ update }) => { await update({ reset: false }); enCours = false; };
+      }}
+      class="rounded-lg border border-border bg-card p-5"
+    >
+      <!-- Les six étapes, dans l'ordre d'exécution -->
+      <ol class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {#each etapes as t, i (t.key)}
+          {@const r = resultat(t.key)}
+          <li class="flex gap-3 rounded-md border p-3 {r?.error ? 'border-destructive/40 bg-destructive/5' : r ? 'border-success/30 bg-success/5' : 'border-border'}">
+            <span class="grid size-7 shrink-0 place-items-center rounded-full bg-muted font-display text-sm font-bold">{i + 1}</span>
+            <div class="min-w-0 flex-1">
+              <p class="flex items-center gap-1.5 font-semibold"><t.icon size={16} class="text-link" /> {t.title}
+                {#if r?.error}<XCircle size={16} class="text-destructive" weight="fill" />{:else if r}<CheckCircle size={16} class="text-success" weight="fill" />{/if}
+              </p>
+              <p class="text-xs text-muted-foreground">{t.desc}</p>
+              {#if r?.error}
+                <p class="mt-1 text-xs font-medium text-destructive">{r.error}</p>
+              {:else if r?.result}
+                <p class="mt-1 text-xs font-medium">
+                  {r.result.created} créé(s), {r.result.updated} mis à jour{#if r.result.skipped}, {r.result.skipped} ignoré(s){/if}
+                  <span class="text-muted-foreground">({r.result.fetched} lus)</span>
+                </p>
+                {#if r.result.warnings.length}
+                  <details class="mt-1 text-xs text-muted-foreground">
+                    <summary class="cursor-pointer">{r.result.warnings.length} avertissement(s)</summary>
+                    <ul class="mt-1 max-h-32 list-disc space-y-0.5 overflow-y-auto pl-4">{#each r.result.warnings as w (w)}<li>{w}</li>{/each}</ul>
+                  </details>
+                {/if}
+              {:else}
+                <p class="mt-1 text-[11px] {syncInfo(t.key).tone}">{syncInfo(t.key).label}</p>
+              {/if}
             </div>
-          {:else}
-            <p class="mb-3 text-xs {syncInfo(t.key).tone}">{syncInfo(t.key).label}</p>
-          {/if}
-          <div class="flex flex-wrap items-center gap-2">
-            <label class="flex items-center gap-1.5 text-sm" title="Plafond de sécurité : nombre maximum d’enregistrements traités en une fois.">
-              Max
-              <input name="limit" type="number" value="500" min="1" max="5000" disabled={enCours[t.key]} class="h-9 w-20 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50" />
-            </label>
-            <label class="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <input type="checkbox" name="dryRun" checked disabled={enCours[t.key]} class="size-4 rounded border-border" /> Simulation
-            </label>
-            <label class="flex items-center gap-1.5 text-sm text-muted-foreground" title="Ignore le dernier import et reprend tout depuis le début.">
-              <input type="checkbox" name="full" class="size-4 rounded border-border" disabled={t.key === 'users' || enCours[t.key]} /> Tout
-            </label>
-            {#if enCours[t.key]}
-              <Button type="submit" variant="outline" size="sm" disabled class="ml-auto">
-                <Spinner size={15} class="animate-spin" /> Import en cours…
-              </Button>
-            {:else}
-              <Button type="submit" variant="outline" size="sm" class="ml-auto"><DownloadSimple size={15} /> Synchroniser</Button>
-            {/if}
-          </div>
-        </form>
-      {/each}
-    </div>
-    <p class="mt-3 text-xs text-muted-foreground">
+          </li>
+        {/each}
+      </ol>
+
+      {#if (form as any)?.syncTout}
+        <p class="mt-3 text-sm font-medium">
+          {(form as any).syncTout.dryRun ? 'Simulation terminée — rien n’a été écrit.' : 'Synchronisation terminée.'}
+          {#if (form as any).syncTout.etapes.some((e: any) => e.error)}<span class="text-destructive">Interrompue à l’étape en erreur (les suivantes en dépendent).</span>{/if}
+        </p>
+      {/if}
+
+      {#if enCours}
+        <div class="mt-4 h-0.5 w-full overflow-hidden rounded bg-muted"><div class="ag-sync-bar h-full w-1/3 bg-link"></div></div>
+      {/if}
+
+      <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-4">
+        <label class="flex items-center gap-1.5 text-sm" title="Plafond de sécurité par étape : nombre maximum d’enregistrements traités en une fois.">
+          Max par étape
+          <input name="limit" type="number" value="2000" min="1" max="5000" disabled={enCours} class="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50" />
+        </label>
+        <label class="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" name="dryRun" checked disabled={enCours} class="size-4 rounded border-border" /> Simulation
+        </label>
+        <label class="flex items-center gap-1.5 text-sm text-muted-foreground" title="Ignore les repères des imports précédents et reprend tout depuis le début.">
+          <input type="checkbox" name="full" disabled={enCours} class="size-4 rounded border-border" /> Tout réimporter
+        </label>
+        <Button type="submit" variant="brand" class="ml-auto" disabled={enCours}>
+          {#if enCours}<Spinner size={16} class="animate-spin" /> Synchronisation en cours…{:else}<DownloadSimple size={16} /> Tout synchroniser <ArrowRight size={14} />{/if}
+        </Button>
+      </div>
+    </form>
+    <p class="mt-3 max-w-3xl text-xs text-muted-foreground">
       Par défaut, seuls les enregistrements <strong>modifiés depuis le dernier import</strong> sont repris
-      (date <span class="font-mono">post_modified_gmt</span> de WordPress) ; cocher « Tout » ignore ce repère.
-      « Max » n'est qu'un plafond de sécurité : si un lot l'atteint, relancer reprend là où on s'est arrêté.
-      Ordre conseillé pour un import complet : Auteurs → Livres → Articles → Rencontres
-      (les liens s'appuient sur les auteurs/livres déjà présents).
+      (date <span class="font-mono">post_modified_gmt</span> de WordPress ; les comptes, non datés, sont toujours balayés en entier).
+      « Max par étape » n'est qu'un plafond de sécurité : si une étape l'atteint, relancer reprend là où elle s'est arrêtée.
+      En simulation, une étape ne voit pas ce que les précédentes <em>auraient</em> créé : les chiffres des étapes aval sont indicatifs.
     </p>
   {/if}
 </div>

@@ -19,21 +19,28 @@
 
 <svelte:head><title>{a.title} · Antichambre — Agone</title></svelte:head>
 
+<!-- Même gabarit que la liste de l'accueil : rubrique en rouge · date au-dessus
+     du titre, l'auteur seul en dessous. -->
 <PageHead
-  eyebrow={a.rubrique_name ? `Antichambre / ${a.rubrique_name}` : 'Antichambre'}
+  eyebrow={a.rubrique_name ?? 'Antichambre'}
   title={a.title}
-  inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'}
+  inner="lg:max-w-[calc(100%/3*2)]"
 >
-  <!-- Date & auteur, juste sous le titre, en petit (minuscules). -->
-  <div class="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-    <span>{fmt(a.published_at)}</span>
+  {#snippet kicker()}
+    <div class="flex flex-wrap items-center gap-x-2 font-display text-sm uppercase tracking-wide">
+      {#if a.rubrique_name}
+        <a href="/antichambre?rubrique={a.rubrique_slug}" class="font-semibold text-link hover:underline">{a.rubrique_name}</a>
+        <span class="text-muted-foreground">·</span>
+      {/if}
+      <span class="text-muted-foreground">{fmt(a.published_at)}</span>
+    </div>
+  {/snippet}
+  <div class="mt-3 flex flex-wrap items-center gap-x-3 font-display text-sm uppercase tracking-[0.14em] text-muted-foreground">
     {#if a.authors.length}
-      <span>·</span>
-      <span>{#each a.authors as au, i (au.slug)}<a href="/auteur/{au.slug}" class="text-link hover:underline">{au.full_name}</a>{#if i < a.authors.length - 1}, {/if}{/each}</span>
+      <span>{#each a.authors as au, i (au.slug)}<a href="/auteur/{au.slug}" class="hover:text-link">{au.full_name}</a>{#if i < a.authors.length - 1}, {/if}{/each}</span>
     {/if}
     {#if isStaff && a.views > 0}
-      <span>·</span>
-      <span class="inline-flex items-center gap-1" title="Nombre de vues (visible admin uniquement)"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
+      <span class="inline-flex items-center gap-1 normal-case tracking-normal" title="Nombre de vues (visible admin uniquement)"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
     {/if}
   </div>
 </PageHead>
@@ -45,7 +52,18 @@
 {/if}
 
 <div class="py-10" style="padding-inline: var(--page-gutter)">
-  <div class="grid gap-10 lg:grid-cols-[2fr_1fr] lg:items-start">
+  {#if !a.en_ligne}
+    <!-- Aperçu staff : le public reçoit une 404 sur cette adresse. -->
+    <p class="mb-8 rounded-md border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+      {#if a.status === 'published' && a.published_at}
+        <strong>Programmé</strong> — cet article sera visible du public le {new Date(a.published_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}.
+      {:else}
+        <strong>Brouillon</strong> — aperçu réservé à l'équipe, invisible du public.
+      {/if}
+    </p>
+  {/if}
+  <!-- Écart entre colonnes = gouttière de page (bord → contenu). -->
+  <div class="grid gap-y-10 lg:grid-cols-[2fr_1fr] lg:items-start" style="column-gap: var(--page-gutter)">
     <article class="min-w-0">
   {#if a.cover_url}
     <img src={a.cover_url} alt="" class="mt-6 w-full rounded-lg border border-border" />

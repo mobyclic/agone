@@ -1,6 +1,6 @@
 /** Pages éditoriales statiques (à propos, contact, CGV, mentions…). */
 import { query } from './surreal';
-import { sansScripts } from '$lib/text';
+import { sansScripts, notesDeBasDePage } from '$lib/text';
 
 export async function getPageBySlug(slug: string): Promise<{ title: string; slug: string; body_html?: string } | null> {
   const rows = await query<any>(
@@ -8,7 +8,7 @@ export async function getPageBySlug(slug: string): Promise<{ title: string; slug
     { slug }
   );
   const p = rows[0];
-  return p ? { title: p.title, slug: p.slug, body_html: sansScripts(p.body_html) } : null;
+  return p ? { title: p.title, slug: p.slug, body_html: notesDeBasDePage(sansScripts(p.body_html)) } : null;
 }
 
 /**

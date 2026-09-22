@@ -4,7 +4,7 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Coins, Warning, Eye, Spinner, Books } from 'phosphor-svelte';
-  import { euros, CONTENT_STATUS_LABEL } from '$lib/labels';
+  import { euros, BOOK_STATUS_LABEL } from '$lib/labels';
 
   let { data, form } = $props();
   const a = $derived(data.author);
@@ -101,7 +101,7 @@
     {:else if data.isNew || dirty}
       <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
     {:else if a?.slug}
-      <Button href="/auteur/{a.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
+      <Button href="/auteur/{a.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
     {/if}
   </div>
 </form>
@@ -124,7 +124,7 @@
               <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>{b.year ?? '—'}</span>
                 {#if b.status !== 'published'}
-                  <span class="rounded bg-secondary px-1.5 py-0.5">{CONTENT_STATUS_LABEL[b.status] ?? b.status}</span>
+                  <span class="rounded bg-secondary px-1.5 py-0.5">{BOOK_STATUS_LABEL[b.status] ?? b.status}</span>
                 {/if}
               </div>
             </div>

@@ -181,9 +181,13 @@ DEFINE FIELD OVERWRITE slug         ON book TYPE string;
 DEFINE FIELD OVERWRITE description_html ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE title_original    ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE language_original ON book TYPE option<string>;
--- « À paraître » n'est PAS un statut : c'est un état dérivé (published + published_at futur).
+-- Statuts stockés : brouillon / en ligne (`published`) / archivé.
+-- « À paraître » (published_at futur) et « Épuisé » (stock_qty <= 0) sont des ÉTATS
+-- DÉRIVÉS, pas des statuts. L'ancien 'out_of_print' est ramené à 'published' à la
+-- première écriture (VALUE auto-réparant), sans migration préalable obligatoire.
 DEFINE FIELD OVERWRITE status       ON book TYPE string
-  ASSERT $value IN ['draft','published','out_of_print'] DEFAULT 'draft';
+  VALUE IF $value = 'out_of_print' THEN 'published' ELSE $value ?? 'draft' END
+  ASSERT $value IN ['draft','published','archived'] DEFAULT 'draft';
 DEFINE FIELD OVERWRITE isbn_paper   ON book TYPE option<string>;   -- EAN-13 (colonne vertébrale)
 DEFINE FIELD OVERWRITE isbn_ebook   ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE price_paper        ON book TYPE option<number>;  -- € TTC
@@ -227,6 +231,9 @@ DEFINE FIELD OVERWRITE title_alt        ON book TYPE option<string>;
 DEFINE FIELD OVERWRITE extra_info_html  ON book TYPE option<string>;   -- infos_additionnelles
 DEFINE FIELD OVERWRITE rubriques        ON book TYPE option<array<record<rubrique>>>;
 DEFINE FIELD OVERWRITE primary_collection ON book TYPE option<record<collection>>;
+-- Mots-clés libres (facette du catalogue). VALUE auto-réparant : les livres
+-- existants (NONE) se remettent d'aplomb à leur prochaine écriture.
+DEFINE FIELD OVERWRITE keywords ON book TYPE array<string> DEFAULT [] VALUE $value ?? [];
 
 -- RUBRIQUE (thèmes/rayons — taxonomie partagée livres & blog)
 DEFINE TABLE OVERWRITE rubrique SCHEMAFULL;

@@ -49,7 +49,7 @@
     {:else if data.isNew || dirty}
       <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
     {:else if c?.slug}
-      <Button href="/collections/{c.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
+      <Button href="/collections/{c.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
     {/if}
   </div>
 </form>

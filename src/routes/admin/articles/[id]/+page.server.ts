@@ -1,15 +1,15 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
-import { getArticleForEdit, saveArticle, deleteArticle, listAllRubriques, type ArticleInput } from '$lib/server/articles';
+import { getArticleForEdit, saveArticle, deleteArticle, listAllRubriques, rencontresLiees, type ArticleInput } from '$lib/server/articles';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
   const rubriques = await listAllRubriques();
-  if (params.id === 'nouveau') return { isNew: true, article: null, rubriques };
-  const article = await getArticleForEdit(params.id);
+  if (params.id === 'nouveau') return { isNew: true, article: null, rubriques, rencontres: [] };
+  const [article, rencontres] = await Promise.all([getArticleForEdit(params.id), rencontresLiees(params.id)]);
   if (!article) throw error(404, { message: 'Article introuvable' });
-  return { isNew: false, article, rubriques };
+  return { isNew: false, article, rubriques, rencontres };
 };
 
 export const actions: Actions = {

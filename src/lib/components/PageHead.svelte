@@ -6,10 +6,15 @@
     meta,
     width = '',
     inner = '',
+    kicker,
     children
   }: {
     eyebrow?: string; title: string; subtitle?: string; meta?: string;
-    width?: string; inner?: string; children?: import('svelte').Snippet;
+    width?: string; inner?: string;
+    /** Surtitre riche (ex. « RUBRIQUE · date ») ; remplace `eyebrow` au-dessus du titre,
+     *  `eyebrow` restant utilisé par la bande de rappel au défilement. */
+    kicker?: import('svelte').Snippet;
+    children?: import('svelte').Snippet;
   } = $props();
 
   // Mini-bande collante : réapparaît au scroll une fois le gros header dépassé.
@@ -31,7 +36,9 @@
        s'additionnaient (≈ 96 à 140 px sous le titre selon les pages). -->
   <div class="pt-10 sm:pt-14 {width}" style="padding-inline: var(--page-gutter)">
     <div class={inner}>
-      {#if eyebrow}
+      {#if kicker}
+        {@render kicker()}
+      {:else if eyebrow}
         <p class="font-display text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
       {/if}
       <h1 class="display-title mt-2 text-4xl leading-[0.9] sm:text-5xl">{title}</h1>

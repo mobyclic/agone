@@ -6,7 +6,7 @@ import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
 import { accentRegex } from '$lib/text';
 import { wpautop } from './wpautop';
-import { sansScripts } from '$lib/text';
+import { sansScripts, notesDeBasDePage } from '$lib/text';
 import { ROLE_ORDER, ROLE_LABEL } from '$lib/labels';
 export { ROLE_LABEL };
 
@@ -128,10 +128,10 @@ export async function recentBooks(limit = 8): Promise<BookCard[]> {
 }
 
 /** Recherche de livres pour un sélecteur (back-office). */
-export async function searchBooksForPicker(q: string): Promise<{ id: string; title: string }[]> {
+export async function searchBooksForPicker(q: string): Promise<{ id: string; title: string; image?: string }[]> {
   if (!q || !q.trim()) return [];
   return query<any>(
-    `SELECT id, title FROM book WHERE string::lowercase(title) CONTAINS $q ORDER BY title ASC LIMIT 12`,
+    `SELECT id, title, cover.url AS image FROM book WHERE string::lowercase(title) CONTAINS $q ORDER BY title ASC LIMIT 12`,
     { q: q.trim().toLowerCase() }
   );
 }
@@ -233,7 +233,8 @@ export interface BookDetail extends BookCard {
   contributors: { role: string; people: { name: string; slug: string }[] }[];
 }
 
-export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
+/** `apercu` (staff) : renvoie aussi brouillons et livres archivés, invisibles du public. */
+export async function getBookBySlug(slug: string, apercu = false): Promise<BookDetail | null> {
   const rows = await query<any>(
     `SELECT *, cover.url AS cover_url, gallery.url AS gallery_urls,
        collections.{ name: name, slug: slug } AS collection_refs
@@ -241,7 +242,7 @@ export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
     { slug }
   );
   const b = rows[0];
-  if (!b) return null;
+  if (!b || (b.status !== 'published' && !apercu)) return null;
 
   const contribs = await query<any>(
     `SELECT out.full_name AS name, out.slug AS slug, role, position
@@ -260,7 +261,7 @@ export async function getBookBySlug(slug: string): Promise<BookDetail | null> {
 
   return {
     ...toCard(b),
-    description_html: sansScripts(b.description_html),
+    description_html: notesDeBasDePage(sansScripts(b.description_html)),
     extra_info_html: sansScripts(b.extra_info_html),
     isbn_paper: b.isbn_paper ?? undefined,
     isbn_ebook: b.isbn_ebook ?? undefined,
@@ -334,55 +335,6 @@ export async function getCollectionBySlug(slug: string): Promise<{ collection: a
   return { collection, books: books.map(toCard) };
 }
 
-export interface CollectionShowcase {
-  name: string;
-  slug: string;
-  description_html?: string;
-  book_count: number;
-  books: BookCard[];
-}
-
-/** Vitrine catalogue : chaque collection avec sa description et ses N derniers livres parus. */
-export async function collectionsWithBooks(perColl = 6): Promise<CollectionShowcase[]> {
-  const colls = await query<any>(`SELECT name, slug, description, sort FROM collection ORDER BY sort ASC`);
-  const result = await Promise.all(
-    colls.map(async (c) => {
-      const [books, count] = await Promise.all([
-        query<any>(
-          `SELECT ${CARD_FIELDS} FROM book
-             WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now())
-               AND (primary_collection.slug = $slug OR collections.slug CONTAINS $slug)
-             ORDER BY published_at DESC LIMIT $lim`,
-          { slug: c.slug, lim: perColl }
-        ),
-        query<any>(
-          `SELECT count() AS n FROM book
-             WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now())
-               AND (primary_collection.slug = $slug OR collections.slug CONTAINS $slug) GROUP ALL`,
-          { slug: c.slug }
-        )
-      ]);
-      return {
-        name: c.name,
-        slug: c.slug,
-        description_html: sansScripts(c.description ? wpautop(c.description) : undefined),
-        book_count: count[0]?.n ?? 0,
-        books: books.map(toCard)
-      };
-    })
-  );
-  return result.filter((c) => c.book_count > 0);
-}
-
-/** Nombre de livres publiés et parus (pour l'en-tête catalogue). */
-export async function countPublishedBooks(): Promise<number> {
-  const r = await query<any>(
-    `SELECT count() AS n FROM book
-       WHERE status = 'published' AND (published_at = NONE OR published_at <= time::now()) GROUP ALL`
-  );
-  return r[0]?.n ?? 0;
-}
-
 // ══════════════════════════════════════════════════════════════
 // ADMINISTRATION (back-office)
 // ══════════════════════════════════════════════════════════════
@@ -398,6 +350,9 @@ export async function listBooksAdmin(opts: { q?: string; status?: string; sort?:
   if (opts.status === 'forthcoming') {
     // Filtre virtuel « à paraître » : publié + date de parution strictement future.
     where.push("status = 'published' AND published_at != NONE AND published_at > time::now()");
+  } else if (opts.status === 'epuise') {
+    // Filtre virtuel « épuisé » : en ligne, déjà paru, plus de stock.
+    where.push("status = 'published' AND (published_at = NONE OR published_at <= time::now()) AND stock_qty <= 0");
   } else if (opts.status) {
     where.push('status = $status'); vars.status = opts.status;
   }
@@ -406,7 +361,10 @@ export async function listBooksAdmin(opts: { q?: string; status?: string; sort?:
   const field = ADMIN_SORT[opts.sort ?? 'recent'] ?? 'updated_at';
   const dir = opts.dir === 'asc' ? 'ASC' : 'DESC';
   const rows = await query<any>(
-    `SELECT id, title, slug, status, isbn_paper, price_paper, stock_qty, published_at, updated_at, cover.url AS cover_url
+    `SELECT id, title, subtitle, slug, status, isbn_paper, price_paper, price_ebook, stock_qty, published_at, updated_at,
+        cover.url AS cover_url,
+        ->contributed_by[WHERE role = 'author']->author.full_name AS authors,
+        (SELECT VALUE format FROM ebook_asset WHERE book = $parent.id AND status = 'available') AS ebook_formats
        FROM book ${whereSql} ORDER BY ${field} ${dir} LIMIT $limit START $start`, vars);
   const count = await query<any>(`SELECT count() AS n FROM book ${whereSql} GROUP ALL`, vars);
   return { books: rows, total: count[0]?.n ?? 0 };
@@ -551,7 +509,7 @@ export interface BookInput {
   status: string; isbn_paper?: string; isbn_ebook?: string;
   price_paper?: number; price_ebook?: number; subscription_price?: number; subscription_end?: string;
   published_at?: string; page_count?: number; width_cm?: number; height_cm?: number; weight_grams?: number;
-  stock_qty?: number; featured?: boolean;
+  stock_qty?: number; featured?: boolean; keywords?: string[];
   collectionIds: string[]; rubriqueIds: string[]; primaryCollectionId?: string; coverId?: string; galleryIds?: string[];
 }
 
@@ -588,7 +546,8 @@ export async function upsertBook(id: string | null, d: BookInput): Promise<strin
   vars.collections = d.collectionIds.map((x) => recId('collection', x));
   vars.rubriques = d.rubriqueIds.map((x) => recId('rubrique', x));
   vars.gallery = (d.galleryIds ?? []).map((x) => recId('media', x));
-  const arraysSql = 'collections = $collections, rubriques = $rubriques, gallery = $gallery';
+  vars.keywords = d.keywords ?? [];
+  const arraysSql = 'collections = $collections, rubriques = $rubriques, gallery = $gallery, keywords = $keywords';
 
   if (id) {
     await query(`UPDATE $id SET ${sql}, ${arraysSql}`, { ...vars, id: recId('book', id) });
@@ -617,4 +576,38 @@ export async function setBookContributors(
 export async function deleteBook(id: string) {
   await query(`DELETE contributed_by WHERE in = $id`, { id: recId('book', id) });
   await query(`DELETE $id`, { id: recId('book', id) });
+}
+
+/** Vocabulaire des mots-clés déjà employés (suggestions à la saisie), du plus fréquent au plus rare. */
+export async function allBookKeywords(): Promise<string[]> {
+  const rows = await query<any>(`SELECT keywords FROM book WHERE array::len(keywords ?? []) > 0`);
+  const freq = new Map<string, number>();
+  for (const r of rows) for (const k of r.keywords ?? []) freq.set(k, (freq.get(k) ?? 0) + 1);
+  return [...freq.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr')).map(([k]) => k);
+}
+
+/* ————————————————————— Catalogue complet à facettes (public) ————————————————————— */
+
+export interface CatalogueBook extends BookCard {
+  collection?: { slug: string; name: string };
+  keywords: string[];
+}
+
+/**
+ * Tout le catalogue en ligne (~400 titres) en UNE requête : la page /catalogue
+ * filtre, compte les facettes et trie côté client, instantanément.
+ */
+export async function catalogueComplet(): Promise<CatalogueBook[]> {
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS}, keywords,
+        (primary_collection ?? collections[0]).slug AS c_slug,
+        (primary_collection ?? collections[0]).name AS c_name
+       FROM book WHERE status = 'published'
+       ORDER BY published_at DESC`
+  );
+  return rows.map((r) => ({
+    ...toCard(r),
+    collection: r.c_slug ? { slug: r.c_slug, name: r.c_name } : undefined,
+    keywords: (r.keywords ?? []).filter(Boolean)
+  }));
 }

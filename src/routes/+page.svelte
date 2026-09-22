@@ -30,18 +30,22 @@
           <a href="/antichambre" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le magazine →</a>
         </div>
 
-        {#if article.rubrique_name}
-          <a href="/antichambre?rubrique={article.rubrique_slug}" class="tick-label w-fit hover:text-link">{article.rubrique_name}</a>
-        {/if}
+        <!-- Même gabarit que les articles suivants : rubrique en rouge · date,
+             puis le titre, puis l'auteur seul — en plus grand. -->
+        <div class="flex flex-wrap items-center gap-x-2 font-display text-sm uppercase tracking-wide">
+          {#if article.rubrique_name}
+            <a href="/antichambre?rubrique={article.rubrique_slug}" class="font-semibold text-link hover:underline">{article.rubrique_name}</a>
+            {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
+          {/if}
+          {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
+        </div>
 
-        <a href="/article/{article.slug}" class="group mt-5 block">
-          <h1 class="display-title break-words text-4xl leading-[0.92] group-hover:text-link sm:text-5xl lg:text-[3.25rem] xl:text-6xl">{article.title}</h1>
+        <a href="/article/{article.slug}" class="group mt-2 block">
+          <h1 class="display-title break-words text-4xl leading-[0.92] group-hover:text-link sm:text-5xl lg:text-[2.25rem] xl:text-5xl">{article.title}</h1>
         </a>
 
-        {#if article.author || article.published_at}
-          <p class="mt-5 font-display text-sm uppercase tracking-[0.14em] text-muted-foreground">
-            {#if article.author}<span class="text-foreground">{article.author}</span>{/if}{#if article.author && article.published_at} · {/if}{#if article.published_at}{fmt(article.published_at)}{/if}
-          </p>
+        {#if article.author}
+          <p class="mt-2 font-display text-sm uppercase tracking-[0.14em] text-muted-foreground">{article.author}</p>
         {/if}
 
         {#if lede}
@@ -62,7 +66,7 @@
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
                 <h3 class="display-title mt-1 text-xl leading-tight group-hover:text-link">{a.title}</h3>
-                {#if a.author}<p class="mt-0.5 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
+                {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
                 {#if a.excerpt}
                   <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>
                 {/if}
@@ -115,7 +119,7 @@
     <div class="grid gap-y-12 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
       {#if data.forthcoming.length}
         <div>
-          <SectionHead title="À paraître" href="/catalogue" more="Souscriptions" />
+          <SectionHead title="À paraître" href="/catalogue" more="Tous les livres" />
           <div class="grid grid-cols-3 gap-x-5 gap-y-8">
             {#each data.forthcoming.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
           </div>

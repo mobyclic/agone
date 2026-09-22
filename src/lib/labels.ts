@@ -53,10 +53,27 @@ export function isForthcoming(book: { status?: string; published_at?: string | n
   );
 }
 
-/** Libellé d'état d'un livre (à paraître dérivé de la date, sinon le statut). */
-export function bookStateLabel(book: { status?: string; published_at?: string | null }): string {
+/** Statuts STOCKÉS d'un livre. */
+export const BOOK_STATUS_LABEL: Record<string, string> = {
+  published: 'En ligne',
+  draft: 'Brouillon',
+  archived: 'Archivé'
+};
+
+/**
+ * État DÉRIVÉ d'un livre en ligne : « À paraître » (date future) prime sur
+ * « Épuisé » (plus de stock) ; null s'il est simplement disponible.
+ */
+export function bookDerivedState(book: { status?: string; published_at?: string | null; stock_qty?: number | null }): 'À paraître' | 'Épuisé' | null {
+  if (book.status !== 'published') return null;
   if (isForthcoming(book)) return 'À paraître';
-  return CONTENT_STATUS_LABEL[book.status ?? ''] ?? book.status ?? '';
+  if (book.stock_qty != null && book.stock_qty <= 0) return 'Épuisé';
+  return null;
+}
+
+/** Libellé d'état d'un livre : l'état dérivé s'il y en a un, sinon le statut. */
+export function bookStateLabel(book: { status?: string; published_at?: string | null; stock_qty?: number | null }): string {
+  return bookDerivedState(book) ?? BOOK_STATUS_LABEL[book.status ?? ''] ?? book.status ?? '';
 }
 
 /** Formate un prix en euros (fr). */

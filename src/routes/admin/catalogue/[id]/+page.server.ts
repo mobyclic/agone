@@ -2,14 +2,14 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import {
-  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, type BookInput
+  getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, type BookInput
 } from '$lib/server/catalogue';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
-  const [collections, rubriques] = await Promise.all([allCollections(), allRubriques()]);
+  const [collections, rubriques, allKeywords] = await Promise.all([allCollections(), allRubriques(), allBookKeywords()]);
   if (params.id === 'nouveau') {
-    return { isNew: true, book: null, contributors: [], collections, rubriques };
+    return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords };
   }
   const data = await getBookAdmin(params.id);
   if (!data) throw error(404, { message: 'Livre introuvable' });
@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ params }) => {
     role: c.role,
     share: c.share ?? 100
   }));
-  return { isNew: false, book: data.book, contributors, collections, rubriques };
+  return { isNew: false, book: data.book, contributors, collections, rubriques, allKeywords };
 };
 
 export const actions: Actions = {
@@ -65,6 +65,8 @@ export const actions: Actions = {
       weight_grams: N('weight_grams'),
       stock_qty: N('stock_qty') ?? 0,
       featured: fd.get('featured') === 'on',
+      // « a, b ; c » → ['a','b','c'] (dédoublonné sans tenir compte de la casse).
+      keywords: [...new Map(S('keywords').split(/[,;\n]/).map((k) => k.trim()).filter(Boolean).map((k) => [k.toLowerCase(), k])).values()],
       collectionIds: collectionId ? [collectionId] : [],
       rubriqueIds: fd.getAll('rubriques').map(String),
       primaryCollectionId: collectionId,

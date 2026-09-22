@@ -1,5 +1,7 @@
+import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { listArticlesAdmin, listAllRubriques, type ArticleSort } from '$lib/server/articles';
+import { requireStaff } from '$lib/server/access';
+import { listArticlesAdmin, listAllRubriques, setArticleStatus, type ArticleSort } from '$lib/server/articles';
 
 const LIMIT = 50;
 const SORTS: ArticleSort[] = ['title', 'status', 'views', 'date'];
@@ -17,4 +19,17 @@ export const load: PageServerLoad = async ({ url }) => {
     listAllRubriques()
   ]);
   return { articles, total, rubriques, q, status, rubrique, sort, dir, page, limit: LIMIT };
+};
+
+export const actions: Actions = {
+  // Interrupteur Publié / Brouillon de la liste.
+  statut: async ({ request, locals }) => {
+    requireStaff(locals);
+    const fd = await request.formData();
+    const id = String(fd.get('id') ?? '');
+    const s = String(fd.get('status') ?? '');
+    if (!id || (s !== 'published' && s !== 'draft')) return fail(400, { error: 'Requête invalide.' });
+    await setArticleStatus(id, s);
+    return { ok: true };
+  }
 };

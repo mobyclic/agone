@@ -8,8 +8,10 @@
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
 
-  let counter = 0;
-  const nid = () => `b${++counter}`;
+  // Identifiants aléatoires : un compteur repartant de 1 à chaque chargement
+  // recréait « b1 » alors qu'un bloc enregistré le portait déjà → clés en double
+  // dans le {#each} et éditeur planté dès l'ajout d'un bloc sur un numéro existant.
+  const nid = () => `b${Math.random().toString(36).slice(2, 10)}`;
 
   type Block = Record<string, any> & { id: string; type: string };
   let title = $state(untrack(() => data.issue?.title ?? ''));

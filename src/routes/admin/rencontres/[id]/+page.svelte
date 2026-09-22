@@ -96,19 +96,26 @@
   <ArrowLeft size={16} /> Rencontres
 </a>
 
-<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvelle rencontre' : ev?.title}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
-  <div class="grid gap-6 sm:grid-cols-[1fr_220px]">
-    <div class="space-y-5">
+  <!-- Pleine largeur : contenu à gauche, rattachements (auteurs, livres, couverture) à droite. -->
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <div class="min-w-0 space-y-5">
       <div class="rounded-lg border border-border bg-card p-4">
         <label class={label}>Titre <input name="title" value={ev?.title ?? ''} class={input} /></label>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           <label class={label}>Début <input name="start_at" type="datetime-local" bind:value={start} class={input} /></label>
           <label class={label}>Fin <input name="end_at" type="datetime-local" bind:value={end} class={input} /></label>
         </div>
+      </div>
+
+      <!-- Description juste après les dates : c'est le contenu principal de la fiche. -->
+      <div class="rounded-lg border border-border bg-card p-4">
+        <span class={label}>Description</span>
+        {#key ev?.id}<RichEditor name="body_html" value={ev?.body_html ?? ''} minHeight="20rem" onchange={() => (dirty = true)} />{/key}
       </div>
 
       <!-- Lieu -->
@@ -175,25 +182,21 @@
         {/if}
       </div>
 
-      <div class="rounded-lg border border-border bg-card p-4">
-        <span class={label}>Description</span>
-        {#key ev?.id}<RichEditor name="body_html" value={ev?.body_html ?? ''} minHeight="14rem" onchange={() => (dirty = true)} />{/key}
-      </div>
     </div>
 
     <div class="space-y-5">
       <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow mb-3">Couverture</h3>
-        <ImageUpload bind:mediaId={coverId} bind:url={coverUrl} folder="rencontres" kind="cover" label="" accept="image/*" />
-        <input type="hidden" name="coverId" value={coverId ?? ''} />
-      </div>
-      <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Auteurs</h3>
-        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
+        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Livres associés</h3>
-        {#key ev?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" initial={ev?.books ?? []} placeholder="Associer un livre…" onchange={() => (dirty = true)} />{/key}
+        {#key ev?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" visuel="couverture" lienBase="/admin/catalogue/" initial={ev?.books ?? []} placeholder="Associer un livre…" onchange={() => (dirty = true)} />{/key}
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4">
+        <h3 class="eyebrow mb-3">Couverture</h3>
+        <ImageUpload bind:mediaId={coverId} bind:url={coverUrl} folder="rencontres" kind="cover" label="" accept="image/*" />
+        <input type="hidden" name="coverId" value={coverId ?? ''} />
       </div>
     </div>
   </div>
@@ -235,13 +238,13 @@
     {:else if data.isNew || dirty}
       <Button type="submit" variant="brand" class="shadow-2xl"><FloppyDisk size={16} /> Enregistrer</Button>
     {:else if ev?.slug}
-      <Button href="/rencontres/{ev.slug}" target="_blank" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
+      <Button href="/rencontres/{ev.slug}" variant="outline" class="bg-background shadow-2xl"><Eye size={16} /> Voir en ligne</Button>
     {/if}
   </div>
 </form>
 
 {#if !data.isNew}
-  <form method="POST" action="?/delete" use:enhance class="mt-6 max-w-3xl border-t border-border pt-4">
+  <form method="POST" action="?/delete" use:enhance class="mt-6 border-t border-border pt-4">
     <Button type="submit" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10"
       onclick={(e: Event) => { if (!confirm('Supprimer cette rencontre ?')) e.preventDefault(); }}>
       <Trash size={15} /> Supprimer cette rencontre

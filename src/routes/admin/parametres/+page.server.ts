@@ -33,45 +33,50 @@ export const load: PageServerLoad = async () => {
 };
 
 /**
- * Import incrémental : on repart du curseur mémorisé (`sync_state`), sauf demande
- * explicite de tout réimporter. Le curseur n'est réécrit qu'après un import réel
- * et réussi — jamais en simulation, jamais s'il reculerait.
+ * Ordre de synchronisation — il n'est PAS arbitraire : chaque étape s'appuie sur
+ * ce que les précédentes ont posé.
+ *   1. Auteurs      — aucune dépendance.
+ *   2. Livres       — arêtes contributed_by → auteurs.
+ *   3. Articles     — liés aux auteurs et aux livres.
+ *   4. Rencontres   — auteurs, livres, lieux.
+ *   5. Utilisateurs — comptes clients.
+ *   6. Commandes    — rattachées aux comptes (5) et aux livres (2).
  */
-async function runSync(
-  key: string,
-  fn: (o: ImportOpts) => Promise<ImportResult>,
-  fd: FormData
-) {
-  const limit = Math.max(1, Math.min(5000, Number(fd.get('limit') ?? 500) || 500));
-  const dryRun = fd.get('dryRun') === 'on';
-  const full = fd.get('full') === 'on';
+const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult> }[] = [
+  { key: 'authors', label: 'Auteurs', fn: importAuthors },
+  { key: 'books', label: 'Livres', fn: importBooks },
+  { key: 'articles', label: 'Articles', fn: importArticles },
+  { key: 'events', label: 'Rencontres', fn: importEvents },
+  { key: 'users', label: 'Utilisateurs', fn: importUsers },
+  { key: 'orders', label: 'Commandes', fn: importOrders }
+];
 
+/**
+ * Une étape, en incrémental : on repart du curseur mémorisé (`sync_state`), sauf
+ * demande explicite de tout réimporter. Le curseur n'est réécrit qu'après un
+ * import réel et réussi — jamais en simulation, jamais s'il reculerait.
+ */
+async function syncEtape(key: string, fn: (o: ImportOpts) => Promise<ImportResult>, opts: { limit: number; dryRun: boolean; full: boolean }) {
   const state = ((await getSetting('sync_state')) ?? {}) as Record<string, any>;
   const prev = state[key]?.watermark ? new Date(String(state[key].watermark)) : null;
-  const since = full ? null : prev;
-
-  try {
-    const result = await fn({ limit, dryRun, since });
-    if (!dryRun) {
-      const next = result.watermark ?? state[key]?.watermark;
-      // Un lot vide laisse le curseur intact ; il ne recule jamais.
-      const keep = prev && next && new Date(next) < prev ? prev.toISOString() : next;
-      await setSetting('sync_state', {
-        ...state,
-        [key]: {
-          at: new Date().toISOString(),
-          watermark: keep ?? null,
-          fetched: result.fetched,
-          created: result.created,
-          updated: result.updated,
-          full_scan: result.fullScan === true
-        }
-      });
-    }
-    return { sync: result };
-  } catch (e) {
-    return fail(500, { syncError: e instanceof Error ? e.message : 'Échec de la synchronisation.' });
+  const result = await fn({ limit: opts.limit, dryRun: opts.dryRun, since: opts.full ? null : prev });
+  if (!opts.dryRun) {
+    const next = result.watermark ?? state[key]?.watermark;
+    // Un lot vide laisse le curseur intact ; il ne recule jamais.
+    const keep = prev && next && new Date(next) < prev ? prev.toISOString() : next;
+    await setSetting('sync_state', {
+      ...state,
+      [key]: {
+        at: new Date().toISOString(),
+        watermark: keep ?? null,
+        fetched: result.fetched,
+        created: result.created,
+        updated: result.updated,
+        full_scan: result.fullScan === true
+      }
+    });
   }
+  return result;
 }
 
 export const actions: Actions = {
@@ -126,10 +131,25 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/parametres', 'Informations de facturation enregistrées.', 'success'));
   },
 
-  syncUsers: async ({ request, locals }) => { requireAdmin(locals); return runSync('users', importUsers, await request.formData()); },
-  syncOrders: async ({ request, locals }) => { requireAdmin(locals); return runSync('orders', importOrders, await request.formData()); },
-  syncAuthors: async ({ request, locals }) => { requireAdmin(locals); return runSync('authors', importAuthors, await request.formData()); },
-  syncArticles: async ({ request, locals }) => { requireAdmin(locals); return runSync('articles', importArticles, await request.formData()); },
-  syncBooks: async ({ request, locals }) => { requireAdmin(locals); return runSync('books', importBooks, await request.formData()); },
-  syncEvents: async ({ request, locals }) => { requireAdmin(locals); return runSync('events', importEvents, await request.formData()); }
+  /** Tout synchroniser, dans l'ordre des dépendances ; arrêt à la première erreur. */
+  syncTout: async ({ request, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const opts = {
+      limit: Math.max(1, Math.min(5000, Number(fd.get('limit') ?? 2000) || 2000)),
+      dryRun: fd.get('dryRun') === 'on',
+      full: fd.get('full') === 'on'
+    };
+    const etapes: { key: string; label: string; result?: ImportResult; error?: string }[] = [];
+    for (const e of ETAPES) {
+      try {
+        etapes.push({ key: e.key, label: e.label, result: await syncEtape(e.key, e.fn, opts) });
+      } catch (err) {
+        // Les étapes suivantes dépendent de celle-ci : inutile (voire nuisible) de continuer.
+        etapes.push({ key: e.key, label: e.label, error: err instanceof Error ? err.message : 'Échec.' });
+        break;
+      }
+    }
+    return { syncTout: { dryRun: opts.dryRun, etapes } };
+  }
 };

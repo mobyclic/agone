@@ -25,13 +25,22 @@ export interface NewsletterIssue {
 
 export async function getNewsletterIssue(id: string): Promise<NewsletterIssue | null> {
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, title, status, newsletter_blocks AS blocks
+    `SELECT meta::id(id) AS id, title, status, newsletter_blocks AS blocks, body_html,
+        books.{ id: meta::id(id), title: title } AS books
        FROM article WHERE id = $id LIMIT 1`,
     { id: recId('article', id) }
   );
   const a = rows[0];
   if (!a) return null;
-  return { id: a.id, title: a.title, status: a.status ?? 'draft', blocks: Array.isArray(a.blocks) ? a.blocks : [] };
+  let blocks: NlBlock[] = Array.isArray(a.blocks) ? a.blocks : [];
+  // Numéros migrés de WordPress : pas de blocs, tout est dans body_html. Sans ce
+  // repli l'éditeur s'ouvrait VIDE — et enregistrer effaçait le corps de l'article.
+  if (!blocks.length && a.body_html) {
+    blocks = [{ type: 'text', html: a.body_html }];
+    const livres = (a.books ?? []).filter((b: any) => b?.id);
+    if (livres.length) blocks.push({ type: 'books', books: livres });
+  }
+  return { id: a.id, title: a.title, status: a.status ?? 'draft', blocks };
 }
 
 /** Corps HTML « Antichambre » dérivé des blocs (titres + textes + livres en liens). */
@@ -74,8 +83,9 @@ export async function saveNewsletterIssue(id: string | null, input: NewsletterIs
     body_html: body_html || undefined,
     books
   };
+  // Garde-fou : un numéro sans aucun contenu textuel ne remplace pas un corps existant.
   const set = `title = $title, status = $status, is_newsletter_issue = true,
-    newsletter_blocks = $blocks, books = $books, body_html = $body_html`;
+    newsletter_blocks = $blocks, books = $books, body_html = $body_html ?? body_html`;
 
   if (id) {
     await query(`UPDATE $id SET ${set}`, { ...vars, id: recId('article', id) });

@@ -358,3 +358,25 @@
 .page-head :is(p, a, span).text-muted-foreground {
   color: color-mix(in oklch, var(--sidebar-foreground) 72%, transparent);
 }
+
+/* ============================================================
+   Notes de bas de page (cf. notesDeBasDePage dans $lib/text.ts)
+   ============================================================ */
+.appel-note { line-height: 0; font-size: 0.72em; margin-left: 0.08em; }
+.appel-note a { font-weight: 600; text-decoration: none; padding: 0 0.1em; }
+.appel-note a:target, .appel-note:target a { background: color-mix(in oklch, var(--link) 15%, transparent); }
+.notes-bas-de-page {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875em;
+  line-height: 1.55;
+  color: color-mix(in oklch, var(--foreground) 82%, transparent);
+  text-align: left;
+}
+.notes-bas-de-page ol { list-style: decimal; padding-left: 1.6em; }
+.notes-bas-de-page li { margin-bottom: 0.45em; scroll-margin-top: 6rem; padding-left: 0.2em; }
+.notes-bas-de-page li:target { background: color-mix(in oklch, var(--link) 8%, transparent); }
+.notes-bas-de-page li::marker { font-weight: 600; color: var(--link); }
+.notes-bas-de-page .retour-note { text-decoration: none; margin-left: 0.15em; }
+.appel-note { scroll-margin-top: 6rem; }

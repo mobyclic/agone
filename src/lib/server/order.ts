@@ -150,10 +150,13 @@ export async function orderStats(): Promise<OrderStats> {
 }
 
 /** Liste paginée des commandes (back-office), recherche par n° ou client. */
-export async function listOrdersAdmin(opts: { q?: string; status?: string; limit?: number; offset?: number } = {}) {
+export async function listOrdersAdmin(opts: { q?: string; status?: string; type?: string; limit?: number; offset?: number } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  // Invité = commande sans compte client rattaché.
+  if (opts.type === 'invites') where.push('customer = NONE');
+  else if (opts.type === 'clients') where.push('customer != NONE');
   if (opts.q && opts.q.trim()) {
     const q = opts.q.trim();
     if (/^\d+$/.test(q)) { where.push('number = $num'); vars.num = Number(q); }
@@ -165,7 +168,8 @@ export async function listOrdersAdmin(opts: { q?: string; status?: string; limit
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const rows = await query<any>(
     `SELECT number, status, total, item_count, has_ebook, has_physical, created_at, paid_at, email,
-       customer.full_name AS customer_name, customer.email AS customer_email
+       customer.full_name AS customer_name, customer.email AS customer_email, customer != NONE AS has_account,
+       billing.first_name AS b_first, billing.last_name AS b_last
      FROM order ${whereSql} ORDER BY created_at DESC LIMIT $limit START $start`,
     vars
   );

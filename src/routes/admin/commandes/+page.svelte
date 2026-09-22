@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { MagnifyingGlass, Plus } from 'phosphor-svelte';
   import { Button } from '$lib/components/ui/button';
+  import Pagination from '$lib/components/Pagination.svelte';
   import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
 
   let { data } = $props();
@@ -20,7 +21,7 @@
   let timer: ReturnType<typeof setTimeout>;
 
   function nav(params: Record<string, string | number | undefined>) {
-    const merged: Record<string, string | number | undefined> = { q, status: data.status, page: data.page, ...params };
+    const merged: Record<string, string | number | undefined> = { q, status: data.status, type: data.type, page: data.page, ...params };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
       if (v === undefined || v === '' || (k === 'page' && v === 1)) continue;
@@ -56,6 +57,13 @@
     <option value="">Tous les statuts</option>
     {#each Object.entries(ORDER_STATUS_LABEL) as [k, v] (k)}<option value={k}>{v}</option>{/each}
   </select>
+  <!-- Invités (sans compte) / clients (avec compte) -->
+  <div class="flex overflow-hidden rounded-md border border-border bg-background text-sm">
+    {#each [['', 'Tous'], ['clients', 'Clients'], ['invites', 'Invités']] as [k, v] (k)}
+      <button type="button" onclick={() => nav({ type: k || undefined, page: 1 })}
+        class="px-3.5 transition-colors {(data.type ?? '') === k ? 'bg-foreground text-background' : 'hover:bg-muted'}">{v}</button>
+    {/each}
+  </div>
 </div>
 
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
@@ -72,10 +80,13 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.orders as o (o.number)}
-        <tr class="hover:bg-muted/30">
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/commandes/${o.number}`); }}>
           <td class="px-3 py-2"><a href="/admin/commandes/{o.number}" class="font-medium hover:text-link">#{o.number}</a></td>
           <td class="px-3 py-2">
-            <div class="text-foreground">{o.customer_name || 'Invité'}</div>
+            <div class="text-foreground">
+              {o.customer_name || [o.b_first, o.b_last].filter(Boolean).join(' ') || '—'}
+              {#if !o.has_account}<span class="ml-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">invité</span>{/if}
+            </div>
             <div class="text-xs text-muted-foreground">{o.customer_email || o.email || '—'}</div>
           </td>
           <td class="px-3 py-2 text-xs text-muted-foreground">
@@ -94,10 +105,4 @@
   </table>
 </div>
 
-{#if pageCount > 1}
-  <div class="mt-6 flex items-center justify-center gap-2 text-sm">
-    {#if data.page > 1}<button type="button" onclick={() => nav({ page: data.page - 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">←</button>{/if}
-    <span class="px-3 py-2 text-muted-foreground">Page {data.page} / {pageCount}</span>
-    {#if data.page < pageCount}<button type="button" onclick={() => nav({ page: data.page + 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">→</button>{/if}
-  </div>
-{/if}
+<Pagination page={data.page} {pageCount} onpage={(p) => nav({ page: p })} />

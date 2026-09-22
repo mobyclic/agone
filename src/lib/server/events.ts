@@ -3,7 +3,7 @@
  * Les lieux sont des `venue` réutilisables et géolocalisés.
  */
 import { query, recId } from './surreal';
-import { sansScripts } from '$lib/text';
+import { sansScripts, notesDeBasDePage } from '$lib/text';
 import { uniqueSlug } from './slug';
 import { geocodeAddress } from './geocode';
 import { GeometryPoint } from 'surrealdb';
@@ -95,7 +95,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail | null> 
     id: e.pid,
     title: e.title,
     slug: e.slug,
-    body_html: sansScripts(e.body_html),
+    body_html: notesDeBasDePage(sansScripts(e.body_html)),
     cover_url: e.cover_url ?? undefined,
     start_at: e.start_at ?? undefined,
     end_at: e.end_at ?? undefined,
@@ -198,8 +198,8 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
         venue.lat AS venue_lat, venue.lng AS venue_lng,
         venue.phone AS venue_phone, venue.website AS venue_website,
         venue.description AS venue_description,
-        authors.{ id: id, label: full_name } AS authors,
-        books.{ id: id, label: title } AS books
+        authors.{ id: id, label: full_name, image: portrait.url } AS authors,
+        books.{ id: id, label: title, image: cover.url } AS books
       FROM event WHERE id = $id LIMIT 1`,
     { id: recId('event', id) }
   );
@@ -221,8 +221,8 @@ export async function getEventForEdit(id: string): Promise<EventEdit | null> {
     venue_phone: e.venue_phone ?? undefined,
     venue_website: e.venue_website ?? undefined,
     venue_description: e.venue_description ?? undefined,
-    authors: (e.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' })),
-    books: (e.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' }))
+    authors: (e.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—', image: x.image ?? undefined })),
+    books: (e.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—', image: x.image ?? undefined }))
   };
 }
 
@@ -371,4 +371,42 @@ export async function listUpcomingWithVenues(): Promise<UpcomingEntry[]> {
         }
       : undefined
   }));
+}
+
+/* ————————————————————— Rencontres à venir liées (fiches livre & auteur) ————————————————————— */
+
+const nu = (id: string, table: string) => String(id).replace(new RegExp(`^${table}:`), '');
+
+/**
+ * Rencontres à venir d'un livre : celles qui citent le livre, ou l'un de ses
+ * AUTEURS (rôle author — une rencontre du préfacier sur un autre sujet n'a pas
+ * sa place sur la fiche).
+ */
+export async function upcomingForBook(bookId: string): Promise<EventCard[]> {
+  const b = recId('book', nu(bookId, 'book'));
+  const auteurs = await query<string>(`SELECT VALUE out FROM contributed_by WHERE in = $b AND role = 'author'`, { b });
+  const au = auteurs.map((x) => recId('author', nu(x, 'author')));
+  const rows = await query<any>(
+    `SELECT ${CARD} FROM event
+       WHERE start_at != NONE AND start_at >= time::now()
+         AND ($b INSIDE (books ?? []) OR (authors ?? []) ANYINSIDE $au)
+       ORDER BY start_at ASC LIMIT 12`,
+    { b, au }
+  );
+  return rows.map(toCard);
+}
+
+/** Rencontres à venir d'un auteur : où il est invité, ou qui citent l'un de ses livres. */
+export async function upcomingForAuthor(authorId: string): Promise<EventCard[]> {
+  const a = recId('author', nu(authorId, 'author'));
+  const livres = await query<string>(`SELECT VALUE in FROM contributed_by WHERE out = $a AND role = 'author'`, { a });
+  const bk = livres.map((x) => recId('book', nu(x, 'book')));
+  const rows = await query<any>(
+    `SELECT ${CARD} FROM event
+       WHERE start_at != NONE AND start_at >= time::now()
+         AND ($a INSIDE (authors ?? []) OR (books ?? []) ANYINSIDE $bk)
+       ORDER BY start_at ASC LIMIT 12`,
+    { a, bk }
+  );
+  return rows.map(toCard);
 }

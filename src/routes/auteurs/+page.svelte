@@ -67,10 +67,10 @@
       {#each groups as [letter, authors] (letter)}
         <div id="lettre-{letter}" class="grid scroll-mt-20 gap-x-8 gap-y-2 sm:grid-cols-[4rem_1fr]">
           <div class="display-title text-5xl leading-none text-foreground sm:text-5xl">{letter}</div>
-          <ul class="columns-1 gap-x-10 sm:columns-2 lg:columns-3">
+          <ul class="columns-1 gap-x-10 sm:columns-2 lg:columns-4">
             {#each authors as a (a.slug)}
               <li class="break-inside-avoid">
-                <a href="/auteur/{a.slug}" class="link inline-block py-0.5 leading-snug">{a.label}</a>
+                <a href="/auteur/{a.slug}" class="inline-block py-0.5 leading-snug text-foreground hover:text-link">{a.label}</a>
               </li>
             {/each}
           </ul>

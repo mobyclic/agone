@@ -14,16 +14,16 @@
 
 <svelte:head><title>Mon panier · Agone</title></svelte:head>
 
-<PageHead eyebrow="Boutique" title="Mon panier" width="max-w-5xl" />
+<PageHead eyebrow="Boutique" title="Mon panier" width="mx-auto max-w-6xl" />
 
-<div class="max-w-5xl py-10" style="padding-inline: var(--page-gutter)">
+<div class="mx-auto max-w-6xl py-10" style="padding-inline: var(--page-gutter)">
   {#if data.cart.lines.length === 0}
     <div class="rounded-lg border border-border bg-card p-10 text-center">
       <p class="text-muted-foreground">Votre panier est vide.</p>
       <Button href="/catalogue" variant="brand" class="mt-4"><BookOpen size={16} /> Parcourir le catalogue</Button>
     </div>
   {:else}
-    <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
+    <div class="mt-6 grid gap-8 lg:grid-cols-[1fr_360px] lg:items-start">
       <!-- Lignes -->
       <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
       {#each data.cart.lines as l (l.id + l.format)}

@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
-import { listUpcoming } from '$lib/server/events';
+import { listUpcomingWithVenues } from '$lib/server/events';
 
 export const load: PageServerLoad = async () => {
-  return { upcoming: await listUpcoming() };
+  // Même agenda que l'accueil : liste dépliante + carte (cf. EventsExplorer).
+  return { events: await listUpcomingWithVenues() };
 };

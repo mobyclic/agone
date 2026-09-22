@@ -1,13 +1,17 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
+  import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
+  import Pagination from '$lib/components/Pagination.svelte';
   import { Plus, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
-  import { CONTENT_STATUS_LABEL } from '$lib/labels';
 
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  const futur = (s?: string) => !!s && new Date(s).getTime() > Date.now();
+  /** Bascule optimiste : l'interrupteur change tout de suite, la liste se recharge ensuite. */
+  let enCours = $state<Record<string, string>>({});
 
   let q = $state(untrack(() => data.q ?? ''));
   let timer: ReturnType<typeof setTimeout>;
@@ -77,16 +81,22 @@
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
       <tr>
+        {@render sortTh('date', 'Date')}
         {@render sortTh('title', 'Titre')}
         <th class="px-3 py-2 font-medium">Catégorie</th>
-        {@render sortTh('status', 'Statut')}
+        {@render sortTh('status', 'Publié')}
         {@render sortTh('views', 'Vues', true)}
-        {@render sortTh('date', 'Date', true)}
       </tr>
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.articles as a (a.id)}
-        <tr class="hover:bg-muted/30">
+        {@const statut = enCours[a.id] ?? a.status}
+        {@const publie = statut === 'published'}
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button,form')) goto(`/admin/articles/${a.id}`); }}>
+          <td class="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
+            {dateFr(a.published_at)}
+            {#if publie && futur(a.published_at)}<div class="text-[11px] font-medium text-warning">programmé</div>{/if}
+          </td>
           <td class="px-3 py-2">
             <a href="/admin/articles/{a.id}" class="font-medium hover:text-link">{a.title}</a>
             {#if a.is_newsletter_issue}<span class="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">LettrInfo</span>{/if}
@@ -94,10 +104,20 @@
           </td>
           <td class="px-3 py-2 text-muted-foreground">{a.rubrique_name ?? '—'}</td>
           <td class="px-3 py-2">
-            <span class="rounded px-2 py-0.5 text-xs font-medium {a.status === 'published' ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}">{CONTENT_STATUS_LABEL[a.status] ?? a.status}</span>
+            <form method="POST" action="?/statut" use:enhance={() => {
+              enCours[a.id] = publie ? 'draft' : 'published';
+              return async ({ update }) => { await update({ reset: false, invalidateAll: true }); delete enCours[a.id]; };
+            }}>
+              <input type="hidden" name="id" value={a.id} />
+              <input type="hidden" name="status" value={publie ? 'draft' : 'published'} />
+              <button type="submit" role="switch" aria-checked={publie} title={publie ? 'Publié — cliquer pour repasser en brouillon' : 'Brouillon — cliquer pour publier'}
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {publie ? 'bg-success' : 'bg-muted-foreground/30'}">
+                <span class="inline-block size-4 rounded-full bg-white shadow transition-transform {publie ? 'translate-x-[18px]' : 'translate-x-0.5'}"></span>
+                <span class="sr-only">{publie ? 'Publié' : 'Brouillon'}</span>
+              </button>
+            </form>
           </td>
           <td class="px-3 py-2 text-right tabular-nums text-muted-foreground">{a.views ? a.views.toLocaleString('fr-FR') : '—'}</td>
-          <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(a.published_at)}</td>
         </tr>
       {/each}
       {#if data.articles.length === 0}
@@ -107,10 +127,4 @@
   </table>
 </div>
 
-{#if pageCount > 1}
-  <div class="mt-6 flex items-center justify-center gap-2 text-sm">
-    {#if data.page > 1}<button type="button" onclick={() => nav({ page: data.page - 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">←</button>{/if}
-    <span class="px-3 py-2 text-muted-foreground">Page {data.page} / {pageCount}</span>
-    {#if data.page < pageCount}<button type="button" onclick={() => nav({ page: data.page + 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">→</button>{/if}
-  </div>
-{/if}
+<Pagination page={data.page} {pageCount} onpage={(p) => nav({ page: p })} />

@@ -7,6 +7,8 @@
   import { fade, scale } from 'svelte/transition';
   import { Button } from '$lib/components/ui/button';
   import Lightbox from '$lib/components/Lightbox.svelte';
+  import RencontresAVenir from '$lib/components/RencontresAVenir.svelte';
+  import CouverturesGrille from '$lib/components/CouverturesGrille.svelte';
   import { ROLE_LABEL, euros, isForthcoming } from '$lib/labels';
   import { trackAddToCart, itemId } from '$lib/analytics';
   import { BookOpen, FileText, HandCoins, PencilSimple, MagnifyingGlassPlus, CheckCircle, X, ShoppingCart, SquaresFour, CircleNotch } from 'phosphor-svelte';
@@ -84,6 +86,12 @@
     <div class="fixed bottom-6 right-6 z-40">
       <Button href="/admin/catalogue/{bookId}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
     </div>
+  {/if}
+  {#if b.status !== 'published'}
+    <!-- Aperçu staff : le public reçoit une 404 sur cette adresse. -->
+    <p class="mb-6 rounded-md border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+      <strong>{b.status === 'archived' ? 'Archivé' : 'Brouillon'}</strong> — aperçu réservé à l'équipe, invisible du public.
+    </p>
   {/if}
 
   <!-- Deux tiers : couverture + contenu. Un tiers : colonne latérale. -->
@@ -184,6 +192,8 @@
 
     <!-- Sidebar : du même auteur / dans la même collection -->
     <aside use:colonneCollante class="space-y-8">
+      <!-- En tête : les prochaines rencontres du livre ou de ses auteurs. -->
+      <RencontresAVenir rencontres={data.rencontres} />
       {#if data.sameAuthor.length}
         <div>
           <div class="tick-label mb-3">Du même auteur</div>
@@ -193,24 +203,7 @@
           <!-- Largeur bornée : sur un écran large, deux colonnes libres donnaient des
                couvertures de 380 px, hors de proportion avec la colonne. ~190 px,
                soit le double des vignettes de « Dans la même collection ». -->
-          <ul class="grid max-w-[400px] grid-cols-2 gap-3">
-            {#each data.sameAuthor as s (s.slug)}
-              <li>
-                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
-                  {#if s.cover_url}
-                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                  {:else}
-                    <span class="flex aspect-[2/3] items-end bg-ink p-2"><span class="font-display text-xs uppercase leading-tight text-white">{s.title}</span></span>
-                  {/if}
-                  <span
-                    class="pointer-events-none absolute inset-0 flex items-end bg-ink/75 p-2.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-                  >
-                    <span class="line-clamp-4 font-display text-sm font-medium uppercase leading-tight text-white">{s.title}</span>
-                  </span>
-                </a>
-              </li>
-            {/each}
-          </ul>
+          <CouverturesGrille livres={data.sameAuthor} colonnes={2} />
         </div>
       {/if}
       {#if data.contributions.length}
@@ -219,22 +212,7 @@
           <!-- Préface, postface, traduction, illustration… Trois colonnes, donc
                des couvertures plus petites que « Du même auteur » : ces titres
                ne sont pas de lui, ils pèsent moins dans la page. -->
-          <ul class="grid max-w-[400px] grid-cols-3 gap-2.5">
-            {#each data.contributions as s (s.slug)}
-              <li>
-                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
-                  {#if s.cover_url}
-                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                  {:else}
-                    <span class="flex aspect-[2/3] items-end bg-ink p-1.5"><span class="font-display text-[10px] uppercase leading-tight text-white">{s.title}</span></span>
-                  {/if}
-                  <span class="pointer-events-none absolute inset-0 flex items-end bg-ink/75 p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                    <span class="line-clamp-4 font-display text-[11px] font-medium uppercase leading-tight text-white">{s.title}</span>
-                  </span>
-                </a>
-              </li>
-            {/each}
-          </ul>
+          <CouverturesGrille livres={data.contributions} colonnes={3} />
         </div>
       {/if}
 
@@ -244,25 +222,7 @@
           <!-- Même grille que « Ses autres contributions ». L'auteur change d'un
                titre à l'autre : il rejoint le titre dans la surimpression, pour
                que passer en couvertures seules ne perde pas l'information. -->
-          <ul class="grid max-w-[400px] grid-cols-3 gap-2.5">
-            {#each data.sameCollection as s (s.slug)}
-              <li>
-                <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
-                  {#if s.cover_url}
-                    <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                  {:else}
-                    <span class="flex aspect-[2/3] items-end bg-ink p-1.5"><span class="font-display text-[10px] uppercase leading-tight text-white">{s.title}</span></span>
-                  {/if}
-                  <span class="pointer-events-none absolute inset-0 flex flex-col justify-end gap-0.5 bg-ink/75 p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                    <span class="line-clamp-3 font-display text-[11px] font-medium uppercase leading-tight text-white">{s.title}</span>
-                    {#if s.authors?.length}
-                      <span class="line-clamp-1 font-display text-[10px] uppercase tracking-wide text-white/70">{s.authors[0].name}</span>
-                    {/if}
-                  </span>
-                </a>
-              </li>
-            {/each}
-          </ul>
+          <CouverturesGrille livres={data.sameCollection} colonnes={3} avecAuteur />
         </div>
       {/if}
     </aside>

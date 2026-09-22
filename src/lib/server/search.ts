@@ -4,6 +4,7 @@
  */
 import { query } from './surreal';
 import { deburr, accentRegex } from '$lib/text';
+import { ARTICLE_EN_LIGNE } from './articles';
 
 export interface SearchResults {
   books: { title: string; slug: string; cover_url?: string; author?: string }[];
@@ -27,7 +28,7 @@ export async function siteSearch(qRaw: string, perType = 6): Promise<SearchResul
          ORDER BY full_name ASC LIMIT $lim`, vars),
     query<any>(
       `SELECT title, slug, published_at, rubrique.name AS rubrique FROM article
-         WHERE status = 'published' AND string::matches(title, $re)
+         WHERE ${ARTICLE_EN_LIGNE} AND string::matches(title, $re)
          ORDER BY published_at DESC LIMIT $lim`, vars),
     query<any>(
       `SELECT title, slug, start_at, venue.city AS venue_city FROM event

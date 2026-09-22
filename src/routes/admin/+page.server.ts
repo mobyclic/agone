@@ -20,7 +20,8 @@ export const load: PageServerLoad = async ({ locals }) => {
     count('book', "status = 'published' AND (published_at = NONE OR published_at <= time::now())"),
     count('book', "status = 'published' AND published_at != NONE AND published_at > time::now()"),
     count('book', "status = 'draft'"),
-    count('book', "status = 'out_of_print'"),
+    // Épuisé = état dérivé : en ligne, déjà paru, plus de stock.
+    count('book', "status = 'published' AND (published_at = NONE OR published_at <= time::now()) AND stock_qty <= 0"),
     count('author'),
     count('article', "status = 'published'"),
     count('article', "status = 'draft'"),

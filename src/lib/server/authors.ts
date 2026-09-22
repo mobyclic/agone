@@ -153,31 +153,6 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
 // ADMINISTRATION (back-office)
 // ══════════════════════════════════════════════════════════════
 
-export type AuthorSort = 'name' | 'titres' | 'visibilite';
-
-export async function listAuthorsAdmin(
-  opts: { q?: string; limit?: number; offset?: number; sort?: AuthorSort; dir?: 'asc' | 'desc' } = {}
-) {
-  const where: string[] = [];
-  const vars: Record<string, unknown> = { limit: opts.limit ?? 60, start: opts.offset ?? 0 };
-  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(full_name) CONTAINS $q'); }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  // Tri whitelisté (les champs sont tous présents dans le SELECT → ORDER BY valide).
-  const dir = opts.dir === 'desc' ? 'DESC' : 'ASC';
-  const orderBy: Record<AuthorSort, string> = {
-    name: `last_name ${dir}, first_name ${dir}`,
-    titres: `book_count ${dir}, last_name ASC`,
-    visibilite: `hidden ${dir}, last_name ASC`
-  };
-  const orderSql = orderBy[opts.sort ?? 'name'] ?? orderBy.name;
-  const rows = await query<any>(
-    `SELECT id, full_name, slug, last_name, first_name, hidden,
-        array::len(array::distinct(<-contributed_by<-book)) AS book_count
-      FROM author ${whereSql} ORDER BY ${orderSql} LIMIT $limit START $start`, vars);
-  const count = await query<any>(`SELECT count() AS n FROM author ${whereSql} GROUP ALL`, vars);
-  return { authors: rows, total: count[0]?.n ?? 0 };
-}
-
 export async function getAuthorAdmin(id: string) {
   const rows = await query<any>(`SELECT *, portrait.url AS portrait_url FROM author WHERE id = $id LIMIT 1`, { id: recId('author', id) });
   return rows[0] ?? null;
@@ -194,10 +169,10 @@ export async function getAuthorAdminBySlug(slug: string) {
   return rows[0] ?? null;
 }
 
-export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string; slug: string }[]> {
+export async function searchAuthorsForPicker(q: string): Promise<{ id: string; full_name: string; slug: string; image?: string }[]> {
   if (!q || !q.trim()) return [];
   return query<any>(
-    `SELECT id, full_name, slug FROM author WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 12`,
+    `SELECT id, full_name, slug, portrait.url AS image FROM author WHERE string::lowercase(full_name) CONTAINS $q ORDER BY full_name ASC LIMIT 12`,
     { q: q.trim().toLowerCase() });
 }
 
@@ -308,4 +283,73 @@ export async function booksForAuthorAdmin(authorId: string): Promise<AuthorBookA
       year: r.published_at ? new Date(r.published_at).getFullYear() : undefined
     }))
     .sort((a, b) => rank(a.role) - rank(b.role) || (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title, 'fr'));
+}
+
+/* ————————————————————— Back-office : vue d'ensemble « Auteurs & Co » ————————————————————— */
+
+export interface AuthorOverviewRow {
+  id: string; slug: string; first_name: string; last_name: string; full_name: string;
+  portrait_url?: string; hidden: boolean;
+  livres: number; prefaces: number; postfaces: number; traductions: number; contributions: number;
+  articles: number; rencontres: number;
+  /** Première participation connue (livre paru, article publié, rencontre) — base de l'ancienneté. */
+  depuis?: string;
+}
+
+/**
+ * Tous les contributeurs avec leurs compteurs, en QUATRE requêtes agrégées côté
+ * serveur (au lieu d'une sous-requête par auteur × 1 000 auteurs). La liste
+ * (~1 000 lignes) part en entier au client : recherche, filtres, tri, pagination
+ * et export y sont instantanés.
+ */
+export async function listAuthorsOverview(): Promise<AuthorOverviewRow[]> {
+  const [authors, contribs, articles, events] = await Promise.all([
+    query<any>(`SELECT meta::id(id) AS id, slug, first_name, last_name, full_name, hidden, portrait.url AS portrait_url FROM author`),
+    query<any>(`SELECT meta::id(out) AS a, meta::id(in) AS b, role, in.published_at AS d, in.status AS s FROM contributed_by`),
+    query<any>(`SELECT authors, published_at, status FROM article WHERE array::len(authors ?? []) > 0`),
+    query<any>(`SELECT authors, start_at FROM event WHERE array::len(authors ?? []) > 0`)
+  ]);
+  const nu = (x: unknown) => String(x ?? '').replace(/^author:/, '');
+  const stats = new Map<string, Omit<AuthorOverviewRow, 'id' | 'slug' | 'first_name' | 'last_name' | 'full_name' | 'portrait_url' | 'hidden'> & { livresVus: Set<string> }>();
+  const st = (id: string) => {
+    let s = stats.get(id);
+    if (!s) stats.set(id, (s = { livres: 0, prefaces: 0, postfaces: 0, traductions: 0, contributions: 0, articles: 0, rencontres: 0, depuis: undefined, livresVus: new Set() }));
+    return s;
+  };
+  const date = (s: { depuis?: string }, d?: string | null) => { if (d && (!s.depuis || d < s.depuis)) s.depuis = d; };
+
+  for (const c of contribs) {
+    const s = st(nu(c.a));
+    // Un livre compte une fois par rôle (doublons d'arêtes possibles après migration).
+    const cle = `${c.role}:${c.b}`;
+    if (s.livresVus.has(cle)) continue;
+    s.livresVus.add(cle);
+    if (c.role === 'author') s.livres++;
+    else if (c.role === 'preface') s.prefaces++;
+    else if (c.role === 'postface') s.postfaces++;
+    else if (c.role === 'translator') s.traductions++;
+    else s.contributions++;
+    // Ancienneté : seuls les livres réellement parus comptent (pas les brouillons ni l'à-paraître).
+    if (c.s === 'published' && c.d && c.d <= new Date().toISOString()) date(s, c.d);
+  }
+  for (const a of articles) for (const id of a.authors ?? []) {
+    const s = st(nu(id));
+    s.articles++;
+    if (a.status === 'published') date(s, a.published_at);
+  }
+  for (const e of events) for (const id of e.authors ?? []) {
+    const s = st(nu(id));
+    s.rencontres++;
+    if (e.start_at && e.start_at <= new Date().toISOString()) date(s, e.start_at);
+  }
+
+  return authors
+    .map((a) => {
+      const { livresVus: _v, ...s } = st(a.id);
+      return {
+        id: a.id, slug: a.slug, first_name: a.first_name ?? '', last_name: a.last_name ?? '',
+        full_name: a.full_name ?? '', portrait_url: a.portrait_url ?? undefined, hidden: a.hidden === true, ...s
+      };
+    })
+    .sort((x, y) => (x.last_name || x.full_name).localeCompare(y.last_name || y.full_name, 'fr', { sensitivity: 'base' }));
 }

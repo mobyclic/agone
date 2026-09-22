@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
   const cart = await cartDetails(cookies);
   if (cart.lines.length === 0) throw redirect(303, '/panier');
   const u = (await query<any>(
-    `SELECT first_name, last_name, email, phone, billing FROM user WHERE id = $id LIMIT 1`,
+    `SELECT first_name, last_name, email, phone, billing, shipping FROM user WHERE id = $id LIMIT 1`,
     { id: recId('user', user.id) }
   ))[0];
   const code = getPromoCode(cookies);
@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
   const shipCountries = shipZones.some((z) => z.rest_of_world)
     ? COUNTRIES
     : COUNTRIES.filter((c) => shipZones.some((z) => z.countries.includes(c.code)));
-  return { cart, user: u, stripeEnabled: isStripeEnabled(), promo, shipZones, shipCountries };
+  return { cart, user: u, stripeEnabled: isStripeEnabled(), promo, shipZones, shipCountries, countries: COUNTRIES };
 };
 
 export const actions: Actions = {
@@ -42,12 +42,25 @@ export const actions: Actions = {
       postcode: g('postcode'), city: g('city'), country: g('country') || 'FR',
       email: g('email') || user.email, phone: g('phone')
     };
+    // Livraison à une autre adresse (cadeau, bureau…) : champs préfixés `ship_`.
+    const separee = cart.has_physical && fd.get('ship_different') === 'on';
+    const autre = {
+      first_name: g('ship_first_name'), last_name: g('ship_last_name'),
+      address_1: g('ship_address_1'), address_2: g('ship_address_2'),
+      postcode: g('ship_postcode'), city: g('ship_city'), country: g('ship_country') || 'FR',
+      phone: g('ship_phone')
+    };
+    const values = { ...billing, ship_different: separee, ship: autre };
     if (!billing.first_name || !billing.last_name || !billing.email)
-      return fail(400, { error: 'Nom et email sont requis.', values: billing });
+      return fail(400, { error: 'Nom et email sont requis.', values });
     if (cart.has_physical && (!billing.address_1 || !billing.postcode || !billing.city))
-      return fail(400, { error: 'Une adresse de livraison est requise pour les articles physiques.', values: billing });
+      return fail(400, { error: 'L’adresse de facturation est requise.', values });
+    if (separee && (!autre.first_name || !autre.last_name || !autre.address_1 || !autre.postcode || !autre.city))
+      return fail(400, { error: 'L’adresse de livraison est incomplète.', values });
 
-    const shipping = cart.has_physical ? billing : undefined;
+    const shipping = cart.has_physical
+      ? separee ? { ...autre, email: billing.email } : billing
+      : undefined;
     // Code promo : re-validé au moment de la commande (le panier a pu changer).
     const code = getPromoCode(cookies);
     const promoRes = code ? await validatePromo(code, cart, user.id) : null;
@@ -55,13 +68,16 @@ export const actions: Actions = {
     const promoCode = promoRes && promoRes.ok ? promoRes.code : undefined;
 
     // Frais de port (autoritatif) selon pays + poids.
-    const shipQuote = quoteShippingFor(await activeShipZones(), billing.country, cart.total_weight, cart.subtotal);
+    const shipQuote = quoteShippingFor(await activeShipZones(), shipping?.country ?? billing.country, cart.total_weight, cart.subtotal);
     if (cart.has_physical && !shipQuote.ok)
-      return fail(400, { error: shipQuote.error ?? 'Nous ne livrons pas encore ce pays.', values: billing });
+      return fail(400, { error: shipQuote.error ?? 'Nous ne livrons pas encore ce pays.', values });
     const shippingTotal = shipQuote.ok ? shipQuote.price : 0;
 
     const order = await createOrder({ customerId: user.id, email: billing.email, billing, shipping, lines: cart.lines, discount, promoCode, shippingTotal });
-    await query(`UPDATE $id SET billing = $b`, { id: recId('user', user.id), b: billing });
+    // Les deux adresses sont mémorisées pour préremplir la prochaine commande.
+    await query(`UPDATE $id SET billing = $b${separee ? ', shipping = $s' : ''}`, {
+      id: recId('user', user.id), b: billing, s: autre
+    });
     clearCart(cookies);
     clearPromoCode(cookies);
 

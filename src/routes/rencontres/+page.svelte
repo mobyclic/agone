@@ -1,46 +1,14 @@
 <script lang="ts">
-  import { MapPin, CalendarBlank } from 'phosphor-svelte';
   import PageHead from '$lib/components/PageHead.svelte';
+  import EventsExplorer from '$lib/components/EventsExplorer.svelte';
   let { data } = $props();
-
-  const fmt = (s?: string) =>
-    s ? new Date(s).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
-  const fmtTime = (s?: string) => {
-    if (!s) return '';
-    const d = new Date(s);
-    return d.getHours() || d.getMinutes() ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-  };
 </script>
 
 <svelte:head><title>Rencontres · Agone</title></svelte:head>
 
 <PageHead eyebrow="L’agenda" title="Rencontres" subtitle="Débats, tables rondes et présentations autour des livres et des auteurs." />
 
-<div class="py-10" style="padding-inline: var(--page-gutter)">
-  <!-- À venir -->
-  <section>
-    <h2 class="text-xl font-bold tracking-tight">À venir</h2>
-    {#if data.upcoming.length === 0}
-      <p class="mt-4 text-muted-foreground">Aucune rencontre programmée pour le moment.</p>
-    {:else}
-      <div class="mt-5 space-y-3">
-        {#each data.upcoming as e (e.slug)}
-          <a href="/rencontres/{e.slug}" class="group flex gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary">
-            <div class="flex w-16 shrink-0 flex-col items-center justify-center rounded-md bg-sidebar py-2 text-sidebar-foreground">
-              <span class="text-2xl font-bold leading-none">{e.start_at ? new Date(e.start_at).getDate() : ''}</span>
-              <span class="text-[11px] uppercase">{e.start_at ? new Date(e.start_at).toLocaleDateString('fr-FR', { month: 'short' }) : ''}</span>
-            </div>
-            <div class="min-w-0">
-              <h3 class="font-semibold leading-snug group-hover:text-link">{e.title}</h3>
-              <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span class="inline-flex items-center gap-1"><CalendarBlank size={14} /> {fmt(e.start_at)}{fmtTime(e.start_at) ? ` · ${fmtTime(e.start_at)}` : ''}</span>
-                {#if e.venue_name}<span class="inline-flex items-center gap-1"><MapPin size={14} /> {e.venue_name}{e.venue_city ? `, ${e.venue_city}` : ''}</span>{/if}
-              </div>
-              {#if e.author_names.length}<p class="mt-1 text-sm">{e.author_names.join(', ')}</p>{/if}
-            </div>
-          </a>
-        {/each}
-      </div>
-    {/if}
-  </section>
-</div>
+<!-- Même principe que l'accueil : la liste défile, la carte suit. -->
+<section class="py-10" style="padding-inline: var(--page-gutter)">
+  <EventsExplorer events={data.events} />
+</section>

@@ -11,8 +11,9 @@
   // Staff (admin/éditeur) → back-office ; client → espace compte ; visiteur → connexion.
   const accountHref = $derived(user ? (isStaff(user.role) ? '/admin' : '/compte') : '/connexion');
   const accountLabel = $derived(user && isStaff(user.role) ? 'Back-office' : 'Mon compte');
-  // Logo : le staff bascule vers le back-office (retour au front via le logo de l'admin).
-  const logoHref = $derived(user && isStaff(user.role) ? '/admin' : '/');
+  // Logo : ramène toujours à l'accueil ; ce n'est que DEPUIS l'accueil que le staff
+  // bascule vers le back-office (retour au front via le logo de l'admin).
+  const logoHref = $derived(page.url.pathname === '/' && user && isStaff(user.role) ? '/admin' : '/');
 
   let open = $state(false);
   let searchOpen = $state(false);

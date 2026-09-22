@@ -1,20 +1,16 @@
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { listBooks, collectionsWithBooks, countPublishedBooks } from '$lib/server/catalogue';
-
-const LIMIT = 24;
+import { catalogueComplet, allCollections } from '$lib/server/catalogue';
 
 export const load: PageServerLoad = async ({ url }) => {
-  const q = (url.searchParams.get('q') ?? '').trim();
+  // Anciens liens de recherche (/catalogue?q=…) : la recherche vit sur /recherche.
+  const q = url.searchParams.get('q');
+  if (q) throw redirect(301, `/recherche?q=${encodeURIComponent(q)}`);
 
-  // Recherche → grille de résultats à plat.
-  if (q) {
-    const sort = (url.searchParams.get('sort') as 'recent' | 'title' | 'price_asc') ?? 'recent';
-    const page = Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1);
-    const { books, total } = await listBooks({ q, sort, limit: LIMIT, offset: (page - 1) * LIMIT });
-    return { mode: 'search' as const, q, sort, page, limit: LIMIT, books, total };
-  }
-
-  // Vitrine par collections (derniers livres + description).
-  const [collections, total] = await Promise.all([collectionsWithBooks(6), countPublishedBooks()]);
-  return { mode: 'collections' as const, q: '', collections, total };
+  const [books, collections] = await Promise.all([catalogueComplet(), allCollections()]);
+  return {
+    books,
+    // Ordre éditorial des collections (champ `sort`), pour la facette.
+    collectionOrder: collections.map((c: any) => c.slug as string)
+  };
 };

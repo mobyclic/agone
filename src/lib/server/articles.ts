@@ -3,7 +3,16 @@
  */
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
-import { accentRegex, sansScripts } from '$lib/text';
+import { accentRegex, sansScripts, notesDeBasDePage } from '$lib/text';
+import { heureParisVersDate } from '$lib/dates';
+
+/**
+ * Condition « visible sur le front » : publié ET date de parution atteinte. Un
+ * article publié daté dans le futur est PROGRAMMÉ — il n'apparaît qu'à cette date,
+ * sans tâche planifiée : la condition est évaluée à chaque requête.
+ * Toute requête publique sur `article` doit passer par elle.
+ */
+export const ARTICLE_EN_LIGNE = `status = 'published' AND (published_at = NONE OR published_at <= time::now())`;
 
 export interface ArticleCard {
   title: string;
@@ -126,7 +135,7 @@ function toCard(r: any): ArticleCard {
 }
 
 export async function listArticles(opts: { rubrique?: string; q?: string; limit?: number; offset?: number } = {}): Promise<{ articles: ArticleCard[]; total: number }> {
-  const where = [`status = 'published'`];
+  const where = [ARTICLE_EN_LIGNE];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 20, start: opts.offset ?? 0 };
   if (opts.rubrique) { where.push('rubrique.slug = $rub'); vars.rub = opts.rubrique; }
   if (opts.q && opts.q.trim()) { vars.re = accentRegex(opts.q); where.push('string::matches(title, $re)'); }
@@ -140,7 +149,7 @@ export async function listArticles(opts: { rubrique?: string; q?: string; limit?
 }
 
 export async function recentArticles(limit = 6): Promise<ArticleCard[]> {
-  const rows = await query<any>(`SELECT ${CARD} FROM article WHERE status = 'published' ORDER BY published_at DESC LIMIT $limit`, { limit });
+  const rows = await query<any>(`SELECT ${CARD} FROM article WHERE ${ARTICLE_EN_LIGNE} ORDER BY published_at DESC LIMIT $limit`, { limit });
   return rows.map(toCard);
 }
 
@@ -156,7 +165,7 @@ export async function incrementArticleViews(slug: string): Promise<void> {
  * « [LettrInfo NN] » est retiré du titre pour un hero propre.
  */
 export async function latestArticle(): Promise<ArticleCard | null> {
-  const base = `SELECT ${CARD}, body_html FROM article WHERE status = 'published'`;
+  const base = `SELECT ${CARD}, body_html FROM article WHERE ${ARTICLE_EN_LIGNE}`;
   let rows = await query<any>(`${base} AND array::len(authors ?? []) > 0 ORDER BY published_at DESC LIMIT 1`);
   if (!rows[0]) rows = await query<any>(`${base} ORDER BY published_at DESC LIMIT 1`);
   if (!rows[0]) return null;
@@ -175,7 +184,7 @@ export async function listBlogRubriques(): Promise<RubriqueInfo[]> {
   // sous-nav avec « 11 » pour n'ouvrir que sur « Aucun article ». La liste
   // (listArticles) ne montre que les publiés : les deux doivent s'accorder.
   const counts = await query<any>(
-    `SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE AND status = 'published' GROUP BY rubrique`
+    `SELECT rubrique AS r, count() AS n FROM article WHERE rubrique != NONE AND ${ARTICLE_EN_LIGNE} GROUP BY rubrique`
   );
   const byR = new Map<string, number>();
   for (const c of counts) if (c.r) byR.set(String(c.r), c.n ?? 0);
@@ -186,25 +195,34 @@ export async function listBlogRubriques(): Promise<RubriqueInfo[]> {
 
 export interface ArticleDetail extends ArticleCard {
   id: string;
+  /** Visible du public (publié et date atteinte) — sinon aperçu réservé au staff. */
+  en_ligne: boolean;
+  status: string;
   body_html?: string;
   authors: { full_name: string; slug: string }[];
   books: { title: string; slug: string }[];
 }
 
-export async function getArticleBySlug(slug: string): Promise<ArticleDetail | null> {
+/**
+ * `apercu` (staff) : renvoie aussi les brouillons et les articles programmés,
+ * que le public ne doit pas pouvoir ouvrir même en connaissant leur adresse.
+ */
+export async function getArticleBySlug(slug: string, apercu = false): Promise<ArticleDetail | null> {
   const rows = await query<any>(
-    `SELECT ${CARD}, meta::id(id) AS pid, body_html,
+    `SELECT ${CARD}, meta::id(id) AS pid, body_html, status, (${ARTICLE_EN_LIGNE}) AS en_ligne,
         authors.{ full_name: full_name, slug: slug } AS authors,
         books.{ title: title, slug: slug } AS books
       FROM article WHERE slug = $slug LIMIT 1`,
     { slug }
   );
   const a = rows[0];
-  if (!a) return null;
+  if (!a || (!a.en_ligne && !apercu)) return null;
   return {
     ...toCard(a),
     id: a.pid,
-    body_html: sansScripts(a.body_html),
+    en_ligne: !!a.en_ligne,
+    status: a.status,
+    body_html: notesDeBasDePage(sansScripts(a.body_html)),
     authors: (a.authors ?? []).filter((x: any) => x?.slug),
     books: (a.books ?? []).filter((x: any) => x?.slug)
   };
@@ -268,16 +286,16 @@ export interface ArticleEdit {
   id: string; title: string; slug: string; status: string;
   excerpt?: string; body_html?: string; is_newsletter_issue: boolean;
   published_at?: string; rubrique_id?: string; cover_url?: string; cover_id?: string;
-  authors: { id: string; label: string }[];
-  books: { id: string; label: string }[];
+  authors: { id: string; label: string; image?: string }[];
+  books: { id: string; label: string; image?: string }[];
 }
 
 export async function getArticleForEdit(id: string): Promise<ArticleEdit | null> {
   const rows = await query<any>(
     `SELECT id, title, slug, status, excerpt, body_html, is_newsletter_issue, published_at,
         rubrique AS rubrique_id, cover.url AS cover_url, cover AS cover_id,
-        authors.{ id: id, label: full_name } AS authors,
-        books.{ id: id, label: title } AS books
+        authors.{ id: id, label: full_name, image: portrait.url } AS authors,
+        books.{ id: id, label: title, image: cover.url } AS books
       FROM article WHERE id = $id LIMIT 1`,
     { id: recId('article', id) }
   );
@@ -289,9 +307,42 @@ export async function getArticleForEdit(id: string): Promise<ArticleEdit | null>
     is_newsletter_issue: a.is_newsletter_issue ?? false, published_at: a.published_at ?? undefined,
     rubrique_id: a.rubrique_id ? plainId(a.rubrique_id, 'rubrique') : undefined,
     cover_url: a.cover_url ?? undefined, cover_id: a.cover_id ? plainId(a.cover_id, 'media') : undefined,
-    authors: (a.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' })),
-    books: (a.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—' }))
+    authors: (a.authors ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—', image: x.image ?? undefined })),
+    books: (a.books ?? []).filter((x: any) => x?.id).map((x: any) => ({ id: String(x.id), label: x.label ?? '—', image: x.image ?? undefined }))
   };
+}
+
+export interface RencontreLiee {
+  id: string; title: string; slug: string; start_at?: string; venue?: string;
+  /** Ce qui relie la rencontre à l'article : noms d'auteurs / titres de livres communs. */
+  via: string[];
+}
+
+/**
+ * Rencontres À VENIR qui partagent un auteur ou un livre avec l'article — signalées
+ * en tête de la colonne d'édition, pour penser à les mentionner.
+ */
+export async function rencontresLiees(articleId: string): Promise<RencontreLiee[]> {
+  // Deux requêtes : query() ne déballe que les réponses à UNE instruction.
+  const src = (await query<any>(`SELECT authors, books FROM $id`, { id: recId('article', articleId) }))[0];
+  const au = (src?.authors ?? []).map((x: string) => recId('author', String(x).replace(/^author:/, '')));
+  const bk = (src?.books ?? []).map((x: string) => recId('book', String(x).replace(/^book:/, '')));
+  if (!au.length && !bk.length) return [];
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, title, slug, start_at, venue.name AS v_name, venue.city AS v_city,
+        (authors ?? [])[WHERE $this INSIDE $au].full_name AS via_a,
+        (books ?? [])[WHERE $this INSIDE $bk].title AS via_b
+       FROM event
+       WHERE start_at != NONE AND start_at >= time::now()
+         AND ((authors ?? []) ANYINSIDE $au OR (books ?? []) ANYINSIDE $bk)
+       ORDER BY start_at ASC LIMIT 10`,
+    { au, bk }
+  );
+  return rows.map((r) => ({
+    id: r.id, title: r.title, slug: r.slug, start_at: r.start_at ?? undefined,
+    venue: [r.v_name, r.v_city].filter(Boolean).join(', ') || undefined,
+    via: [...(r.via_a ?? []), ...(r.via_b ?? [])].filter(Boolean)
+  }));
 }
 
 export interface ArticleInput {
@@ -307,7 +358,8 @@ export async function saveArticle(id: string | null, d: ArticleInput): Promise<s
     excerpt: plainSummary(d.body_html, 240) ?? undefined, // accroche auto-dérivée du corps
     body_html: d.body_html,
     is_newsletter_issue: !!d.is_newsletter_issue,
-    published_at: d.published_at ? new Date(d.published_at) : undefined,
+    // Heure de Paris (datetime-local) ; publier sans date = publier maintenant.
+    published_at: d.published_at ? (heureParisVersDate(d.published_at) ?? undefined) : d.status === 'published' ? new Date() : undefined,
     rubrique: d.rubriqueId ? recId('rubrique', d.rubriqueId) : undefined,
     cover: d.coverId ? recId('media', d.coverId) : undefined,
     authors: d.authorIds ? d.authorIds.map((x) => recId('author', x)) : undefined,
@@ -424,13 +476,13 @@ export async function articleLadder(current: ArticleCard, autour = 2): Promise<L
   const [recents, anciens] = await Promise.all([
     query<any>(
       `SELECT ${CARD} FROM article
-         WHERE status = 'published' AND slug != $s AND published_at != NONE AND published_at > type::datetime($d)
+         WHERE ${ARTICLE_EN_LIGNE} AND slug != $s AND published_at != NONE AND published_at > type::datetime($d)
          ORDER BY published_at ASC LIMIT $n`,
       vars
     ),
     query<any>(
       `SELECT ${CARD} FROM article
-         WHERE status = 'published' AND slug != $s
+         WHERE ${ARTICLE_EN_LIGNE} AND slug != $s
            -- NONE < datetime est VRAI en SurrealQL : sans ce garde, un article non
            -- daté se classait parmi les plus anciens de n'importe quelle échelle.
            AND published_at != NONE AND published_at < type::datetime($d)
@@ -451,4 +503,12 @@ export async function articleLadder(current: ArticleCard, autour = 2): Promise<L
     soi,
     ...anciens.slice(0, nAnciens).map(toCard).map((c) => ({ ...c, current: false }))
   ];
+}
+
+/** Bascule publié ↔ brouillon depuis la liste. Publier un article non daté le date de maintenant. */
+export async function setArticleStatus(id: string, status: 'published' | 'draft'): Promise<void> {
+  await query(
+    `UPDATE $id SET status = $s, published_at = IF $s = 'published' AND published_at = NONE THEN time::now() ELSE published_at END`,
+    { id: recId('article', id), s: status }
+  );
 }

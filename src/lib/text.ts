@@ -82,3 +82,31 @@ export function sansScripts(html?: string | null): string | undefined {
   if (!html) return undefined;
   return html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '').replace(/<script\b[^>]*\/?>/gi, '');
 }
+
+/**
+ * Notes de bas de page : l'éditeur (RichEditor) stocke chaque appel de note EN
+ * PLACE, texte compris — `<sup data-fn="texte de la note"></sup>` — pour que
+ * déplacer ou supprimer un paragraphe emporte sa note sans renumérotation à la
+ * main. Au rendu, chaque appel devient un exposant numéroté pointant vers la
+ * liste finale, et chaque note renvoie à son appel (ancres aller-retour).
+ */
+export function notesDeBasDePage(html?: string | null): string | undefined {
+  if (!html || !html.includes('data-fn=')) return html ?? undefined;
+  const notes: string[] = [];
+  const decode = (s: string) =>
+    s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const echappe = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const liens = (s: string) =>
+    s.replace(/\bhttps?:\/\/[^\s<]+[^\s<.,;:!?»)\]]/g, (u) => `<a href="${u.replace(/"/g, '&quot;')}" rel="noopener">${u}</a>`);
+  const corps = html.replace(/<sup\b[^>]*\bdata-fn="([^"]*)"[^>]*>[\s\S]*?<\/sup>/gi, (_m, brut: string) => {
+    notes.push(liens(echappe(decode(brut).trim())));
+    const n = notes.length;
+    return `<sup class="appel-note" id="appel-${n}"><a href="#note-${n}" aria-describedby="titre-notes">${n}</a></sup>`;
+  });
+  if (!notes.length) return html;
+  const liste = notes
+    .map((t, i) => `<li id="note-${i + 1}">${t} <a href="#appel-${i + 1}" class="retour-note" aria-label="Revenir à l’appel de note ${i + 1}">↩</a></li>`)
+    .join('');
+  return `${corps}<section class="notes-bas-de-page"><h2 id="titre-notes" class="sr-only">Notes</h2><ol>${liste}</ol></section>`;
+}

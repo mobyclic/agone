@@ -2,16 +2,21 @@
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
+  import Pagination from '$lib/components/Pagination.svelte';
   import { Plus, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
-  import { bookStateLabel } from '$lib/labels';
+  import { BOOK_STATUS_LABEL, bookDerivedState } from '$lib/labels';
 
   let { data } = $props();
 
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
-  // Options du filtre. « À paraître » = filtre virtuel (publié + date future), pas un statut stocké.
-  const STATUS: Record<string, string> = { published: 'Publié', draft: 'Brouillon', forthcoming: 'À paraître', out_of_print: 'Épuisé' };
+  // Options du filtre : les 3 statuts stockés, puis les 2 états dérivés (filtres virtuels).
+  const STATUS: Record<string, string> = { ...BOOK_STATUS_LABEL, forthcoming: 'À paraître', epuise: 'Épuisé' };
   const euro = (n?: number) => (n != null ? `${n.toFixed(2).replace('.', ',')} €` : '—');
-  const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }) : '—');
+  const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
+  const nu = (id: string) => String(id).replace('book:', '');
+  const STATUT_CLS: Record<string, string> = {
+    published: 'bg-success/15 text-success', draft: 'bg-secondary text-muted-foreground', archived: 'bg-muted text-muted-foreground line-through'
+  };
 
   // Recherche instantanée (bind local pour garder le focus/la valeur pendant la navigation)
   let q = $state(untrack(() => data.q ?? ''));
@@ -85,38 +90,49 @@
         {@render sortable('ISBN', 'isbn')}
         {@render sortable('Parution', 'date')}
         {@render sortable('Prix', 'price', 'right')}
+        <th class="px-3 py-2 font-medium">Ebook</th>
         {@render sortable('Stock', 'stock', 'right')}
       </tr>
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.books as b (b.id)}
-        <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2">
-            <a href="/admin/catalogue/{String(b.id).replace('book:', '')}" class="flex items-center gap-3">
-              <span class="h-12 w-9 shrink-0 overflow-hidden rounded border border-border bg-muted">
+        {@const etat = bookDerivedState(b)}
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/catalogue/${nu(b.id)}`); }}>
+          <td class="px-3 py-2.5">
+            <a href="/admin/catalogue/{nu(b.id)}" class="flex items-center gap-3">
+              <span class="h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-muted">
                 {#if b.cover_url}<img src={b.cover_url} alt="" class="size-full object-cover" />{/if}
               </span>
-              <span class="font-medium hover:text-link">{b.title}</span>
+              <span class="min-w-0">
+                <span class="block font-display text-lg font-semibold leading-tight hover:text-link">{b.title}</span>
+                {#if b.subtitle}<span class="mt-0.5 block text-sm leading-snug text-muted-foreground">{b.subtitle}</span>{/if}
+                {#if b.authors?.length}<span class="mt-0.5 block text-xs uppercase tracking-wide text-foreground/70">{b.authors.join(', ')}</span>{/if}
+              </span>
             </a>
           </td>
-          <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{bookStateLabel(b)}</span></td>
+          <td class="px-3 py-2">
+            <span class="whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium {STATUT_CLS[b.status] ?? 'bg-secondary'}">{BOOK_STATUS_LABEL[b.status] ?? b.status}</span>
+            {#if etat}<div class="mt-1 whitespace-nowrap text-[11px] font-medium {etat === 'Épuisé' ? 'text-destructive' : 'text-warning'}">{etat}</div>{/if}
+          </td>
           <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{b.isbn_paper ?? '—'}</td>
-          <td class="px-3 py-2 text-muted-foreground">{dateFr(b.published_at)}</td>
-          <td class="px-3 py-2 text-right">{euro(b.price_paper)}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{dateFr(b.published_at)}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right">{euro(b.price_paper)}</td>
+          <td class="px-3 py-2">
+            {#if b.ebook_formats?.length}
+              <span class="whitespace-nowrap text-xs font-medium uppercase">{[...new Set(b.ebook_formats)].join(' · ')}</span>
+              {#if b.price_ebook != null}<div class="whitespace-nowrap text-xs text-muted-foreground">{euro(b.price_ebook)}</div>{/if}
+            {:else if b.price_ebook != null}
+              <span class="whitespace-nowrap text-xs text-warning" title="Prix ebook renseigné mais aucun fichier">sans fichier</span>
+            {:else}<span class="text-muted-foreground">—</span>{/if}
+          </td>
           <td class="px-3 py-2 text-right {b.stock_qty > 0 ? '' : 'text-destructive'}">{b.stock_qty}</td>
         </tr>
       {/each}
       {#if data.books.length === 0}
-        <tr><td colspan="6" class="px-3 py-10 text-center text-muted-foreground">Aucun livre ne correspond.</td></tr>
+        <tr><td colspan="7" class="px-3 py-10 text-center text-muted-foreground">Aucun livre ne correspond.</td></tr>
       {/if}
     </tbody>
   </table>
 </div>
 
-{#if pageCount > 1}
-  <div class="mt-6 flex items-center justify-center gap-2 text-sm">
-    {#if data.page > 1}<button type="button" onclick={() => nav({ page: data.page - 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">←</button>{/if}
-    <span class="px-3 py-2 text-muted-foreground">Page {data.page} / {pageCount}</span>
-    {#if data.page < pageCount}<button type="button" onclick={() => nav({ page: data.page + 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">→</button>{/if}
-  </div>
-{/if}
+<Pagination page={data.page} {pageCount} onpage={(p) => nav({ page: p })} />

@@ -70,6 +70,10 @@ Catalogue & contenu (Phase 1, **migrés depuis WordPress**) : `collection`, `rub
 `author` + arête `book->contributed_by->author {role, share, position}` ; `venue` (lieux
 **réutilisables & géolocalisés**, `geometry<point>`), `event` (→ venue), `article` (Antichambre),
 `page`. **L'ISBN-13 (`book.isbn_paper`) est la colonne vertébrale.** Chaque nœud migré porte `legacy_wp_id`.
+Statuts livre stockés : `draft` / `published` (« En ligne ») / `archived` ; « À paraître » (date future) et
+« Épuisé » (stock ≤ 0) sont **dérivés** (`bookDerivedState` dans `$lib/labels.ts`).
+Articles : toute requête publique filtre avec `ARTICLE_EN_LIGNE` (`articles.ts`) — publié ET date atteinte
+(publication programmée). Brouillons/programmés/livres non publiés : 404 public, aperçu staff.
 À venir : `order`/`contains`, `ebook_asset`/`owns`, `stock_movement`, `bl_export`,
 `royalty_contract`/`sales_report`/`royalty_statement`.
 

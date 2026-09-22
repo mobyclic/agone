@@ -3,6 +3,8 @@
   import { goto } from '$app/navigation';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
+  import Pagination from '$lib/components/Pagination.svelte';
+  import SearchSelect from '$lib/components/SearchSelect.svelte';
   import { MagnifyingGlass, UserPlus, X } from 'phosphor-svelte';
 
   let { data, form } = $props();
@@ -22,7 +24,10 @@
   let q = $state(untrack(() => data.q ?? ''));
   let timer: ReturnType<typeof setTimeout>;
   function nav(params: Record<string, string | number | undefined>) {
-    const merged: Record<string, string | number | undefined> = { q, role: data.role, page: data.page, ...params };
+    const merged: Record<string, string | number | undefined> = {
+      q, role: data.role, page: data.page, livre: data.livre?.id, auteur: data.auteur?.id,
+      min: data.min || undefined, sansnom: data.sansNom ? '1' : undefined, ...params
+    };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
       if (v === undefined || v === '' || (k === 'page' && v === 1)) continue;
@@ -39,8 +44,17 @@
 <div class="mb-5">
   <h2 class="text-xl font-bold">Utilisateurs</h2>
   <p class="text-sm text-muted-foreground">
-    {data.total} compte{data.total > 1 ? 's' : ''}
-    {#if data.byRole.customer}· {data.byRole.customer} client{data.byRole.customer > 1 ? 's' : ''}{/if}
+    {#if data.filtreAchat || data.q || data.role}
+      {data.total} compte{data.total > 1 ? 's' : ''} correspondant{data.total > 1 ? 's' : ''}
+    {:else}
+      {data.total} compte{data.total > 1 ? 's' : ''}
+      {#if data.byRole.customer}· dont {data.byRole.customer} client{data.byRole.customer > 1 ? 's' : ''}{/if}
+    {/if}
+    {#if data.anonymes && !data.sansNom}
+      · <button type="button" onclick={() => nav({ sansnom: '1', page: 1 })} class="underline hover:text-foreground">{data.anonymes} comptes sans nom masqués</button>
+    {:else if data.sansNom}
+      · <button type="button" onclick={() => nav({ sansnom: undefined, page: 1 })} class="underline hover:text-foreground">masquer les comptes sans nom</button>
+    {/if}
   </p>
 </div>
 
@@ -61,6 +75,23 @@
   <Button type="button" variant="brand" class="h-10" onclick={() => (showNew = true)}><UserPlus size={16} /> Nouvel utilisateur</Button>
 </div>
 
+<!-- Filtres d'achat (commandes payées) -->
+<div class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+  <span class="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Achats</span>
+  <SearchSelect class="w-64" searchUrl="/api/books/search" labelField="title" placeholder="A acheté le livre…"
+    value={data.livre} onselect={(v) => nav({ livre: v?.id.replace(/^book:/, ''), page: 1 })} />
+  <SearchSelect class="w-64" searchUrl="/api/authors/search" labelField="full_name" placeholder="…un livre de l'auteur"
+    value={data.auteur} onselect={(v) => nav({ auteur: v?.id.replace(/^author:/, ''), page: 1 })} />
+  <select value={String(data.min || '')} onchange={(e) => nav({ min: e.currentTarget.value || undefined, page: 1 })}
+    class="h-10 rounded-md border border-border bg-background px-3 text-sm">
+    <option value="">Nombre de commandes</option>
+    {#each [1, 2, 3, 5, 10] as n (n)}<option value={String(n)}>{n === 1 ? 'Au moins 1 commande' : `${n} commandes ou plus`}</option>{/each}
+  </select>
+  {#if data.filtreAchat}
+    <button type="button" onclick={() => nav({ livre: undefined, auteur: undefined, min: undefined, page: 1 })} class="ml-auto inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><X size={14} /> Effacer</button>
+  {/if}
+</div>
+
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -74,7 +105,7 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.users as u (u.id)}
-        <tr class="hover:bg-muted/30">
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/utilisateurs/${u.id}`); }}>
           <td class="px-3 py-2">
             <a href="/admin/utilisateurs/{u.id}" class="font-medium hover:text-link">{u.full_name}</a>
             {#if u.legacy}<span class="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">Importé</span>{/if}
@@ -131,10 +162,4 @@
   </div>
 {/if}
 
-{#if pageCount > 1}
-  <div class="mt-6 flex items-center justify-center gap-2 text-sm">
-    {#if data.page > 1}<button type="button" onclick={() => nav({ page: data.page - 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">←</button>{/if}
-    <span class="px-3 py-2 text-muted-foreground">Page {data.page} / {pageCount}</span>
-    {#if data.page < pageCount}<button type="button" onclick={() => nav({ page: data.page + 1 })} class="rounded-md border border-border px-3 py-2 hover:bg-muted">→</button>{/if}
-  </div>
-{/if}
+<Pagination page={data.page} {pageCount} onpage={(p) => nav({ page: p })} />

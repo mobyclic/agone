@@ -47,7 +47,7 @@ export const ADMIN_NAV: NavSection[] = [
     items: [
       { label: 'Livres', href: '/admin/catalogue', icon: 'BookOpen' },
       { label: 'Collections', href: '/admin/collections', icon: 'Books' },
-      { label: 'Auteurs', href: '/admin/auteurs', icon: 'PenNib' }
+      { label: 'Auteurs & Co', href: '/admin/auteurs', icon: 'PenNib' }
     ]
   },
   {
