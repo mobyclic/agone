@@ -51,6 +51,11 @@ DEFINE FIELD OVERWRITE size        ON media TYPE option<int>;
 DEFINE FIELD OVERWRITE width       ON media TYPE option<int>;
 DEFINE FIELD OVERWRITE height      ON media TYPE option<int>;
 DEFINE FIELD OVERWRITE alt         ON media TYPE option<string>;
+-- Provenance d'un média repris ailleurs (Wikimedia Commons) : la licence libre
+-- impose d'afficher l'auteur de la photo et sa licence, et de pointer la source.
+DEFINE FIELD OVERWRITE credit      ON media TYPE option<string>;   -- « Photo : Jane Doe »
+DEFINE FIELD OVERWRITE license     ON media TYPE option<string>;   -- « CC BY-SA 4.0 »
+DEFINE FIELD OVERWRITE source_url  ON media TYPE option<string>;   -- page du fichier sur Commons
 DEFINE FIELD OVERWRITE owner       ON media TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE created_at  ON media TYPE datetime DEFAULT time::now();
 

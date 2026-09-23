@@ -86,7 +86,8 @@
         </span>
         <div class="min-w-0 flex-1">
           <div class="truncate text-sm font-medium">{user.full_name || user.email}</div>
-          <div class="truncate text-xs text-sidebar-foreground/60">{user.email}</div>
+          <!-- Sans nom, le libellé ci-dessus EST l'e-mail : ne pas le répéter. -->
+          {#if user.full_name}<div class="truncate text-xs text-sidebar-foreground/60">{user.email}</div>{/if}
         </div>
       </div>
       <div class="flex items-center gap-1">

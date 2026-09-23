@@ -48,13 +48,14 @@
   <ArrowLeft size={16} /> Auteurs
 </a>
 
-<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
+<form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="pb-8">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvel auteur' : a?.full_name}</h2>
 
   {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
-  <div class="grid gap-6 sm:grid-cols-[1fr_220px]">
-    <div class="space-y-5">
+  <!-- Pleine largeur : identité et biographie à gauche, portrait et visibilité à droite. -->
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <div class="min-w-0 space-y-5">
       <div class="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
         <label class={label}>Prénom <input name="first_name" value={a?.first_name ?? ''} class={input} /></label>
         <label class={label}>Nom <input name="last_name" value={a?.last_name ?? ''} class={input} /></label>
@@ -66,7 +67,7 @@
 
       <div class="rounded-lg border border-border bg-card p-4">
         <span class={label}>Biographie</span>
-        {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="10rem" onchange={() => (dirty = true)} />{/key}
+        {#key a?.id}<RichEditor name="bio_html" value={a?.bio_html ?? ''} minHeight="18rem" onchange={() => (dirty = true)} />{/key}
       </div>
 
       {#if data.canSeeRoyalties}
@@ -107,8 +108,9 @@
 </form>
 
 {#if !data.isNew}
-  <!-- Titres du contributeur — l'inverse du bloc « Contributeurs » de la fiche livre. -->
-  <div class="mt-8 max-w-3xl">
+  <!-- Titres et droits côte à côte : la page occupe toute la largeur disponible. -->
+  <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
+  <div class="mt-8">
     <h3 class="mb-3 flex items-center gap-2 text-base font-semibold"><Books size={17} /> Titres ({data.books.length})</h3>
     {#if data.books.length}
       <div class="space-y-2">
@@ -143,7 +145,7 @@
 
   <!-- Droits d'auteur par année — admins uniquement. -->
   {#if data.canSeeRoyalties}
-  <div class="mt-8 max-w-3xl">
+  <div class="mt-8">
     <h3 class="mb-3 flex items-center gap-2 text-base font-semibold"><Coins size={17} /> Droits d'auteur par année</h3>
     {#if byYear.length}
       <div class="space-y-4">
@@ -175,9 +177,10 @@
     {/if}
   </div>
   {/if}
+  </div>
 
   <!-- Suppression -->
-  <div class="mt-8 max-w-3xl border-t border-border pt-4">
+  <div class="mt-8 border-t border-border pt-4 pb-24">
     {#if hasBooks}
       <p class="flex items-center gap-2 text-sm text-muted-foreground"><Warning size={15} class="text-warning" /> Cet auteur a {a?.book_count} titre{a?.book_count > 1 ? 's' : ''} : suppression impossible.</p>
     {:else}

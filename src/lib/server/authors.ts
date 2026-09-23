@@ -82,6 +82,10 @@ export interface AuthorDetail {
   slug: string;
   bio_html?: string;
   portrait_url?: string;
+  /** Crédit imposé par la licence de la photo (Wikimedia Commons). */
+  portrait_credit?: string;
+  portrait_license?: string;
+  portrait_source?: string;
   nationality?: string;
   birth_year?: number;
   death_year?: number;
@@ -95,7 +99,9 @@ export interface AuthorDetail {
 
 export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null> {
   const rows = await query<any>(
-    `SELECT *, portrait.url AS portrait_url FROM author WHERE slug = $slug LIMIT 1`,
+    `SELECT *, portrait.url AS portrait_url, portrait.credit AS portrait_credit,
+        portrait.license AS portrait_license, portrait.source_url AS portrait_source
+      FROM author WHERE slug = $slug LIMIT 1`,
     { slug }
   );
   const a = rows[0];
@@ -145,6 +151,9 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
     slug: a.slug,
     bio_html: a.bio_html ?? undefined,
     portrait_url: a.portrait_url ?? undefined,
+    portrait_credit: a.portrait_credit ?? undefined,
+    portrait_license: a.portrait_license ?? undefined,
+    portrait_source: a.portrait_source ?? undefined,
     nationality: a.nationality ?? undefined,
     birth_year: a.birth_year ?? undefined,
     death_year: a.death_year ?? undefined,

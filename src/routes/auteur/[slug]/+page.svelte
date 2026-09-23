@@ -41,6 +41,14 @@
             <div class="grid size-full place-items-center bg-gradient-to-br from-sidebar to-brand-blue font-display text-6xl font-bold text-white">{initiales}</div>
           {/if}
         </div>
+        {#if a.portrait_credit || a.portrait_license}
+          <!-- Mention imposée par la licence libre de la photo. -->
+          <p class="mt-1.5 max-w-[280px] text-[11px] leading-snug text-muted-foreground">
+            {#if a.portrait_source}<a href={a.portrait_source} target="_blank" rel="noopener" class="hover:text-foreground">Photo</a>{:else}Photo{/if}
+            {#if a.portrait_credit}: {a.portrait_credit}{/if}{#if a.portrait_license} · {a.portrait_license}{/if}
+          </p>
+        {/if}
+
         <dl class="mt-6 max-w-[280px] space-y-3 text-sm">
           {#if a.nationality}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Nationalité</dt><dd class="text-right font-medium">{a.nationality}</dd></div>{/if}
           {#if years}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Dates</dt><dd class="font-medium">{years}</dd></div>{/if}
