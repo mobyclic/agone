@@ -24,6 +24,8 @@
 <PageHead
   eyebrow={a.rubrique_name ?? 'Antichambre'}
   title={a.title}
+  barDate={fmt(a.published_at)}
+  barAuteur={a.authors.map((x) => x.full_name).join(', ')}
   inner="lg:max-w-[calc(100%/3*2)]"
 >
   {#snippet kicker()}
@@ -90,7 +92,7 @@
                 {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
               </span>
               <span class="min-w-0">
-                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
+                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:underline group-hover:underline-offset-4">{book.title}</span>
                 {#if book.authors?.length}<span class="mt-1 block text-sm text-link">{book.authors[0].name}</span>{/if}
               </span>
             </a>
@@ -117,7 +119,7 @@
               {:else}
                 <a href="/article/{r.slug}" class="group block border-l-4 border-transparent px-4 py-3 transition-colors hover:bg-muted/30">
                   <p class="font-display text-xs uppercase tracking-wide text-muted-foreground">{fmt(r.published_at)}{r.rubrique_name ? ` · ${r.rubrique_name}` : ''}</p>
-                  <p class="mt-0.5 line-clamp-2 font-display text-base font-medium uppercase leading-tight group-hover:text-link">{r.title}</p>
+                  <p class="mt-0.5 line-clamp-2 font-display text-base font-medium uppercase leading-tight group-hover:underline group-hover:underline-offset-4">{r.title}</p>
                 </a>
               {/if}
             </li>

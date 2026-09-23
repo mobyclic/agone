@@ -6,11 +6,16 @@
     meta,
     width = '',
     inner = '',
+    barDate,
+    barAuteur,
     kicker,
     children
   }: {
     eyebrow?: string; title: string; subtitle?: string; meta?: string;
     width?: string; inner?: string;
+    /** Bande de rappel : date et signature, à la suite de la rubrique et du titre. */
+    barDate?: string;
+    barAuteur?: string;
     /** Surtitre riche (ex. « RUBRIQUE · date ») ; remplace `eyebrow` au-dessus du titre,
      *  `eyebrow` restant utilisé par la bande de rappel au défilement. */
     kicker?: import('svelte').Snippet;
@@ -61,6 +66,14 @@
       <span class="shrink-0 font-display text-xs font-semibold uppercase tracking-[0.14em] text-background/55">{eyebrow}</span>
       <span class="shrink-0 text-background/30">·</span>
     {/if}
+    {#if barDate}
+      <span class="shrink-0 font-display text-xs uppercase tracking-[0.14em] text-background/55">{barDate}</span>
+      <span class="shrink-0 text-background/30">·</span>
+    {/if}
     <span class="truncate font-display text-sm font-bold uppercase tracking-wide">{title}</span>
+    {#if barAuteur}
+      <span class="shrink-0 text-background/30">·</span>
+      <span class="hidden shrink-0 font-display text-xs uppercase tracking-[0.14em] text-background/55 sm:inline">{barAuteur}</span>
+    {/if}
   </div>
 </div>

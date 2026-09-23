@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
    * Le catalogue complet, filtrable par facettes — tout se passe côté client sur
-   * ~400 titres : chaque clic répond instantanément, compteurs compris.
+   * ~400 titres : chaque clic répond instantanément.
    *
    * Facettes : Parutions (nouveautés / fond / à paraître / souscription),
    * Collections, Mots-clés, précédées d'une recherche libre « titre ou auteur ». Au sein d'une facette les choix
-   * s'additionnent (OU) ; d'une facette à l'autre ils se combinent (ET). Le
-   * compteur de chaque option tient compte des AUTRES facettes, pour qu'il dise
-   * toujours combien de titres ce clic afficherait.
+   * s'additionnent (OU) ; d'une facette à l'autre ils se combinent (ET). Les
+   * options qui ne donneraient aucun résultat sont estompées (le décompte sert à
+   * cela, sans être affiché : un catalogue n'est pas un tableau de bord).
    */
   import { untrack } from 'svelte';
   import { replaceState } from '$app/navigation';
@@ -174,8 +174,7 @@
       <span class="grid size-4 shrink-0 place-items-center border {coche ? 'border-foreground bg-foreground text-background' : 'border-border group-hover:border-foreground'}">
         {#if coche}<svg viewBox="0 0 12 12" class="size-3" aria-hidden="true"><path d="M2.5 6.2 5 8.6l4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" /></svg>{/if}
       </span>
-      <span class="min-w-0 flex-1 leading-snug {coche ? 'font-semibold' : ''} group-hover:text-link">{texte}</span>
-      <span class="shrink-0 text-xs tabular-nums text-muted-foreground">{n}</span>
+      <span class="min-w-0 flex-1 leading-snug {coche ? 'font-semibold' : ''} group-hover:underline group-hover:underline-offset-4">{texte}</span>
     </button>
   </li>
 {/snippet}
@@ -241,9 +240,7 @@
     <!-- Résultats -->
     <div class="min-w-0">
       <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-foreground pb-3">
-        <p class="font-display text-lg font-semibold uppercase tracking-wide">
-          {resultats.length} titre{resultats.length > 1 ? 's' : ''}
-        </p>
+
         <!-- Filtres actifs, retirables un à un -->
         <div class="flex flex-1 flex-wrap gap-1.5">
           {#each parutions as p (p)}

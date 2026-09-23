@@ -93,7 +93,7 @@
 }
 
 @media (min-width: 1024px) {
-  :root { --logo-extra: 11rem; }
+  :root { --logo-extra: 7.5rem; }
 }
 
 .dark {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { authorList, isForthcoming } from '$lib/labels';
+  import { authorList, isForthcoming, formatsEnVente, estEpuise, euros } from '$lib/labels';
   interface Book {
     title: string;
     subtitle?: string;
@@ -10,19 +10,30 @@
     cover_url?: string;
     status?: string;
     published_at?: string;
+    price_ebook?: number;
+    stock_qty?: number;
+    has_ebook_file?: boolean;
     authors?: { name: string; slug: string; first_name?: string; last_name?: string }[];
   }
   let { book }: { book: Book } = $props();
   const authors = $derived(authorList(book.authors));
   const forthcoming = $derived(isForthcoming(book));
-  // À paraître → pas de prix, sauf s'il y a un prix ET une date de souscription.
+  /**
+   * Prix affiché SEULEMENT si au moins un format est réellement en vente (mêmes
+   * règles que la fiche : stock, prix > 0, fichier ebook déposé) — sinon le
+   * catalogue annonçait un prix pour un titre impossible à commander.
+   * `stock_qty` absent = données sans stock : on garde l'affichage d'avant.
+   */
+  const enVente = $derived(book.stock_qty === undefined ? null : formatsEnVente(book));
+  const epuise = $derived(book.stock_qty !== undefined && estEpuise(book));
   const price = $derived.by(() => {
-    if (forthcoming) {
-      return book.subscription_price != null && book.subscription_end
-        ? `${book.subscription_price.toFixed(2).replace('.', ',')} €`
-        : '';
+    if (enVente === null) {
+      if (forthcoming) return book.subscription_price != null && book.subscription_end ? (euros(book.subscription_price) ?? '') : '';
+      return euros(book.price_paper) ?? '';
     }
-    return book.price_paper != null ? `${book.price_paper.toFixed(2).replace('.', ',')} €` : '';
+    // Papier d'abord (prix de référence), sinon le format disponible.
+    const f = enVente.find((x) => x.key === 'papier') ?? enVente[0];
+    return f ? (euros(f.price) ?? '') : '';
   });
   const pubDate = $derived(
     book.published_at
@@ -50,10 +61,14 @@
       <span class="absolute left-0 top-2 bg-ink px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">
         À paraître
       </span>
+    {:else if epuise}
+      <span class="absolute left-0 top-2 bg-muted-foreground px-1.5 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-white">
+        Épuisé
+      </span>
     {/if}
   </div>
   <div class="mt-2.5">
-    <h3 class="line-clamp-2 font-sans text-sm font-bold leading-snug text-foreground group-hover:text-link">{book.title}</h3>
+    <h3 class="line-clamp-2 font-sans text-sm font-bold leading-snug text-foreground group-hover:underline group-hover:underline-offset-4">{book.title}</h3>
     {#if book.subtitle}<p class="mt-px line-clamp-1 text-xs leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
     {#if authors}<p class="mt-px line-clamp-1 text-xs text-link">{authors}</p>{/if}
     {#if forthcoming}
@@ -61,6 +76,8 @@
       {#if price}<p class="mt-0.5 text-xs font-medium text-foreground">Souscription {price}</p>{/if}
     {:else if price}
       <p class="mt-1 text-xs font-medium text-foreground">{price}</p>
+    {:else if epuise}
+      <p class="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Épuisé</p>
     {/if}
   </div>
 </a>

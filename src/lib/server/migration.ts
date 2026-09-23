@@ -19,6 +19,7 @@ import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
 import { wpautop } from './wpautop';
 import { extraitPropre } from '$lib/text';
+import { accorderEbooksPayes } from './library';
 import { uploadOptimizedImage, bookCoverKey } from './storage';
 
 export interface ImportResult {
@@ -749,6 +750,25 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
   }
   if (couvertures) warnings.unshift(`${couvertures} couverture(s) récupérée(s).`);
   return { type: 'books', fetched: posts.length, created, updated, skipped, warnings: warnings.slice(0, 20), dryRun, watermark: maxModified(posts) };
+}
+
+/**
+ * Bibliothèques clientes : accorde les ebooks des commandes payées (voir
+ * accorderEbooksPayes). Étape de synchro sans curseur — elle repart des commandes
+ * déjà importées, donc rien à lire côté WordPress.
+ */
+export async function importBibliotheques(opts: ImportOpts = {}): Promise<ImportResult> {
+  const r = await accorderEbooksPayes({ dryRun: !!opts.dryRun });
+  const warnings: string[] = [
+    'Créés = droits d’accès accordés ; ignorés = achats sans compte client (invités) ou livre sans fichier ebook.'
+  ];
+  if (r.sansCompte) warnings.push(`${r.sansCompte} achat(s) d’ebook en invité : sans compte, aucune bibliothèque possible.`);
+  if (r.sansFichier) warnings.push(`${r.sansFichier} achat(s) d’ebook dont le livre n’a aucun fichier déposé.`);
+  return {
+    type: 'library', fetched: r.accordes + r.sansCompte + r.sansFichier,
+    created: r.accordes, updated: 0, skipped: r.sansCompte + r.sansFichier,
+    warnings, dryRun: !!opts.dryRun, fullScan: true
+  };
 }
 
 /** Termes d'une taxonomie par post (tous, pas seulement le premier). */

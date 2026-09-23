@@ -17,7 +17,6 @@
   const initiales = $derived(a.full_name.split(' ').map((p) => p[0]).slice(0, 2).join(''));
   const livres = $derived(a.works.find((g) => g.role === 'author')?.books ?? []);
   const contributions = $derived(a.works.filter((g) => g.role !== 'author' && g.books.length));
-  const nbTitres = $derived(new Set(a.works.flatMap((g) => g.books.map((b) => b.slug))).size);
 </script>
 
 <svelte:head><title>{a.full_name} · Agone</title></svelte:head>
@@ -45,7 +44,6 @@
         <dl class="mt-6 max-w-[280px] space-y-3 text-sm">
           {#if a.nationality}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Nationalité</dt><dd class="text-right font-medium">{a.nationality}</dd></div>{/if}
           {#if years}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Dates</dt><dd class="font-medium">{years}</dd></div>{/if}
-          {#if nbTitres}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Chez Agone</dt><dd class="font-medium">{nbTitres} titre{nbTitres > 1 ? 's' : ''}</dd></div>{/if}
           {#if a.website}
             <div><a href={a.website} target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 font-medium text-link hover:underline"><ArrowSquareOut size={14} /> Site web</a></div>
           {/if}
@@ -71,13 +69,13 @@
         <div class="mt-10 space-y-8">
           {#if livres.length}
             <div>
-              <div class="tick-label mb-3">Ses livres{livres.length > 1 ? ` · ${livres.length}` : ''}</div>
+              <div class="tick-label mb-3">Ses livres</div>
               <CouverturesGrille livres={livres} colonnes={2} etendu />
             </div>
           {/if}
           {#each contributions as g (g.role)}
             <div>
-              <div class="tick-label mb-3">{g.role_label}{g.books.length > 1 ? ` · ${g.books.length}` : ''}</div>
+              <div class="tick-label mb-3">{g.role_label}</div>
               <CouverturesGrille livres={g.books} colonnes={3} etendu />
             </div>
           {/each}

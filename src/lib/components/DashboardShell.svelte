@@ -52,7 +52,7 @@
       <a href="/" aria-label="Agone — accueil"><Wordmark /></a>
     </div>
 
-    <nav class="nav-defile flex-1 space-y-1.5 overflow-y-auto px-3 py-2 lg:w-0 lg:min-w-full">
+    <nav class="nav-defile flex-1 space-y-1.5 overflow-y-auto px-3 pb-2 pt-5 lg:w-0 lg:min-w-full">
       {#each navSections as section, si (section.title ?? `_${si}`)}
         <div class="space-y-0.5">
           {#if section.title}

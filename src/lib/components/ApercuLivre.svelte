@@ -173,7 +173,6 @@
             {#if ajoute}
               <a href="/panier" class="link mt-2 inline-block text-sm">Voir mon panier →</a>
             {/if}
-            <p class="mt-4 text-xs text-muted-foreground">{(index ?? 0) + 1} / {livres.length} · ← → pour parcourir</p>
           </div>
         </div>
       {/key}

@@ -14,6 +14,7 @@
 import { getSetting, setSetting } from './site';
 import {
   importUsers, importOrders, importAuthors, importArticles, importBooks, importEvents, importCoversEtCollections,
+  importBibliotheques,
   type ImportResult, type ImportOpts
 } from './migration';
 
@@ -27,6 +28,7 @@ import {
  *   4. Rencontres   — auteurs, livres, lieux.
  *   5. Utilisateurs — comptes clients.
  *   6. Commandes    — rattachées aux comptes (5) et aux livres (2).
+ *   7. Bibliothèques — droits d'accès aux ebooks, déduits des commandes payées.
  */
 const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<ImportResult>; limit?: number }[] = [
   { key: 'authors', label: 'Auteurs', fn: importAuthors },
@@ -37,7 +39,9 @@ const ETAPES: { key: string; label: string; fn: (o: ImportOpts) => Promise<Impor
   { key: 'events', label: 'Rencontres', fn: importEvents },
   // Comptes : WordPress ne date pas leurs modifications → balayage complet en un seul lot.
   { key: 'users', label: 'Utilisateurs', fn: importUsers, limit: 5000 },
-  { key: 'orders', label: 'Commandes', fn: importOrders }
+  { key: 'orders', label: 'Commandes', fn: importOrders },
+  // Bibliothèques : dépend des commandes (6) et des fichiers ebook.
+  { key: 'library', label: 'Bibliothèques ebook', fn: importBibliotheques, limit: 5000 }
 ];
 
 /** Au-delà, on s'arrête (garde-fou contre une boucle) ; relancer continue. */

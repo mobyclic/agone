@@ -41,7 +41,7 @@
         </div>
 
         <a href="/article/{article.slug}" class="group mt-2 block">
-          <h1 class="display-title break-words text-4xl leading-[0.92] group-hover:text-link sm:text-5xl lg:text-[2.25rem] xl:text-5xl">{article.title}</h1>
+          <h1 class="display-title break-words text-4xl leading-[1.04] group-hover:underline group-hover:underline-offset-4 sm:text-5xl lg:text-[2.25rem] xl:text-5xl">{article.title}</h1>
         </a>
 
         {#if article.author}
@@ -65,7 +65,7 @@
                   {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
-                <h3 class="display-title mt-1 text-xl leading-tight group-hover:text-link">{a.title}</h3>
+                <h3 class="display-title mt-1 text-xl leading-tight group-hover:underline group-hover:underline-offset-4">{a.title}</h3>
                 {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
                 {#if a.excerpt}
                   <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>
@@ -101,7 +101,7 @@
                 {/if}
               </div>
               <div class="mt-3">
-                <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground transition-colors group-hover:text-link sm:text-[17px]">{book.title}</h3>
+                <h3 class="line-clamp-2 font-sans text-base font-bold leading-tight text-foreground transition-colors group-hover:underline group-hover:underline-offset-4 sm:text-[17px]">{book.title}</h3>
                 {#if book.subtitle}<p class="mt-px line-clamp-2 text-[13px] leading-snug text-muted-foreground">{book.subtitle}</p>{/if}
                 {#if book.authors?.length}<p class="mt-0.5 line-clamp-1 text-[13px] font-semibold tracking-wide text-link transition-colors group-hover:text-foreground">{authorList(book.authors)}</p>{/if}
               </div>

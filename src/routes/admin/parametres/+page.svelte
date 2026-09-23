@@ -49,7 +49,8 @@
     { key: 'articles', icon: Article, title: 'Articles', desc: 'Antichambre : corps, rubrique, auteurs, livres, LettrInfo.' },
     { key: 'events', icon: CalendarDots, title: 'Rencontres', desc: 'Lieux géolocalisés, auteurs et livres liés.' },
     { key: 'users', icon: Users, title: 'Utilisateurs', desc: 'Clients WordPress → comptes.' },
-    { key: 'orders', icon: Receipt, title: 'Commandes', desc: 'WooCommerce + lignes → comptes et livres.' }
+    { key: 'orders', icon: Receipt, title: 'Commandes', desc: 'WooCommerce + lignes → comptes et livres.' },
+    { key: 'library', icon: BookOpen, title: 'Bibliothèques ebook', desc: 'Droits d’accès des clients, déduits des commandes payées.' }
   ];
   const resultat = (key: string) => job?.etapes.find((e) => e.key === key);
 </script>

@@ -97,7 +97,7 @@
                 {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
               </span>
               <span class="min-w-0">
-                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:text-link">{book.title}</span>
+                <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:underline group-hover:underline-offset-4">{book.title}</span>
                 {#if book.authors?.length}<span class="mt-1 block text-sm text-link">{book.authors[0].name}</span>{/if}
               </span>
             </a>

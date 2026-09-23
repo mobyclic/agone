@@ -29,7 +29,7 @@
               <span class="mt-1 text-xs uppercase text-muted-foreground">{mois(r.start_at)}</span>
             </span>
             <span class="min-w-0">
-              <span class="block font-display text-base font-medium uppercase leading-tight group-hover:text-link">{r.title}</span>
+              <span class="block font-display text-base font-medium uppercase leading-tight group-hover:underline group-hover:underline-offset-4">{r.title}</span>
               <span class="mt-1 block text-xs text-muted-foreground">
                 <span class="first-letter:uppercase">{jourSemaine(r.start_at)}</span>{#if heure(r.start_at)}{' '}· {heure(r.start_at)}{/if}
                 {#if r.venue_name}<br /><MapPin size={11} class="mb-0.5 mr-0.5 inline" />{r.venue_name}{r.venue_city ? `, ${r.venue_city}` : ''}{/if}

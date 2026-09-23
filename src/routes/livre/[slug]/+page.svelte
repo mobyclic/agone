@@ -115,13 +115,14 @@
 
     <!-- Contenu -->
     <div class="min-w-0">
-      <!-- Fil d'Ariane, au-dessus du titre, en petit : Catalogue / Collection -->
-      <nav class="mb-3 flex flex-wrap items-center gap-1.5 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <a href="/catalogue" class="hover:text-foreground">Catalogue</a>
-        {#if collection}<span class="opacity-40">/</span><a href="/collections/{collection.slug}" class="hover:text-foreground">{collection.name}</a>{/if}
-      </nav>
+      <!-- Collection seule au-dessus du titre (le retour au catalogue est dans la
+           navigation), ligne compacte pour que le titre arrive à la hauteur du
+           haut de la couverture. -->
+      {#if collection}
+        <a href="/collections/{collection.slug}" class="block font-display text-xs font-medium uppercase leading-none tracking-wide text-muted-foreground hover:text-foreground">{collection.name}</a>
+      {/if}
 
-      <h2 class="display-title text-3xl leading-tight sm:text-4xl">{b.title}</h2>
+      <h2 class="display-title mt-1.5 text-3xl leading-tight sm:text-4xl">{b.title}</h2>
       {#if b.subtitle}<p class="mt-2 text-base leading-snug text-muted-foreground">{b.subtitle}</p>{/if}
 
       <!-- Auteur principal : sous le titre, plus gros -->
@@ -255,7 +256,7 @@
                 <div class="aspect-[2/3] overflow-hidden border border-border bg-muted">
                   {#if r.cover_url}<img src={r.cover_url} alt={r.title} loading="lazy" class="size-full object-cover transition-transform group-hover:scale-[1.04]" />{/if}
                 </div>
-                <p class="mt-1 line-clamp-2 font-display text-[11px] font-medium uppercase leading-tight text-muted-foreground group-hover:text-link">{r.title}</p>
+                <p class="mt-1 line-clamp-2 font-display text-[11px] font-medium uppercase leading-tight text-muted-foreground group-hover:underline group-hover:underline-offset-4">{r.title}</p>
               </a>
             {/each}
           </div>

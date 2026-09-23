@@ -104,7 +104,11 @@ export async function getAuthorBySlug(slug: string): Promise<AuthorDetail | null
   const works = await query<any>(
     `SELECT role,
         in.title AS title, in.slug AS slug, in.cover.url AS cover_url,
-        in.price_paper AS price_paper, in.published_at AS published_at
+        in.price_paper AS price_paper, in.price_ebook AS price_ebook,
+        in.subscription_price AS subscription_price, in.subscription_end AS subscription_end,
+        in.stock_qty AS stock_qty, in.status AS status,
+        count((SELECT id FROM ebook_asset WHERE book = $parent.in AND status = 'available')) > 0 AS has_ebook_file,
+        in.published_at AS published_at
       FROM contributed_by
       WHERE out = $id AND in.status = 'published'
       ORDER BY role`,

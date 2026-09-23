@@ -5,6 +5,6 @@
   let { class: klass = '' }: { class?: string } = $props();
 </script>
 
-<span class="font-serif text-[1.625rem] font-bold uppercase leading-none tracking-tight {klass}">
+<span class="font-serif text-[2.15rem] font-bold uppercase leading-none tracking-tight {klass}">
   <span class="italic text-[1.4em]">A</span>GON<span class="text-[1.4em]">E</span>
 </span>

@@ -3,6 +3,10 @@
    * Grille de couvertures pour colonne latérale (fiches livre et auteur) :
    * couvertures seules, titre (et auteur si demandé) en surimpression au survol
    * et au focus clavier. `colonnes` = 2 (grandes) ou 3 (petites).
+   *
+   * Les couvertures ne sont PAS rognées : toutes les collections n'ont pas le même
+   * format (la Revue est presque carrée), et un recadrage coupait les titres. Elles
+   * sont donc contenues dans un cadre 2:3, centrées en bas.
    */
   interface Livre { slug: string; title: string; cover_url?: string; authors?: { name: string }[] }
   let { livres, colonnes = 3, avecAuteur = false, etendu = false }: {
@@ -22,7 +26,7 @@
     <li>
       <a href="/livre/{s.slug}" class="group relative block overflow-hidden border border-border bg-muted focus:outline-none">
         {#if s.cover_url}
-          <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+          <img src={s.cover_url} alt={s.title} loading="lazy" class="block aspect-[2/3] w-full bg-secondary/40 object-contain object-bottom transition-transform duration-300 group-hover:scale-[1.04]" />
         {:else}
           <span class="flex aspect-[2/3] items-end bg-ink {grand ? 'p-2' : 'p-1.5'}"><span class="font-display {grand ? 'text-xs' : 'text-[10px]'} uppercase leading-tight text-white">{s.title}</span></span>
         {/if}
