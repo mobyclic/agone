@@ -25,6 +25,14 @@ const ACCOUNT_ID  = env.CLOUDFLARE_ACCOUNT_ID;
 const ACCESS_KEY  = env.CLOUDFLARE_R2_ACCESS_KEY_ID;
 const SECRET_KEY  = env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
 const BUCKET      = env.CLOUDFLARE_R2_BUCKET_NAME;
+/**
+ * Bucket PRIVÉ (sans domaine public) pour les fichiers qui ne doivent jamais être
+ * servis en direct : ebooks. Le bucket principal est exposé par une URL r2.dev,
+ * donc tout ce qu'il contient est téléchargeable par qui connaît la clé — un nom
+ * de fichier aléatoire n'est pas une protection. Tant que la variable n'est pas
+ * renseignée, on retombe sur le bucket principal (comportement d'avant).
+ */
+const BUCKET_PRIVE = env.CLOUDFLARE_R2_BUCKET_PRIVATE || '';
 const PUBLIC_URL  = (env.CLOUDFLARE_R2_PUBLIC_URL ?? '').replace(/\/+$/, '');
 // Juridiction du bucket : '' (défaut), 'eu' ou 'fedramp'. Les buckets EU
 // utilisent l'endpoint <account>.eu.r2.cloudflarestorage.com.
@@ -45,6 +53,20 @@ function getClient(): S3Client {
     credentials: { accessKeyId: ACCESS_KEY, secretAccessKey: SECRET_KEY }
   });
   return _client;
+}
+
+/** Préfixes stockés dans le bucket privé (jamais d'URL publique). */
+const PREFIXES_PRIVES = ['livres/ebooks/'];
+
+/** Le fichier est-il de ceux qui ne doivent pas être servis en direct ? */
+export function estPrive(key: string): boolean {
+  const k = String(key).replace(/^\/+/, '');
+  return PREFIXES_PRIVES.some((p) => k.startsWith(p));
+}
+
+/** Bucket où vit cette clé : privé pour les ebooks (si configuré), principal sinon. */
+function bucketFor(key: string): string {
+  return estPrive(key) && BUCKET_PRIVE ? BUCKET_PRIVE : (BUCKET as string);
 }
 
 /** Construit l'URL publique d'un fichier stocké (à partir de sa clé). */
@@ -115,7 +137,7 @@ export async function uploadBuffer(opts: {
 }): Promise<UploadResult> {
   const client = getClient();
   await client.send(new PutObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucketFor(opts.key),
     Key: opts.key,
     Body: opts.buffer,
     ContentType: opts.contentType,
@@ -133,7 +155,7 @@ export async function uploadBuffer(opts: {
 export async function getObject(key: string): Promise<{ body: Uint8Array; contentType?: string } | null> {
   const client = getClient();
   try {
-    const res: any = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+    const res: any = await client.send(new GetObjectCommand({ Bucket: bucketFor(key), Key: key }));
     const body = (await res.Body.transformToByteArray()) as Uint8Array;
     return { body, contentType: res.ContentType };
   } catch (e: any) {
@@ -185,7 +207,7 @@ export async function listObjects(prefix = ''): Promise<MediaListing> {
   let token: string | undefined;
   do {
     const res: any = await client.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
+      Bucket: bucketFor(withSlash),
       Prefix: withSlash,
       Delimiter: '/',
       ContinuationToken: token
@@ -215,7 +237,7 @@ export async function listAllImages(prefix = ''): Promise<MediaFile[]> {
   let token: string | undefined;
   do {
     const res: any = await client.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
+      Bucket: bucketFor(withSlash),
       Prefix: withSlash,
       ContinuationToken: token
     }));
@@ -237,7 +259,7 @@ export async function listAllImages(prefix = ''): Promise<MediaFile[]> {
 /** Supprime un seul objet du bucket. */
 export async function deleteFile(key: string): Promise<void> {
   const client = getClient();
-  await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  await client.send(new DeleteObjectCommand({ Bucket: bucketFor(key), Key: key }));
 }
 
 /** Supprime TOUS les objets sous un préfixe (ex: tout le dossier d'un talent). */
@@ -246,15 +268,16 @@ export async function deletePrefix(prefix: string): Promise<number> {
   let total = 0;
   let continuationToken: string | undefined = undefined;
   do {
+    const prefixe = prefix.replace(/^\/+|\/+$/g, '') + '/';
     const listed: any = await client.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
-      Prefix: prefix.replace(/^\/+|\/+$/g, '') + '/',
+      Bucket: bucketFor(prefixe),
+      Prefix: prefixe,
       ContinuationToken: continuationToken
     }));
     const contents = listed.Contents ?? [];
     if (contents.length > 0) {
       await client.send(new DeleteObjectsCommand({
-        Bucket: BUCKET,
+        Bucket: bucketFor(prefix.replace(/^\/+|\/+$/g, '') + '/'),
         Delete: { Objects: contents.map((o: any) => ({ Key: o.Key })) }
       }));
       total += contents.length;

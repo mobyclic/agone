@@ -19,7 +19,8 @@
     "seed": "bun run scripts/seed.ts",
     "db:local": "sh scripts/surreal-local.sh start",
     "db:local:pull": "sh scripts/surreal-local.sh pull",
-    "covers": "bun run scripts/sync-covers.ts"
+    "covers": "bun run scripts/sync-covers.ts",
+    "ebooks:prive": "bun run scripts/ebooks-vers-bucket-prive.ts"
   },
   "devDependencies": {
     "@fontsource-variable/oswald": "^5.3.0",
