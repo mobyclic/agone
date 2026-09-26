@@ -22,6 +22,8 @@ function getClient(): Resend | null {
 const FROM = env.MAIL_FROM || 'Agone <onboarding@resend.dev>';
 const REPLY_TO = env.MAIL_REPLY_TO;
 const SITE = env.PUBLIC_SITE_NAME || 'Agone';
+/** Adresse publique du site, pour les liens des emails (pas d'origine de requête en tâche de fond). */
+export const SITE_URL = (env.PUBLIC_SITE_URL || 'https://agone.org').replace(/\/+$/, '');
 
 const DRY_RUN = ['1', 'true', 'yes', 'on'].includes((env.MAIL_DRY_RUN || '').trim().toLowerCase());
 const dryRunTo = env.MAIL_DRY_RUN_TO || 'alistair.marca@gmail.com';
@@ -73,7 +75,7 @@ export async function sendMail(
 }
 
 // ── Gabarit HTML minimal, sobre & éditorial (encre + rouge Agone) ──
-function layout(title: string, inner: string): string {
+export function layout(title: string, inner: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Georgia,'Times New Roman',serif;color:#171717">
   <div style="max-width:520px;margin:0 auto;padding:32px 20px">
     <!-- Le wordmark du site : A initial en italique, A et E agrandis. -->
@@ -86,7 +88,7 @@ function layout(title: string, inner: string): string {
   </div></body></html>`;
 }
 
-function button(href: string, label: string): string {
+export function button(href: string, label: string): string {
   return `<a href="${href}" style="display:inline-block;background:#d4211c;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:9px;font-weight:700;font-family:Arial,Helvetica,sans-serif">${label}</a>`;
 }
 

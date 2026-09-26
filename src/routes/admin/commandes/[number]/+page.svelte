@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Check } from 'phosphor-svelte';
+  import { ArrowLeft, Check, Truck, PaperPlaneTilt, ArrowCounterClockwise, NotePencil } from 'phosphor-svelte';
   import { ORDER_STATUS_LABEL, CHANNEL_LABEL, euros } from '$lib/labels';
 
   let { data, form } = $props();
@@ -49,7 +49,7 @@
     {:else if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status)}
       <form method="POST" action="?/generate_invoice" use:enhance><button type="submit" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Générer la facture</button></form>
     {/if}
-    {#if o.channel === 'sortie_editeur'}
+    {#if o.has_physical}
       <a href="/admin/commandes/{o.number}/livraison?dl=1" class="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm hover:bg-muted">Bon de livraison</a>
     {/if}
     {#if o.channel && o.channel !== 'web'}<span class="rounded border border-border px-2.5 py-1 text-sm font-medium text-muted-foreground">{CHANNEL_LABEL[o.channel] ?? o.channel}</span>{/if}
@@ -92,16 +92,51 @@
       </table>
     </div>
 
+    {#if form?.error}<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
+
     <!-- Changement de statut -->
     <form method="POST" action="?/status" use:enhance class="rounded-lg border border-border bg-card p-4">
       <h3 class="mb-3 text-sm font-semibold">Mettre à jour le statut</h3>
-      {#if form?.error}<p class="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
       <div class="flex flex-wrap items-center gap-2">
         <select name="status" value={o.status} class="h-10 rounded-md border border-border bg-background px-3 text-sm">
           {#each Object.entries(ORDER_STATUS_LABEL) as [k, v] (k)}<option value={k}>{v}</option>{/each}
         </select>
         <Button type="submit"><Check size={16} /> Enregistrer</Button>
       </div>
+      <p class="mt-2 text-xs text-muted-foreground">« Terminée » sur une commande papier envoie l’avis d’expédition au client (une seule fois).</p>
+    </form>
+
+    <!-- Expédition : transporteur et suivi, saisis à la main -->
+    {#if o.has_physical}
+      <form method="POST" action="?/tracking" use:enhance class="rounded-lg border border-border bg-card p-4">
+        <h3 class="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Truck size={16} /> Expédition</h3>
+        <div class="grid gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
+          <label class="text-xs font-medium text-muted-foreground">Transporteur
+            <select name="carrier" class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground">
+              <option value="">—</option>
+              {#each Object.entries(data.transporteurs) as [k, t] (k)}<option value={k} selected={o.carrier === t.nom}>{t.nom}</option>{/each}
+            </select>
+          </label>
+          <label class="text-xs font-medium text-muted-foreground">Numéro de suivi
+            <input name="tracking_number" value={o.tracking_number ?? ''} placeholder="ex. 6A12345678901" class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+          </label>
+          <label class="text-xs font-medium text-muted-foreground sm:col-span-2">Adresse de suivi
+            <input name="tracking_url" value={o.tracking_url ?? ''} placeholder="déduite du transporteur si vide" class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+          </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="outline" size="sm">Enregistrer</Button>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="prevenir" class="size-4 accent-[var(--color-link)]" /> et prévenir le client par email</label>
+          {#if o.shipping_notified_at}<span class="text-xs text-muted-foreground">avis d’expédition envoyé le {dateFr(o.shipping_notified_at)}</span>{/if}
+        </div>
+      </form>
+    {/if}
+
+    <!-- Notes internes -->
+    <form method="POST" action="?/notes" use:enhance class="rounded-lg border border-border bg-card p-4">
+      <h3 class="mb-2 flex items-center gap-1.5 text-sm font-semibold"><NotePencil size={16} /> Notes internes</h3>
+      <textarea name="notes" rows="3" placeholder="Visible par l’équipe seulement." class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">{o.notes ?? ''}</textarea>
+      <div class="mt-2"><Button type="submit" variant="outline" size="sm">Enregistrer les notes</Button></div>
     </form>
   </div>
 
@@ -110,7 +145,33 @@
     <div class="rounded-lg border border-border bg-card p-4">
       <h3 class="mb-2 text-sm font-semibold">Client</h3>
       <p class="text-sm">{o.email || (billing[billing.length - 1] ?? '—')}</p>
+      {#if o.email}
+        <p class="mt-2 text-xs text-muted-foreground">
+          {o.confirmation_sent_at ? `Confirmation envoyée le ${dateFr(o.confirmation_sent_at)}` : 'Aucune confirmation envoyée'}
+        </p>
+        <form method="POST" action="?/resend_confirmation" use:enhance class="mt-2">
+          <button type="submit" class="inline-flex items-center gap-1 text-xs text-link hover:underline"><PaperPlaneTilt size={13} /> Renvoyer la confirmation</button>
+        </form>
+      {/if}
     </div>
+
+    <!-- Remboursement : Stripe si la commande a été payée en ligne, sinon consigné -->
+    {#if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status) && !o.stripe_refund_id}
+      <form method="POST" action="?/refund" use:enhance class="rounded-lg border border-border bg-card p-4"
+        onsubmit={(e: Event) => { if (!confirm('Rembourser cette commande ? Le client sera prévenu par email.')) e.preventDefault(); }}>
+        <h3 class="mb-2 flex items-center gap-1.5 text-sm font-semibold"><ArrowCounterClockwise size={16} /> Rembourser</h3>
+        <label class="text-xs font-medium text-muted-foreground">Montant (vide = total {euros(o.total)})
+          <input name="montant" type="number" step="0.01" min="0" max={o.total} class="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+        </label>
+        <Button type="submit" variant="outline" size="sm" class="mt-2 text-destructive">Rembourser</Button>
+        <p class="mt-2 text-xs text-muted-foreground">{o.stripe_payment_intent ? 'Via Stripe, sur le paiement d’origine.' : 'Paiement hors Stripe : le virement est à faire à la main, l’opération est seulement consignée.'}</p>
+      </form>
+    {:else if o.stripe_refund_id}
+      <div class="rounded-lg border border-border bg-card p-4 text-sm">
+        <h3 class="mb-1 text-sm font-semibold">Remboursée</h3>
+        <p class="text-xs text-muted-foreground">le {dateFr(o.refunded_at)}{o.stripe_refund_id?.startsWith('re_') ? ' via Stripe' : ' (hors Stripe)'}</p>
+      </div>
+    {/if}
     {#if billing.length}
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="mb-2 text-sm font-semibold">Facturation</h3>

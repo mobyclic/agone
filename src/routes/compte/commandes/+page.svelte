@@ -4,7 +4,7 @@
   let { data } = $props();
   const eur = (n: number) => `${(n ?? 0).toFixed(2).replace('.', ',')} €`;
   const fmt = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-  const STATUS: Record<string, string> = { pending: 'En attente', paid: 'Payée', processing: 'En préparation', sent_to_bl: 'Expédiée', completed: 'Terminée', cancelled: 'Annulée', refunded: 'Remboursée', failed: 'Échouée' };
+  const STATUS: Record<string, string> = { pending: 'En attente', paid: 'Payée', processing: 'En préparation', sent_to_bl: 'En cours d’expédition', completed: 'Expédiée', cancelled: 'Annulée', refunded: 'Remboursée', failed: 'Échouée' };
 </script>
 
 <svelte:head><title>Mes commandes · Agone</title></svelte:head>
@@ -21,7 +21,7 @@
   <div class="mt-6 overflow-x-auto rounded-lg border border-border bg-card">
     <table class="w-full text-sm">
       <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-        <tr><th class="px-3 py-2 font-medium">N°</th><th class="px-3 py-2 font-medium">Date</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 text-right font-medium">Total</th></tr>
+        <tr><th class="px-3 py-2 font-medium">N°</th><th class="px-3 py-2 font-medium">Date</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 font-medium">Suivi</th><th class="px-3 py-2 text-right font-medium">Total</th></tr>
       </thead>
       <tbody class="divide-y divide-border">
         {#each data.orders as o (o.id)}
@@ -29,6 +29,11 @@
             <td class="px-3 py-2"><a href="/commande/{o.number}" class="font-medium hover:text-link">n°{o.number}</a></td>
             <td class="px-3 py-2 text-muted-foreground">{fmt(o.created_at)}</td>
             <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[o.status] ?? o.status}</span></td>
+            <td class="px-3 py-2 text-xs">
+              {#if o.tracking_url}<a href={o.tracking_url} target="_blank" rel="noopener" class="text-link hover:underline">{o.tracking_number}</a>
+              {:else if o.tracking_number}<span class="font-mono">{o.tracking_number}</span>
+              {:else}<span class="text-muted-foreground">—</span>{/if}
+            </td>
             <td class="px-3 py-2 text-right font-semibold">{eur(o.total)}</td>
           </tr>
         {/each}

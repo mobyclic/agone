@@ -606,6 +606,18 @@ DEFINE FIELD OVERWRITE stripe_session        ON order TYPE option<string>;
 DEFINE FIELD OVERWRITE stripe_payment_intent ON order TYPE option<string>;
 DEFINE FIELD OVERWRITE invoice_number ON order TYPE option<int>;
 DEFINE FIELD OVERWRITE bl_exported_at ON order TYPE option<datetime>;
+-- Expédition : transporteur et numéro de suivi (saisis à la main, Les Belles
+-- Lettres ne les transmettent pas), notes internes, et horodatage des emails
+-- envoyés au client pour ne jamais les envoyer deux fois.
+DEFINE FIELD OVERWRITE carrier         ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE tracking_number ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE tracking_url    ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE shipped_at      ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE notes           ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE confirmation_sent_at  ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE shipping_notified_at  ON order TYPE option<datetime>;
+DEFINE FIELD OVERWRITE stripe_refund_id      ON order TYPE option<string>;
+DEFINE FIELD OVERWRITE refunded_at           ON order TYPE option<datetime>;
 DEFINE FIELD OVERWRITE paid_at      ON order TYPE option<datetime>;
 DEFINE FIELD OVERWRITE completed_at ON order TYPE option<datetime>;
 DEFINE FIELD OVERWRITE created_at   ON order TYPE datetime DEFAULT time::now();

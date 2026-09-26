@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import { CheckCircle, Clock, BookOpen, Receipt } from 'phosphor-svelte';
+  import { CheckCircle, Clock, BookOpen, Receipt, Truck } from 'phosphor-svelte';
   import { trackPurchase, itemId } from '$lib/analytics';
 
   let { data } = $props();
@@ -11,7 +11,7 @@
   const paid = $derived(o.status === 'paid' || o.status === 'completed' || o.status === 'processing');
   const STATUS: Record<string, string> = {
     pending: 'En attente de paiement', paid: 'Payée', processing: 'En préparation',
-    sent_to_bl: 'Transmise au distributeur', completed: 'Terminée', cancelled: 'Annulée', refunded: 'Remboursée', failed: 'Échouée'
+    sent_to_bl: 'En cours d’expédition', completed: 'Expédiée', cancelled: 'Annulée', refunded: 'Remboursée', failed: 'Échouée'
   };
 
   // Conversion e-commerce (dédupliquée par n° de commande) — pour Meta/Instagram Ads via GTM.
@@ -58,6 +58,18 @@
       <div class="flex justify-between pt-1 text-base font-bold"><span>Total</span><span>{eur(o.total)}</span></div>
     </div>
   </div>
+
+  {#if o.has_physical && (o.tracking_number || o.status === 'completed')}
+    <div class="mt-4 rounded-lg border border-border bg-card p-5 text-sm">
+      <p class="flex items-center gap-2 font-semibold"><Truck size={18} class="text-link" /> {o.status === 'completed' ? 'Votre colis est parti' : 'Suivi du colis'}</p>
+      {#if o.tracking_number}
+        <p class="mt-2">Numéro de suivi{o.carrier ? ` (${o.carrier})` : ''} : <span class="font-mono font-semibold">{o.tracking_number}</span></p>
+        {#if o.tracking_url}<Button href={o.tracking_url} target="_blank" rel="noopener" variant="outline" size="sm" class="mt-3">Suivre mon colis</Button>{/if}
+      {:else}
+        <p class="mt-1 text-muted-foreground">Expédié par notre distributeur ; le numéro de suivi n’est pas toujours disponible.</p>
+      {/if}
+    </div>
+  {/if}
 
   <div class="mt-6 flex flex-wrap justify-center gap-3">
     {#if paid && o.has_ebook}

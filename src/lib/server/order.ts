@@ -90,11 +90,22 @@ export async function markOrderPaid(orderId: string): Promise<void> {
   } catch (e) {
     console.error('[invoice] génération échouée pour la commande', orderId, e);
   }
+
+  // Confirmation au client — après la facture, pour qu'elle existe quand il clique.
+  // Jamais bloquant : un email qui échoue ne doit pas défaire un paiement.
+  try {
+    const { sendOrderConfirmation } = await import('./orderMail');
+    await sendOrderConfirmation(orderId);
+  } catch (e) {
+    console.error('[mail] confirmation de commande', orderId, e);
+  }
 }
 
 const ORDER_FIELDS = `
   id, number, status, channel, total, subtotal, shipping_total, discount_total, promo_code,
-  item_count, has_ebook, has_physical, invoice_number, created_at, paid_at, billing, shipping, email
+  item_count, has_ebook, has_physical, invoice_number, created_at, paid_at, billing, shipping, email,
+  carrier, tracking_number, tracking_url, shipped_at, notes,
+  confirmation_sent_at, shipping_notified_at, stripe_payment_intent, stripe_refund_id, refunded_at
 `;
 
 export async function getOrderByNumber(number: number) {
@@ -177,12 +188,108 @@ export async function listOrdersAdmin(opts: { q?: string; status?: string; type?
   return { orders: rows, total: count[0]?.n ?? 0 };
 }
 
-/** Change le statut d'une commande (par numéro), horodatage selon l'état. */
+/**
+ * Change le statut d'une commande (par numéro), horodatage selon l'état.
+ * Passer une commande papier en « terminée » prévient le client que son colis
+ * est parti (une seule fois, cf. shipping_notified_at).
+ */
 export async function setOrderStatus(number: number, status: string): Promise<void> {
   const extra =
     status === 'completed' ? ', completed_at = time::now()' :
     status === 'paid' ? ', paid_at = time::now()' : '';
   await query(`UPDATE order SET status = $s${extra} WHERE number = $n`, { s: status, n: number });
+  if (status === 'completed') {
+    const o = (await query<any>(`SELECT meta::id(id) AS id, has_physical, email, created_at FROM order WHERE number = $n LIMIT 1`, { n: number }))[0];
+    // Garde-fou : reclasser une vieille commande migrée ne doit pas annoncer un
+    // colis à un client d'il y a trois ans. Au-delà de 60 jours, rien ne part
+    // automatiquement (le bouton « prévenir » de la fiche reste disponible).
+    const recente = o?.created_at && Date.now() - +new Date(o.created_at) < 60 * 86_400_000;
+    if (o?.has_physical && o.email && recente) {
+      try {
+        const { sendShippingNotice } = await import('./orderMail');
+        await sendShippingNotice(o.id);
+      } catch (e) {
+        console.error('[mail] avis d’expédition', number, e);
+      }
+    }
+  }
+}
+
+/* ————————————————————— Expédition, notes, remboursement ————————————————————— */
+
+/** Transporteurs usuels et gabarit d'adresse de suivi (le numéro remplace {n}). */
+export const TRANSPORTEURS: Record<string, { nom: string; suivi?: string }> = {
+  colissimo: { nom: 'Colissimo', suivi: 'https://www.laposte.fr/outils/suivre-vos-envois?code={n}' },
+  lettre_suivie: { nom: 'Lettre suivie', suivi: 'https://www.laposte.fr/outils/suivre-vos-envois?code={n}' },
+  chronopost: { nom: 'Chronopost', suivi: 'https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT={n}' },
+  mondial_relay: { nom: 'Mondial Relay', suivi: 'https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition={n}' },
+  dhl: { nom: 'DHL', suivi: 'https://www.dhl.com/fr-fr/home/tracking.html?tracking-id={n}' },
+  ups: { nom: 'UPS', suivi: 'https://www.ups.com/track?tracknum={n}' },
+  autre: { nom: 'Autre' }
+};
+
+/** Enregistre le suivi ; `prevenir` envoie l'avis d'expédition (à nouveau si demandé). */
+export async function setOrderTracking(
+  number: number,
+  d: { carrier?: string; tracking_number?: string; tracking_url?: string },
+  prevenir: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const numero = (d.tracking_number ?? '').trim();
+  const transporteur = d.carrier && TRANSPORTEURS[d.carrier] ? d.carrier : undefined;
+  const gabarit = transporteur ? TRANSPORTEURS[transporteur].suivi : undefined;
+  const url = (d.tracking_url ?? '').trim() || (numero && gabarit ? gabarit.replace('{n}', encodeURIComponent(numero)) : '');
+  await query(
+    `UPDATE order SET carrier = $c, tracking_number = $t, tracking_url = $u, shipped_at = shipped_at ?? time::now() WHERE number = $n`,
+    { c: transporteur ? TRANSPORTEURS[transporteur].nom : undefined, t: numero || undefined, u: url || undefined, n: number }
+  );
+  if (!prevenir) return { ok: true };
+  const o = (await query<any>(`SELECT meta::id(id) AS id FROM order WHERE number = $n LIMIT 1`, { n: number }))[0];
+  const { sendShippingNotice } = await import('./orderMail');
+  return sendShippingNotice(o.id, { force: true });
+}
+
+export const setOrderNotes = (number: number, notes: string) =>
+  query(`UPDATE order SET notes = $v WHERE number = $n`, { v: notes.trim() || undefined, n: number });
+
+/**
+ * Rembourse via Stripe (tout ou partie) puis passe la commande en « remboursée »
+ * si le remboursement est total. Les commandes hors Stripe (comptoir, virement)
+ * se remboursent à la main : on ne fait que consigner.
+ */
+export async function refundOrder(number: number, montant?: number): Promise<{ ok: boolean; error?: string; montant: number }> {
+  const o = (await query<any>(
+    `SELECT meta::id(id) AS id, total, status, stripe_payment_intent, stripe_session, stripe_refund_id FROM order WHERE number = $n LIMIT 1`, { n: number }
+  ))[0];
+  if (!o) return { ok: false, error: 'Commande introuvable.', montant: 0 };
+  if (o.stripe_refund_id) return { ok: false, error: 'Déjà remboursée via Stripe.', montant: 0 };
+  const somme = r2(montant && montant > 0 ? Math.min(montant, o.total) : o.total);
+  if (somme <= 0) return { ok: false, error: 'Montant nul.', montant: 0 };
+
+  const { getStripe } = await import('./stripe');
+  const stripe = getStripe();
+  let refundId: string | undefined;
+  if (stripe && (o.stripe_payment_intent || o.stripe_session)) {
+    let pi = o.stripe_payment_intent as string | undefined;
+    if (!pi && o.stripe_session) {
+      const session = await stripe.checkout.sessions.retrieve(o.stripe_session);
+      pi = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    }
+    if (!pi) return { ok: false, error: 'Paiement Stripe introuvable pour cette commande.', montant: 0 };
+    const refund = await stripe.refunds.create({ payment_intent: pi, amount: Math.round(somme * 100) });
+    refundId = refund.id;
+  }
+  const total = somme >= o.total - 0.005;
+  await query(
+    `UPDATE $id SET stripe_refund_id = $r, refunded_at = time::now()${total ? ", status = 'refunded'" : ''}`,
+    { id: recId('order', o.id), r: refundId ?? `manuel-${Date.now()}` }
+  );
+  try {
+    const { sendRefundNotice } = await import('./orderMail');
+    await sendRefundNotice(o.id, somme);
+  } catch (e) {
+    console.error('[mail] avis de remboursement', number, e);
+  }
+  return { ok: true, montant: somme };
 }
 
 /* ————————————————————— Commande rapide (back-office) ————————————————————— */
