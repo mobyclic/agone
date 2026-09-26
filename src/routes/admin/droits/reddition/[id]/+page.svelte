@@ -62,6 +62,7 @@
         <tr>
           <td class="px-3 py-2 font-medium">
             {l.book_title}
+            {#if l.kind === 'cession'}<span class="block text-xs font-normal text-link">{l.label}</span>{/if}
             {#if l.segment_start}
               <!-- Contrat qui ne couvre qu'une partie de l'exercice (avenant). -->
               <span class="block text-xs font-normal text-muted-foreground">

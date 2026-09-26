@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { FileText, Receipt, Coins, FloppyDisk, ArrowsClockwise } from 'phosphor-svelte';
+  import { FileText, Receipt, Coins, FloppyDisk, ArrowsClockwise, Globe } from 'phosphor-svelte';
   let { data } = $props();
 
   const exercice = new Date().getUTCFullYear();
@@ -9,7 +9,8 @@
   const sections = $derived([
     { href: '/admin/droits/contrats', title: 'Contrats', desc: 'Barèmes par paliers, à-valoir, périmètre — par livre et contributeur.', n: data.stats.contracts, icon: FileText },
     { href: '/admin/droits/ventes', title: 'Ventes de l’exercice', desc: 'Ventes en librairie, ventes du site et mouvements de stock, année par année.', n: data.stats.reports, icon: Receipt },
-    { href: '/admin/droits/reddition', title: 'Reddition de comptes', desc: 'États de droits par auteur et par période.', n: data.stats.statements, icon: Coins }
+    { href: '/admin/droits/reddition', title: 'Reddition de comptes', desc: 'États de droits par auteur et par période.', n: data.stats.statements, icon: Coins },
+    { href: '/admin/droits/cessions', title: 'Cessions de droits', desc: 'Droits vendus à l’étranger et droits acquis : à-valoir, taux, échéances.', n: data.stats.cessions, icon: Globe }
   ]);
   const fmtP = (s: string, e: string) =>
     `${new Date(s).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })} → ${new Date(e).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}`;
@@ -40,7 +41,7 @@
   </form>
 </div>
 
-<div class="grid gap-4 sm:grid-cols-3">
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
   {#each sections as s (s.href)}
     <a href={s.href} class="group rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary">
       <div class="flex items-center justify-between">

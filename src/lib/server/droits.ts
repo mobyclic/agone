@@ -149,22 +149,48 @@ export async function contractCoverage(opts: { q?: string; limit?: number } = {}
         array::len(->contributed_by[WHERE role = 'editor']) AS editor_count,
         array::len(->contributed_by[WHERE role != 'author' AND role != 'editor']) AS contributor_count
        FROM book WHERE ${where} ORDER BY title ASC LIMIT $limit`, vars);
-  // Contrats par livre + statut (active | draft | ended).
-  const counts = await query<any>(`SELECT book, status, count() AS n FROM royalty_contract GROUP BY book, status`);
-  const totalByBook = new Map<string, number>();
-  const activeByBook = new Map<string, number>();
-  for (const c of counts) {
+
+  // Couverture par rôle : combien de contributeurs ont un contrat VALIDÉ (les
+  // brouillons ne comptent pas), rapporté au nombre de contributeurs du livre.
+  const contrats = await query<any>(
+    `SELECT book, author, role, status FROM royalty_contract WHERE book != NONE`
+  );
+  type Cle = 'author' | 'editor' | 'contributor';
+  const famille = (role: string): Cle => (role === 'author' ? 'author' : role === 'editor' ? 'editor' : 'contributor');
+  const valides = new Map<string, Set<string>>();   // livre|famille → contributeurs sous contrat validé
+  const brouillons = new Map<string, Set<string>>();
+  const total = new Map<string, number>();          // nombre de contrats du livre
+  const actifs = new Map<string, number>();         // dont non brouillons
+  for (const c of contrats) {
     if (!c.book) continue;
-    const k = String(c.book);
-    totalByBook.set(k, (totalByBook.get(k) ?? 0) + (c.n ?? 0));
-    if (c.status === 'active') activeByBook.set(k, (activeByBook.get(k) ?? 0) + (c.n ?? 0));
+    const livre = String(c.book);
+    const k = `${livre}|${famille(String(c.role))}`;
+    const cible = c.status === 'draft' ? brouillons : valides;
+    const set = cible.get(k) ?? new Set<string>();
+    set.add(String(c.author));
+    cible.set(k, set);
+    total.set(livre, (total.get(livre) ?? 0) + 1);
+    if (c.status !== 'draft') actifs.set(livre, (actifs.get(livre) ?? 0) + 1);
   }
-  return books.map((b) => ({
-    ...b,
-    contract_total: totalByBook.get(String(b.id)) ?? 0,
-    contract_active: activeByBook.get(String(b.id)) ?? 0
-  }));
+  const compte = (m: Map<string, Set<string>>, book: string, f: Cle) => m.get(`${book}|${f}`)?.size ?? 0;
+
+  return books.map((b) => {
+    const k = String(b.id);
+    return {
+      ...b,
+      // « 1/1 » : un contrat validé pour l'unique auteur du livre.
+      author_signed: compte(valides, k, 'author'),
+      author_draft: compte(brouillons, k, 'author'),
+      contributor_signed: compte(valides, k, 'contributor'),
+      contributor_draft: compte(brouillons, k, 'contributor'),
+      editor_signed: compte(valides, k, 'editor'),
+      editor_draft: compte(brouillons, k, 'editor'),
+      contract_total: total.get(k) ?? 0,
+      contract_active: actifs.get(k) ?? 0
+    };
+  });
 }
+
 
 // ── Relevés de ventes ─────────────────────────────────────────
 export async function listReports() {
@@ -376,6 +402,8 @@ export interface StatementLine {
   /** Part des unités retenues vendue hors France (taux contractuel réduit de moitié). */
   units_export: number;
   base_amount: number; rate: number; share: number; gross: number; advance_applied: number; net: number;
+  /** 'sales' (défaut) ou 'cession' : produit d'une cession de droits. */
+  kind?: string; label?: string;
   /** Portion de l'exercice couverte par ce contrat, quand il n'en couvre qu'une partie. */
   segment_start?: string; segment_end?: string;
 }
@@ -556,6 +584,36 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
         );
       }
     });
+  }
+
+  // ── Cessions de droits ───────────────────────────────────────────────────
+  // Les sommes encaissées d'un éditeur étranger sur la période reviennent en
+  // partie aux auteurs du livre (part fixée cession par cession, l'usage étant
+  // la moitié). On les rattache au contrat d'édition principal de l'auteur.
+  const principal = new Map<string, any>();
+  const priorite = (scope: string) => (scope === 'all' ? 0 : scope === 'paper' ? 1 : 2);
+  for (const c of contracts) {
+    if (c.role !== 'author') continue;
+    const bookId = String(c.book).replace(/^book:/, '');
+    const actuel = principal.get(bookId);
+    if (!actuel || priorite(c.scope) < priorite(actuel.scope)) principal.set(bookId, c);
+  }
+  for (const [bookId, c] of principal) {
+    const { produitsCessions } = await import('./cessions');
+    for (const p of await produitsCessions(bookId, periodStart, periodEnd)) {
+      const part = Math.min(100, Math.max(0, Number(c.share ?? 100))) / 100;
+      const gross = r2(p.part_auteurs * part);
+      if (!gross) continue;
+      lines.push({
+        contract: String(c.id), book: bookId, book_title: c.book_title, role: c.role, format: c.scope,
+        kind: 'cession', label: p.libelle,
+        units: 0, units_sold: 0, units_returned: 0, units_provision: 0, units_released: 0, units_export: 0,
+        base_amount: p.encaisse, rate: p.author_share, share: r2(part * 100),
+        gross, advance_applied: 0, net: gross
+      });
+      gross_total += gross;
+      net_total += gross;
+    }
   }
 
   // Report à nouveau et seuil de paiement (100 € chez Agone).

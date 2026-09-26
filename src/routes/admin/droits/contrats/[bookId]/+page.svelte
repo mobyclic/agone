@@ -40,6 +40,33 @@
 
 <div class="mb-6"><VentesExercices exercices={data.ventes} /></div>
 
+<!-- Cessions de droits attachées à ce titre -->
+{#if data.cessions.length}
+  <div class="mb-6 overflow-hidden rounded-lg border border-border bg-card">
+    <div class="flex items-baseline justify-between border-b border-border px-4 py-3">
+      <h3 class="text-sm font-semibold">Cessions de droits</h3>
+      <a href="/admin/droits/cessions" class="text-xs text-link hover:underline">Toutes les cessions</a>
+    </div>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-border">
+        {#each data.cessions as c (c.id)}
+          <tr class="hover:bg-muted/30">
+            <td class="px-4 py-2">
+              <a href="/admin/droits/cessions/{c.id}" class="font-medium hover:text-link">{c.counterparty}</a>
+              <span class="block text-xs text-muted-foreground">
+                {c.direction === 'out' ? 'droits vendus' : 'droits acquis'}{c.language ? ` · ${c.language}` : ''}
+              </span>
+            </td>
+            <td class="px-3 py-2 text-right tabular-nums">{c.advance ? `${c.advance} ${c.currency === 'EUR' ? '€' : c.currency}` : '—'}<span class="block text-xs text-muted-foreground">à-valoir</span></td>
+            <td class="px-3 py-2 text-right tabular-nums">{c.encaisse ? `${c.encaisse} €` : '—'}<span class="block text-xs text-muted-foreground">réglé</span></td>
+            <td class="px-4 py-2 text-right text-xs text-muted-foreground">{c.direction === 'out' ? `${c.author_share} % aux auteurs` : ''}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
 <!-- Mouvements de stock relevés chez le distributeur : ce qui a été fabriqué,
      vendu, rendu et donné en service de presse sur chaque exercice importé. -->
 {#if data.mouvements.length}

@@ -407,6 +407,60 @@ DEFINE INDEX OVERWRITE idx_contract_author ON royalty_contract FIELDS author;
 -- les avenants successifs coexistent, ils ne se marchent pas dessus.
 DEFINE INDEX OVERWRITE idx_contract_uniq   ON royalty_contract FIELDS book, author, role, term_start UNIQUE;
 
+-- CESSION DE DROITS : droits VENDUS à un éditeur étranger (Agone encaisse) ou
+-- droits ACQUIS auprès d'un ayant droit étranger (Agone paie). Les deux se
+-- suivent de la même façon : un contrat, un à-valoir, des taux, des échéances.
+DEFINE TABLE OVERWRITE rights_deal SCHEMAFULL;
+DEFINE FIELD OVERWRITE book         ON rights_deal TYPE record<book>;
+DEFINE FIELD OVERWRITE direction    ON rights_deal TYPE string
+  ASSERT $value IN ['out','in'] DEFAULT 'out';        -- out = droits vendus, in = droits acquis
+DEFINE FIELD OVERWRITE counterparty ON rights_deal TYPE string;                    -- l'éditeur d'en face
+DEFINE FIELD OVERWRITE country      ON rights_deal TYPE option<string>;
+DEFINE FIELD OVERWRITE language     ON rights_deal TYPE option<string>;
+DEFINE FIELD OVERWRITE territory    ON rights_deal TYPE option<string>;            -- « monde entier », « Amérique du Nord »…
+DEFINE FIELD OVERWRITE kind         ON rights_deal TYPE string
+  ASSERT $value IN ['translation','pocket','club','audio','film','digital','other'] DEFAULT 'translation';
+DEFINE FIELD OVERWRITE signed_at    ON rights_deal TYPE option<datetime>;
+DEFINE FIELD OVERWRITE term_years   ON rights_deal TYPE option<int>;               -- durée de la licence
+DEFINE FIELD OVERWRITE expires_at   ON rights_deal TYPE option<datetime>;
+DEFINE FIELD OVERWRITE publish_deadline ON rights_deal TYPE option<datetime>;      -- délai de publication imposé
+DEFINE FIELD OVERWRITE advance      ON rights_deal TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE currency     ON rights_deal TYPE string DEFAULT 'EUR';
+DEFINE FIELD OVERWRITE rate_paper   ON rights_deal TYPE option<number>;            -- % sur le papier
+DEFINE FIELD OVERWRITE rate_paper_base ON rights_deal TYPE string
+  ASSERT $value IN ['retail','net'] DEFAULT 'retail';                              -- prix public ou net encaissé
+DEFINE FIELD OVERWRITE rate_ebook   ON rights_deal TYPE option<number>;
+DEFINE FIELD OVERWRITE rate_ebook_base ON rights_deal TYPE string
+  ASSERT $value IN ['retail','net'] DEFAULT 'net';
+-- Part des sommes encaissées qui revient aux auteurs du livre (cession vendue).
+-- Le contrat d'édition Agone la renvoie à un avenant : elle se règle cession
+-- par cession, l'usage étant la moitié.
+DEFINE FIELD OVERWRITE author_share ON rights_deal TYPE number DEFAULT 50 VALUE $value ?? 50;
+DEFINE FIELD OVERWRITE status       ON rights_deal TYPE string
+  ASSERT $value IN ['draft','active','expired','terminated'] DEFAULT 'active';
+DEFINE FIELD OVERWRITE notes        ON rights_deal TYPE option<string>;
+DEFINE FIELD OVERWRITE document     ON rights_deal TYPE option<record<media>>;     -- contrat signé
+DEFINE FIELD OVERWRITE created_at   ON rights_deal TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON rights_deal TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_deal_book ON rights_deal FIELDS book;
+
+-- Mouvements d'argent d'une cession : à-valoir, redevances annuelles, divers.
+-- Une somme ne compte dans la reddition qu'une fois RÉGLÉE (settled_at).
+DEFINE TABLE OVERWRITE rights_payment SCHEMAFULL;
+DEFINE FIELD OVERWRITE deal         ON rights_payment TYPE record<rights_deal>;
+DEFINE FIELD OVERWRITE kind         ON rights_payment TYPE string
+  ASSERT $value IN ['advance','royalty','other'] DEFAULT 'royalty';
+DEFINE FIELD OVERWRITE amount       ON rights_payment TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE currency     ON rights_payment TYPE string DEFAULT 'EUR';
+DEFINE FIELD OVERWRITE due_on       ON rights_payment TYPE option<datetime>;
+DEFINE FIELD OVERWRITE settled_at   ON rights_payment TYPE option<datetime>;       -- encaissé (vendu) / payé (acquis)
+DEFINE FIELD OVERWRITE period_start ON rights_payment TYPE option<datetime>;
+DEFINE FIELD OVERWRITE period_end   ON rights_payment TYPE option<datetime>;
+DEFINE FIELD OVERWRITE notes        ON rights_payment TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at   ON rights_payment TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON rights_payment TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_payment_deal ON rights_payment FIELDS deal;
+
 -- RELEVÉ DE VENTES : une période × un canal (import ou saisie)
 DEFINE TABLE OVERWRITE sales_report SCHEMAFULL;
 DEFINE FIELD OVERWRITE channel      ON sales_report TYPE record<sales_channel>;
@@ -483,6 +537,8 @@ DEFINE FIELD OVERWRITE lines.*.format          ON royalty_statement TYPE option<
 DEFINE FIELD OVERWRITE lines.*.base_amount      ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.share           ON royalty_statement TYPE option<number>;  -- part du barème (coauteurs)
+DEFINE FIELD OVERWRITE lines.*.kind            ON royalty_statement TYPE option<string>;  -- 'sales' (défaut) ou 'cession'
+DEFINE FIELD OVERWRITE lines.*.label           ON royalty_statement TYPE option<string>;  -- libellé d'une ligne de cession
 DEFINE FIELD OVERWRITE lines.*.gross           ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.advance_applied  ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.net             ON royalty_statement TYPE option<number>;

@@ -18,12 +18,14 @@
     // Un titre se lit de A à Z, un nombre et une date du plus grand au plus petit.
     else { sortCol = col; sortDir = col === 'title' ? 'asc' : 'desc'; }
   }
+  // Trier sur la couverture : les livres à contrats manquants d'abord.
+  const manque = (signes: number, total: number) => (total ? (signes >= total ? 2 : signes ? 1 : 0) : 3);
   const val = (b: any, col: Col) =>
     // Sans date de parution, le livre part en fin de liste dans les deux sens.
     col === 'date' ? (b.published_at ? +new Date(b.published_at) : 0)
-    : col === 'author' ? b.author_count
-    : col === 'contributor' ? b.contributor_count
-    : col === 'editor' ? b.editor_count
+    : col === 'author' ? manque(b.author_signed, b.author_count)
+    : col === 'contributor' ? manque(b.contributor_signed, b.contributor_count)
+    : col === 'editor' ? manque(b.editor_signed, b.editor_count)
     : col === 'contract' ? b.contract_total
     : 0;
   const sorted = $derived(
@@ -39,7 +41,10 @@
 
 <a href="/admin/droits" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Droits d’auteur</a>
 <h2 class="text-xl font-bold">Contrats par livre</h2>
-<p class="mb-4 text-sm text-muted-foreground">Cliquez sur un livre pour voir ses contrats, ses ventes et ses mouvements de stock.</p>
+<p class="mb-4 text-sm text-muted-foreground">
+  Cliquez sur un livre pour voir ses ventes. Les colonnes indiquent, par rôle, le nombre de contributeurs ayant un
+  contrat validé — « 1/1 » signifie couvert, « +1 » un contrat encore en brouillon.
+</p>
 
 <form method="GET" class="mb-4 max-w-md">
   <div class="relative">
@@ -47,6 +52,20 @@
     <input name="q" value={data.q ?? ''} placeholder="Rechercher un livre…" class="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary" />
   </div>
 </form>
+
+<!-- « 1/1 » : un contrat validé pour l'unique contributeur de ce rôle. Les
+     brouillons sont comptés à part : ils n'ouvrent droit à rien. -->
+{#snippet couverture(signes: number, brouillons: number, total: number)}
+  {#if !total}
+    <span class="text-muted-foreground/50">—</span>
+  {:else}
+    <span class={signes >= total ? 'text-success' : signes ? 'text-warning' : 'text-muted-foreground'}
+      title="{signes} contrat(s) validé(s) sur {total} contributeur(s){brouillons ? ` · ${brouillons} en brouillon` : ''}">
+      {signes}/{total}
+    </span>
+    {#if brouillons}<span class="ml-1 text-xs text-muted-foreground" title="{brouillons} contrat(s) en brouillon">+{brouillons}</span>{/if}
+  {/if}
+{/snippet}
 
 {#snippet sortable(label: string, col: Col, align = 'left')}
   <th class="px-3 py-2 font-medium" style="text-align:{align}">
@@ -94,9 +113,9 @@
             </span>
           </td>
           <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{parution(b.published_at)}</td>
-          <td class="px-3 py-2 text-right tabular-nums {b.author_count ? '' : 'text-muted-foreground'}">{b.author_count}</td>
-          <td class="px-3 py-2 text-right tabular-nums {b.contributor_count ? '' : 'text-muted-foreground'}">{b.contributor_count}</td>
-          <td class="px-3 py-2 text-right tabular-nums {b.editor_count ? '' : 'text-muted-foreground'}">{b.editor_count}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.author_signed, b.author_draft, b.author_count)}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.contributor_signed, b.contributor_draft, b.contributor_count)}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.editor_signed, b.editor_draft, b.editor_count)}</td>
           <td class="px-3 py-2 text-right tabular-nums">
             {#if b.contract_total === 0}
               <span class="text-muted-foreground">0</span>

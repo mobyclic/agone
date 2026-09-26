@@ -15,6 +15,8 @@ let CONTRACTS: any[] = [];    // contrats successifs (avenants), prioritaires su
 let BOOK: any = {};           // livre simulé
 let PREV_LINES: any[] = [];   // lignes de l'exercice précédent (provision)
 let PREV_CARRY = 0;           // report à nouveau
+let DEALS: any[] = [];        // cessions de droits vendues
+let PAIEMENTS: any[] = [];    // échéances réglées de ces cessions
 
 mock.module(`${R}/surreal.ts`, () => ({
   recId: (t: string, id: string) => `${t}:${id}`,
@@ -30,6 +32,8 @@ mock.module(`${R}/surreal.ts`, () => ({
           ps: l.start ?? l.end, pe: l.end
         }));
     }
+    if (sql.includes('FROM rights_deal')) return DEALS;
+    if (sql.includes('FROM rights_payment')) return PAIEMENTS.filter((p) => p.settled_at >= vars.s && p.settled_at <= vars.e);
     if (sql.includes('returns_provision_rate AS r')) return [{ r: BOOK.returns_provision_rate }];
     if (sql.includes('lines, period_end FROM royalty_statement')) return PREV_LINES.length ? [{ lines: PREV_LINES }] : [];
     if (sql.includes('carry_out, period_end FROM royalty_statement')) return [{ carry_out: PREV_CARRY }];
@@ -210,4 +214,29 @@ test('part du barème : deux coauteurs se partagent la même redevance', async (
   // Au centime près : la moitié d'un brut déjà arrondi.
   eq('moitié du barème', moitie.lines[0].gross, entier.lines[0].gross / 2);
   eq('part enregistrée sur la ligne', moitie.lines[0].share, 50);
+});
+
+// ── Cessions de droits ─────────────────────────────────────────────────────
+test('cession de droits : la part de l’auteur entre dans la reddition', async () => {
+  CONTRACT = { ...base, tiers: [{ rate: 8 }], advance: 0, advance_recouped: 0 };
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0; SALES = [];
+  DEALS = [{ id: 'd1', counterparty: 'Hoja de Lata', language: 'espagnol', kind: 'translation', author_share: 50, currency: 'EUR' }];
+  PAIEMENTS = [{ amount: 1000, settled_at: new Date('2026-03-01') }];
+
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  eq('moitié des 1 000 € encaissés', r.lines[0].gross, 500);
+  eq('assiette = somme encaissée', r.lines[0].base_amount, 1000);
+  expect(r.lines[0].kind, 'ligne de cession').toBe('cession');
+  expect(r.lines[0].label, 'libellé').toContain('Hoja de Lata');
+
+  // Coauteurs : la part de l'auteur se partage comme le barème.
+  CONTRACT = { ...base, tiers: [{ rate: 8 }], advance: 0, advance_recouped: 0, share: 50 };
+  const coauteur = await computeStatementForAuthor('a1', P1, P2);
+  eq('un coauteur sur deux', coauteur.lines[0].gross, 250);
+
+  // Un encaissement hors période ne compte pas.
+  PAIEMENTS = [{ amount: 1000, settled_at: new Date('2025-03-01') }];
+  const hors = await computeStatementForAuthor('a1', P1, P2);
+  eq('aucune ligne', hors.lines.length, 0);
+  DEALS = []; PAIEMENTS = [];
 });

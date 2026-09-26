@@ -10,15 +10,16 @@ const countOf = (t: string) =>
 
 export const load: PageServerLoad = async () => {
   await ensureChannels();
-  const [channels, periods, contracts, reports, statements, reglages] = await Promise.all([
+  const [channels, periods, contracts, reports, statements, cessions, reglages] = await Promise.all([
     listChannels(),
     listPeriods(),
     countOf('royalty_contract'),
     countOf('sales_report'),
     countOf('royalty_statement'),
+    countOf('rights_deal'),
     getReglagesDroits()
   ]);
-  return { channels, periods, reglages, stats: { contracts, reports, statements } };
+  return { channels, periods, reglages, stats: { contracts, reports, statements, cessions } };
 };
 
 export const actions: Actions = {
