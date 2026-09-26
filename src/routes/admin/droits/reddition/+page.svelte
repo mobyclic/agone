@@ -100,7 +100,13 @@
             </td>
           </tr>
         {/each}
-        {#if data.statements.length === 0}<tr><td colspan="7" class="px-3 py-8 text-center text-muted-foreground">Aucune reddition pour cette période.</td></tr>{/if}
+        {#if data.statements.length === 0}
+          <tr><td colspan="7" class="px-3 py-8 text-center text-sm text-muted-foreground">
+            Aucune reddition pour cette période. Une reddition suppose un titre à la fois
+            <a href="/admin/droits/contrats" class="text-link hover:underline">sous contrat</a> et
+            <a href="/admin/droits/ventes" class="text-link hover:underline">relevé en ventes</a>.
+          </td></tr>
+        {/if}
       </tbody>
     </table>
   </div>

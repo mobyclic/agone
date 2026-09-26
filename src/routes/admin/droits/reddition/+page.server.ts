@@ -1,7 +1,7 @@
 import { redirect, fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { listStatements, listPeriods, generateStatements, couvertureExercices } from '$lib/server/droits';
+import { listStatements, listPeriods, generateStatements, couvertureExercices, diagnosticReddition } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -27,6 +27,17 @@ export const actions: Actions = {
     const end = exercice ? `${annee}-12-31` : String(fd.get('period_end') || '');
     if (!start || !end) return fail(400, { error: 'Période requise.' });
     const n = await generateStatements(new Date(start), new Date(end));
-    throw redirect(303, withFlash(`/admin/droits/reddition?start=${start}&end=${end}`, `${n} reddition(s) générée(s).`, 'success'));
+    if (n > 0) {
+      throw redirect(303, withFlash(`/admin/droits/reddition?start=${start}&end=${end}`, `${n} reddition(s) générée(s).`, 'success'));
+    }
+    // Rien à calculer : dire ce qui manque plutôt que d'afficher un tableau vide.
+    const d = await diagnosticReddition(new Date(start), new Date(end));
+    const raison = d.livres_sous_contrat === 0
+      ? 'aucun contrat n’est enregistré'
+      : d.livres_vendus === 0
+        ? 'aucune vente n’est relevée sur cette période'
+        : `aucun des ${d.livres_vendus} titres vendus sur la période n’a de contrat (${d.livres_sous_contrat} titre(s) sous contrat, sans vente)`;
+    throw redirect(303, withFlash(`/admin/droits/reddition?start=${start}&end=${end}`,
+      `Aucune reddition : ${raison}.`, 'info'));
   }
 };

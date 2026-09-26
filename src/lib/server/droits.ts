@@ -1093,3 +1093,29 @@ export async function couvertureExercices(annees: number[]): Promise<Record<numb
   }
   return Object.fromEntries(annees.map((a) => [a, parAnnee[a].size]));
 }
+
+/**
+ * Pourquoi une reddition ne produit rien : il faut qu'un même livre ait à la
+ * fois un contrat et des ventes relevées sur la période. Le plus souvent, les
+ * contrats manquent — 400 titres migrés, deux contrats saisis.
+ */
+export async function diagnosticReddition(periodStart: Date, periodEnd: Date) {
+  const [contrats, vendus] = await Promise.all([
+    query<any>(`SELECT book FROM royalty_contract WHERE status != 'draft' GROUP BY book`),
+    query<any>(
+      `SELECT book FROM sales_line
+        WHERE book != NONE AND report.period_end >= $s AND report.period_start <= $e
+        GROUP BY book`,
+      { s: periodStart, e: periodEnd }
+    )
+  ]);
+  const sousContrat = new Set(contrats.map((c: any) => String(c.book)));
+  const avecVentes = new Set(vendus.map((v: any) => String(v.book)));
+  const communs = [...avecVentes].filter((b) => sousContrat.has(b));
+  return {
+    livres_sous_contrat: sousContrat.size,
+    livres_vendus: avecVentes.size,
+    livres_calculables: communs.length,
+    vendus_sans_contrat: avecVentes.size - communs.length
+  };
+}
