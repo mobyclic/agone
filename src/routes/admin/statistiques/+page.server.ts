@@ -4,7 +4,12 @@ import { salesByYear, salesByMonth, topBooks, formatBreakdown, overview, booksWi
 export const load: PageServerLoad = async ({ url }) => {
   const bookSlug = url.searchParams.get('livre') || undefined;
 
-  const byYear = await salesByYear(bookSlug);
+  // Deux séries : années entières, et à date comparable (même quantième).
+  const aujourdhui = new Date();
+  const [byYear, byYearToDate] = await Promise.all([
+    salesByYear(bookSlug),
+    salesByYear(bookSlug, aujourdhui)
+  ]);
   const years = byYear.map((r) => r.period);
   const year = Number(url.searchParams.get('annee')) || years[0] || new Date().getUTCFullYear();
 
@@ -18,5 +23,5 @@ export const load: PageServerLoad = async ({ url }) => {
 
   const bookTitle = bookSlug ? books.find((b) => b.slug === bookSlug)?.title : undefined;
 
-  return { byYear, byMonth, tops, formats, overview: ov, books, year, years, bookSlug, bookTitle };
+  return { byYear, byYearToDate, jour: aujourdhui.toISOString(), byMonth, tops, formats, overview: ov, books, year, years, bookSlug, bookTitle };
 };

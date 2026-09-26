@@ -31,8 +31,8 @@ mock.module(`${R}/surreal.ts`, () => ({
         }));
     }
     if (sql.includes('returns_provision_rate AS r')) return [{ r: BOOK.returns_provision_rate }];
-    if (sql.includes('SELECT lines FROM royalty_statement')) return PREV_LINES.length ? [{ lines: PREV_LINES }] : [];
-    if (sql.includes('SELECT carry_out FROM royalty_statement')) return [{ carry_out: PREV_CARRY }];
+    if (sql.includes('lines, period_end FROM royalty_statement')) return PREV_LINES.length ? [{ lines: PREV_LINES }] : [];
+    if (sql.includes('carry_out, period_end FROM royalty_statement')) return [{ carry_out: PREV_CARRY }];
     return [];
   }
 }));

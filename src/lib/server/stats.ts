@@ -17,26 +17,44 @@ function fmtISO(d: Date): string {
 }
 
 /** Ventes par année. Si `bookSlug`, restreint à un livre. */
-export async function salesByYear(bookSlug?: string): Promise<YearRow[]> {
+/**
+ * Ventes par année. `jusquAu` limite chaque année au même jour (31 août pour
+ * toutes) : sans cela, l'année en cours est comparée à des années entières et
+ * paraît toujours mauvaise.
+ */
+export async function salesByYear(bookSlug?: string, jusquAu?: Date): Promise<YearRow[]> {
+  // Même quantième pour toutes les années : mois antérieur, ou même mois jusqu'au jour.
+  const borne = (champ: string) =>
+    jusquAu
+      ? ` AND (time::month(${champ}) < $mois OR (time::month(${champ}) = $mois AND time::day(${champ}) <= $jour))`
+      : '';
+  const vars: Record<string, unknown> = jusquAu
+    ? { mois: jusquAu.getUTCMonth() + 1, jour: jusquAu.getUTCDate() }
+    : {};
+
   if (bookSlug) {
     const rows = await query<any>(
       `SELECT time::year(in.created_at) AS period, count() AS orders, math::sum(qty) AS units, math::sum(line_total) AS ca
-         FROM contains WHERE in.status IN ${PAID} AND out.slug = $s GROUP BY period ORDER BY period DESC`,
-      { s: bookSlug }
+         FROM contains WHERE in.status IN ${PAID} AND out.slug = $s${borne('in.created_at')} GROUP BY period ORDER BY period DESC`,
+      { ...vars, s: bookSlug }
     );
     return rows.map((r) => ({ period: r.period, orders: r.orders ?? 0, units: r.units ?? 0, ca: r.ca ?? 0 }));
   }
   const orders = await query<any>(
     `SELECT time::year(created_at) AS period, count() AS orders, math::sum(total) AS ca
-       FROM order WHERE status IN ${PAID} GROUP BY period ORDER BY period DESC`
+       FROM order WHERE status IN ${PAID}${borne('created_at')} GROUP BY period ORDER BY period DESC`,
+    vars
   );
   const units = await query<any>(
-    `SELECT time::year(in.created_at) AS period, math::sum(qty) AS units FROM contains WHERE in.status IN ${PAID} GROUP BY period`
+    `SELECT time::year(in.created_at) AS period, math::sum(qty) AS units
+       FROM contains WHERE in.status IN ${PAID}${borne('in.created_at')} GROUP BY period`,
+    vars
   );
   const uByYear = new Map<number, number>();
   for (const u of units) uByYear.set(u.period, u.units ?? 0);
   return orders.map((r) => ({ period: r.period, orders: r.orders ?? 0, units: uByYear.get(r.period) ?? 0, ca: r.ca ?? 0 }));
 }
+
 
 /** Ventes par mois (1..12) pour une année. Complète les mois vides à 0. */
 export async function salesByMonth(year: number, bookSlug?: string): Promise<YearRow[]> {

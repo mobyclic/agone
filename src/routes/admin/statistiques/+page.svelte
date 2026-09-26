@@ -37,7 +37,15 @@
   });
 
   const monthMax = $derived(Math.max(1, ...data.byMonth.map((m) => m.ca)));
-  const yearMax = $derived(Math.max(1, ...data.byYear.map((y) => y.ca)));
+  // Années entières ou arrêtées au même quantième (l'année en cours n'est pas finie).
+  let aDate = $state(false);
+  const seriesAnnees = $derived(aDate ? data.byYearToDate : data.byYear);
+  const yearMax = $derived(Math.max(1, ...seriesAnnees.map((y) => y.ca)));
+  const quantieme = $derived(
+    new Date(data.jour).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+  );
+  const ongletAnnee = (actif: boolean) =>
+    `rounded-full border px-3 py-1 text-xs ${actif ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:border-primary hover:text-foreground'}`;
   const fmtTotal = $derived(Math.max(1, data.formats.reduce((s, f) => s + f.units, 0)));
 
   const cards = $derived([
@@ -146,11 +154,18 @@
   </div>
 </div>
 
-<!-- Par année -->
+<!-- Par année : entières, ou arrêtées au même quantième pour comparer à l'année
+     en cours (qui n'est pas finie). -->
 <div class="mt-6 rounded-lg border border-border bg-card p-5">
-  <h3 class="mb-4 text-base font-semibold">Par année</h3>
+  <div class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+    <h3 class="text-base font-semibold">Par année</h3>
+    <div class="flex gap-1.5">
+      <button type="button" class={ongletAnnee(!aDate)} onclick={() => (aDate = false)}>Année complète</button>
+      <button type="button" class={ongletAnnee(aDate)} onclick={() => (aDate = true)}>À date (au {quantieme})</button>
+    </div>
+  </div>
   <div class="space-y-2.5">
-    {#each data.byYear as y (y.period)}
+    {#each seriesAnnees as y (y.period)}
       <button type="button" onclick={() => nav({ annee: y.period })}
         class="flex w-full items-center gap-4 text-left {y.period === data.year ? '' : 'opacity-70 hover:opacity-100'}">
         <span class="w-12 shrink-0 font-display text-lg font-bold tabular-nums">{y.period}</span>
@@ -160,8 +175,14 @@
         <span class="w-40 shrink-0 text-right text-sm text-muted-foreground">{y.orders} cmd · {y.units} ex.</span>
       </button>
     {/each}
-    {#if data.byYear.length === 0}<p class="text-sm text-muted-foreground">Aucune vente.</p>{/if}
+    {#if seriesAnnees.length === 0}<p class="text-sm text-muted-foreground">Aucune vente.</p>{/if}
   </div>
+  {#if aDate}
+    <p class="mt-3 text-xs text-muted-foreground">
+      Chaque année est arrêtée au {quantieme}, pour que {data.byYear[0]?.period ?? 'l’année en cours'} soit comparée à
+      la même portion des années précédentes.
+    </p>
+  {/if}
 </div>
 
 <!-- Top livres -->
