@@ -11,6 +11,7 @@ import { expect, mock, test } from 'bun:test';
 const R = '.';
 let SALES: any[] = [];        // lignes de vente simulées
 let CONTRACT: any = {};       // contrat simulé
+let CONTRACTS: any[] = [];    // contrats successifs (avenants), prioritaires sur CONTRACT
 let BOOK: any = {};           // livre simulé
 let PREV_LINES: any[] = [];   // lignes de l'exercice précédent (provision)
 let PREV_CARRY = 0;           // report à nouveau
@@ -18,19 +19,16 @@ let PREV_CARRY = 0;           // report à nouveau
 mock.module(`${R}/surreal.ts`, () => ({
   recId: (t: string, id: string) => `${t}:${id}`,
   query: async (sql: string, vars: any = {}) => {
-    if (sql.includes('FROM royalty_contract WHERE author')) return [CONTRACT];
+    if (sql.includes('FROM royalty_contract WHERE author')) return CONTRACTS.length ? CONTRACTS : [CONTRACT];
+    // Lignes brutes, avec la période de leur relevé : le moteur les répartit lui-même.
     if (sql.includes('FROM sales_line')) {
-      // filtre temporel : avant la période, ou dans la période
-      const dans = (l: any) =>
-        vars.before ? l.end < vars.before : l.end >= vars.from && l.end <= vars.to;
-      const par = new Map<string, any>();
-      for (const l of SALES.filter(dans)) {
-        const e = par.get(l.format) ?? { format: l.format, sold: 0, returned: 0, exported: 0, revenue_ttc: 0, priced_units: 0 };
-        e.sold += l.sold; e.returned += l.returned; e.exported += l.exported ?? 0;
-        if (l.price != null) { e.revenue_ttc += (l.sold - l.returned) * l.price; e.priced_units += l.sold - l.returned; }
-        par.set(l.format, e);
-      }
-      return [...par.values()];
+      return SALES
+        .filter((l) => l.end >= vars.min && (l.start ?? l.end) <= vars.max)
+        .map((l) => ({
+          format: l.format, units_sold: l.sold, units_returned: l.returned,
+          units_export: l.exported ?? 0, gross_price: l.price,
+          ps: l.start ?? l.end, pe: l.end
+        }));
     }
     if (sql.includes('returns_provision_rate AS r')) return [{ r: BOOK.returns_provision_rate }];
     if (sql.includes('SELECT lines FROM royalty_statement')) return PREV_LINES.length ? [{ lines: PREV_LINES }] : [];
@@ -135,4 +133,66 @@ test('ventes hors France : taux réduit de moitié', async () => {
   eq('unités hors France', r.lines[0].units_export, 200);
   // 800 ex. à 6 % + 200 ex. à 3 % (la moitié du taux)
   eq('brut', r.lines[0].gross, (800 * 0.06 + 200 * 0.03) * PPHT);
+});
+
+// ── Contrat arrêté en cours d'année, reconduit à d'autres conditions ────────
+// Chaque contrat ne vaut que pour ses ventes : celles de sa période de validité.
+const AVENANT_A = { ...base, id: 'royalty_contract:c1', tiers: [{ rate: 6 }], term_end: '2026-06-30T00:00:00Z' };
+const AVENANT_B = { ...base, id: 'royalty_contract:c2', tiers: [{ rate: 10 }], term_start: '2026-07-01T00:00:00Z' };
+
+test('avenant en cours d’exercice : chaque contrat sur sa période', async () => {
+  CONTRACTS = [AVENANT_A, AVENANT_B];
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [
+    { format: 'paper', sold: 1000, returned: 0, price: null, start: new Date('2026-01-01'), end: new Date('2026-03-31') },
+    { format: 'paper', sold: 500, returned: 0, price: null, start: new Date('2026-07-01'), end: new Date('2026-09-30') }
+  ];
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  eq('deux lignes, une par contrat', r.lines.length, 2);
+  eq('1er semestre au taux d’origine', r.lines[0].gross, 1000 * 0.06 * PPHT);
+  eq('2d semestre au taux de l’avenant', r.lines[1].gross, 500 * 0.10 * PPHT);
+  eq('total brut', r.gross_total, (1000 * 0.06 + 500 * 0.10) * PPHT);
+  expect(r.warnings, 'aucune réserve').toHaveLength(0);
+  CONTRACTS = [];
+});
+
+test('relevé annuel à cheval sur un avenant : prorata des jours, et on le dit', async () => {
+  CONTRACTS = [AVENANT_A, AVENANT_B];
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [{ format: 'paper', sold: 1000, returned: 0, price: null, start: new Date('2026-01-01'), end: new Date('2026-12-31') }];
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  // 181 jours sur 365 avant l'avenant, 184 après — et pas un exemplaire perdu.
+  eq('avant l’avenant', r.lines[0].units, 496);
+  eq('après l’avenant', r.lines[1].units, 504);
+  eq('total conservé', r.lines[0].units + r.lines[1].units, 1000);
+  expect(r.warnings.join(' '), 'réserve sur la répartition').toContain('prorata');
+  CONTRACTS = [];
+});
+
+test('ventes sans contrat en vigueur : signalées, pas de droits calculés', async () => {
+  CONTRACTS = [AVENANT_A];
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [{ format: 'paper', sold: 300, returned: 0, price: null, start: new Date('2026-07-01'), end: new Date('2026-09-30') }];
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  eq('aucune ligne de droits', r.lines.length, 0);
+  expect(r.warnings.join(' '), 'réserve « sans contrat »').toContain('sans contrat en vigueur');
+  expect(r.warnings.join(' '), 'nombre d’exemplaires concernés').toContain('300 ex.');
+  CONTRACTS = [];
+});
+
+test('paliers : l’avenant continue le cumul, sauf s’il repart de zéro', async () => {
+  const paliers = [{ up_to: 2000, rate: 6 }, { rate: 10 }];
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [
+    { format: 'paper', sold: 1500, returned: 0, price: null, start: new Date('2026-01-01'), end: new Date('2026-03-31') },
+    { format: 'paper', sold: 1000, returned: 0, price: null, start: new Date('2026-07-01'), end: new Date('2026-09-30') }
+  ];
+  CONTRACTS = [{ ...AVENANT_A, tiers: paliers }, { ...AVENANT_B, tiers: paliers }];
+  const suite = await computeStatementForAuthor('a1', P1, P2);
+  eq('le cumul se poursuit (500 à 6 %, 500 à 10 %)', suite.lines[1].gross, (500 * 0.06 + 500 * 0.10) * PPHT);
+
+  CONTRACTS = [{ ...AVENANT_A, tiers: paliers }, { ...AVENANT_B, tiers: paliers, tiers_reset: true }];
+  const remise = await computeStatementForAuthor('a1', P1, P2);
+  eq('avenant qui repart de zéro', remise.lines[1].gross, 1000 * 0.06 * PPHT);
+  CONTRACTS = [];
 });

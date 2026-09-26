@@ -30,6 +30,16 @@
   </form>
 </div>
 
+<!-- Réserves du calcul : à lever avant d'émettre la reddition. -->
+{#if s.warnings?.length}
+  <div class="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-4">
+    <p class="mb-1 text-sm font-semibold">À vérifier avant émission</p>
+    <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+      {#each s.warnings as w (w)}<li>{w}</li>{/each}
+    </ul>
+  </div>
+{/if}
+
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -50,7 +60,15 @@
     <tbody class="divide-y divide-border">
       {#each s.lines as l (l.contract)}
         <tr>
-          <td class="px-3 py-2 font-medium">{l.book_title}</td>
+          <td class="px-3 py-2 font-medium">
+            {l.book_title}
+            {#if l.segment_start}
+              <!-- Contrat qui ne couvre qu'une partie de l'exercice (avenant). -->
+              <span class="block text-xs font-normal text-muted-foreground">
+                du {new Date(l.segment_start).toLocaleDateString('fr-FR')} au {new Date(l.segment_end).toLocaleDateString('fr-FR')}
+              </span>
+            {/if}
+          </td>
           <td class="px-3 py-2 text-muted-foreground">{ROLE_LABEL[l.role] ?? l.role}</td>
           <td class="px-3 py-2 text-right text-muted-foreground">{l.units_sold ?? '—'}</td>
           <td class="px-3 py-2 text-right text-muted-foreground">{l.units_returned ? `−${l.units_returned}` : '—'}</td>

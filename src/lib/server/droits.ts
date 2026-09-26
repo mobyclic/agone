@@ -58,17 +58,21 @@ export async function setReglagesDroits(r: ReglagesDroits) {
 // ── Contrats ──────────────────────────────────────────────────
 export interface Tier { up_to?: number; rate: number }
 export interface ContractInput {
+  /** Contrat existant à modifier ; absent = nouveau contrat (ou avenant). */
+  id?: string;
   bookId: string; authorId: string; role: string;
   tiers: Tier[]; scope: string; base: string; net_rate?: number;
   advance?: number; advance_recouped?: number; status?: string; notes?: string;
+  /** Validité : un avenant en cours d'année = un second contrat qui prend la suite. */
+  term_start?: string; term_end?: string; tiers_reset?: boolean;
 }
 
 /** Contrats d'un livre (avec nom d'auteur), indexés par authorId+role. */
 export async function contractsForBook(bookId: string) {
   return query<any>(
-    `SELECT id, author, author.full_name AS author_name, role, tiers, scope, base, net_rate,
-        advance, advance_recouped, status, notes
-      FROM royalty_contract WHERE book = $b ORDER BY role`,
+    `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate,
+        advance, advance_recouped, status, notes, term_start, term_end
+      FROM royalty_contract WHERE book = $b ORDER BY role, term_start`,
     { b: recId('book', bookId) }
   );
 }
@@ -81,15 +85,21 @@ export async function upsertContract(d: ContractInput) {
     book: recId('book', d.bookId), author: recId('author', d.authorId), role: d.role || 'author',
     tiers, scope: d.scope || 'all', base: d.base || 'ppht', net_rate: d.net_rate ?? 60,
     advance: d.advance ?? 0, advance_recouped: d.advance_recouped ?? 0,
-    status: d.status || 'active', notes: d.notes || undefined
+    status: d.status || 'active', notes: d.notes || undefined,
+    term_start: d.term_start ? new Date(d.term_start) : undefined,
+    term_end: d.term_end ? new Date(d.term_end) : undefined,
+    tiers_reset: d.tiers_reset === true
   };
-  // upsert par (book, author, role)
-  const existing = await query<any>(
-    `SELECT id FROM royalty_contract WHERE book = $b AND author = $a AND role = $r LIMIT 1`,
-    { b: fields.book, a: fields.author, r: fields.role }
-  );
+  // Modification d'un contrat désigné, sinon upsert par (livre, auteur, rôle,
+  // prise d'effet) : les avenants successifs coexistent au lieu de s'écraser.
+  const existing = d.id
+    ? [{ id: d.id.replace(/^royalty_contract:/, '') }]
+    : await query<any>(
+        `SELECT id FROM royalty_contract WHERE book = $b AND author = $a AND role = $r AND term_start = $t LIMIT 1`,
+        { b: fields.book, a: fields.author, r: fields.role, t: fields.term_start ?? null }
+      );
   if (existing[0]) {
-    await query(`UPDATE $id CONTENT $c`, { id: recId('royalty_contract', existing[0].id), c: fields });
+    await query(`UPDATE $id CONTENT $c`, { id: recId('royalty_contract', String(existing[0].id).replace(/^royalty_contract:/, '')), c: fields });
     return String(existing[0].id);
   }
   const rows = await query<any>(`CREATE royalty_contract CONTENT $c`, { c: fields });
@@ -107,11 +117,16 @@ export async function bookContributorsWithContracts(bookId: string) {
     { b: recId('book', bookId) }
   );
   const contracts = await contractsForBook(bookId);
-  const byKey = new Map<string, any>();
-  for (const c of contracts) byKey.set(`${String(c.author)}|${c.role}`, c);
+  // Plusieurs contrats possibles par contributeur : le contrat d'origine et ses
+  // avenants successifs, chacun valable sur sa période.
+  const byKey = new Map<string, any[]>();
+  for (const c of contracts) {
+    const k = `${String(c.author)}|${c.role}`;
+    byKey.set(k, [...(byKey.get(k) ?? []), c]);
+  }
   return contributors.map((ct: any) => ({
     author_id: String(ct.author_id), author_name: ct.author_name, role: ct.role,
-    contract: byKey.get(`${String(ct.author_id)}|${ct.role}`) ?? null
+    contracts: byKey.get(`${String(ct.author_id)}|${ct.role}`) ?? []
   }));
 }
 
@@ -235,34 +250,115 @@ export function tieredRoyalty(prior: number, units: number, tiers: Tier[], baseU
  * numérique, dont le contrat calcule les droits sur « le prix de vente hors
  * taxes payé par le public », et non sur le prix catalogue.
  */
-async function ventesParFormat(
-  bookId: string,
-  formats: string[],
-  bound: { before?: Date; from?: Date; to?: Date }
-): Promise<Map<string, { sold: number; returned: number; exported: number; revenue_ttc: number; priced_units: number }>> {
-  const cond: string[] = ['book = $book', 'format IN $formats'];
-  const vars: Record<string, unknown> = { book: recId('book', bookId), formats };
-  if (bound.before) { cond.push('report.period_end < $before'); vars.before = bound.before; }
-  if (bound.from) { cond.push('report.period_end >= $from'); vars.from = bound.from; }
-  if (bound.to) { cond.push('report.period_end <= $to'); vars.to = bound.to; }
+export interface Segment { from: Date; to: Date }
+type AgrFormat = { sold: number; returned: number; exported: number; revenue_ttc: number; priced_units: number };
+const agrVide = (): AgrFormat => ({ sold: 0, returned: 0, exported: 0, revenue_ttc: 0, priced_units: 0 });
+
+const JOUR = 86_400_000;
+/** Nombre de jours communs à deux intervalles (bornes incluses). */
+function chevauchement(a: Segment, b: Segment) {
+  const debut = Math.max(+a.from, +b.from), fin = Math.min(+a.to, +b.to);
+  return fin < debut ? 0 : (fin - debut) / JOUR + 1;
+}
+
+/** Répartit des parts fractionnaires en entiers dont la somme est conservée. */
+function repartirEntiers(parts: number[]): number[] {
+  const total = Math.round(parts.reduce((a, b) => a + b, 0));
+  const bas = parts.map((p) => Math.floor(p));
+  let reste = total - bas.reduce((a, b) => a + b, 0);
+  const ordre = parts.map((p, i) => ({ i, frac: p - Math.floor(p) })).sort((x, y) => y.frac - x.frac);
+  for (const o of ordre) { if (reste <= 0) break; bas[o.i]++; reste--; }
+  for (let k = ordre.length - 1; k >= 0 && reste < 0; k--) { bas[ordre[k].i]--; reste++; }
+  return bas;
+}
+
+/**
+ * Ventes d'un livre réparties entre plusieurs tranches de temps.
+ *
+ * Sert aux contrats qui changent en cours d'exercice : chaque tranche reçoit les
+ * ventes de sa période. Un relevé à cheval sur un changement (un relevé annuel
+ * quand l'avenant prend effet au 1er juillet) est réparti AU PRORATA DES JOURS —
+ * approximation signalée dans la reddition, et qui disparaît si les ventes sont
+ * relevées mois par mois ou au moins par semestre.
+ */
+async function ventesParSegments(
+  bookId: string, formats: string[], segments: Segment[]
+): Promise<{ parSegment: Map<string, AgrFormat>[]; aCheval: boolean }> {
+  if (!segments.length) return { parSegment: [], aCheval: false };
+  const min = new Date(Math.min(...segments.map((s) => +s.from)));
+  const max = new Date(Math.max(...segments.map((s) => +s.to)));
   const rows = await query<any>(
-    `SELECT format,
-        math::sum(units_sold) AS sold,
-        math::sum(units_returned) AS returned,
-        math::sum(units_export ?? 0) AS exported,
-        math::sum(IF gross_price != NONE THEN (units_sold - units_returned) * gross_price ELSE 0 END) AS revenue_ttc,
-        math::sum(IF gross_price != NONE THEN units_sold - units_returned ELSE 0 END) AS priced_units
-       FROM sales_line WHERE ${cond.join(' AND ')} GROUP BY format`,
-    vars
+    `SELECT format, units_sold, units_returned, units_export, gross_price,
+            report.period_start AS ps, report.period_end AS pe
+       FROM sales_line
+      WHERE book = $book AND format IN $formats
+        AND report.period_end >= $min AND report.period_start <= $max`,
+    { book: recId('book', bookId), formats, min, max }
   );
-  const out = new Map<string, { sold: number; returned: number; exported: number; revenue_ttc: number; priced_units: number }>();
+
+  // Poids de chaque relevé dans chaque tranche, cumulés en flottant…
+  const flottant = new Map<string, number[]>();
+  const ajoute = (f: string, champ: string, i: number, v: number) => {
+    const cle = `${f}|${champ}`;
+    let t = flottant.get(cle);
+    if (!t) { t = segments.map(() => 0); flottant.set(cle, t); }
+    t[i] += v;
+  };
+  let aCheval = false;
   for (const r of rows) {
-    out.set(r.format, {
-      sold: r.sold ?? 0, returned: r.returned ?? 0, exported: r.exported ?? 0,
-      revenue_ttc: r.revenue_ttc ?? 0, priced_units: r.priced_units ?? 0
+    const rapport: Segment = { from: new Date(r.ps), to: new Date(r.pe ?? r.ps) };
+    const duree = Math.max(1, (+rapport.to - +rapport.from) / JOUR + 1);
+    const f = String(r.format ?? 'paper');
+    let tranchesTouchees = 0;
+    segments.forEach((seg, i) => {
+      const poids = chevauchement(rapport, seg) / duree;
+      if (poids <= 0) return;
+      if (poids < 0.999) tranchesTouchees++;
+      const vendus = Number(r.units_sold ?? 0), rendus = Number(r.units_returned ?? 0);
+      ajoute(f, 'sold', i, vendus * poids);
+      ajoute(f, 'returned', i, rendus * poids);
+      ajoute(f, 'exported', i, Number(r.units_export ?? 0) * poids);
+      if (r.gross_price != null) {
+        ajoute(f, 'revenue_ttc', i, (vendus - rendus) * Number(r.gross_price) * poids);
+        ajoute(f, 'priced_units', i, (vendus - rendus) * poids);
+      }
+    });
+    if (tranchesTouchees > 1) aCheval = true;
+  }
+
+  // … puis arrondis en entiers, sans perdre ni inventer d'exemplaire.
+  const parSegment = segments.map(() => new Map<string, AgrFormat>());
+  for (const [cle, parts] of flottant) {
+    const [f, champ] = cle.split('|');
+    const valeurs = champ === 'revenue_ttc' ? parts : repartirEntiers(parts);
+    valeurs.forEach((v, i) => {
+      const m = parSegment[i];
+      const a = m.get(f) ?? agrVide();
+      (a as any)[champ] = v;
+      m.set(f, a);
     });
   }
-  return out;
+  return { parSegment, aCheval };
+}
+
+/** Portion de l'exercice couverte par un contrat (null s'il n'y était pas en vigueur). */
+function segmentContrat(c: { term_start?: string; term_end?: string }, periodStart: Date, periodEnd: Date): Segment | null {
+  const debut = c.term_start && new Date(c.term_start) > periodStart ? new Date(c.term_start) : periodStart;
+  const fin = c.term_end && new Date(c.term_end) < periodEnd ? new Date(c.term_end) : periodEnd;
+  return +fin < +debut ? null : { from: debut, to: fin };
+}
+
+/** Jours de l'exercice qu'aucun contrat ne couvre (ventes sans contrat). */
+function trousDeCouverture(segments: Segment[], periodStart: Date, periodEnd: Date): Segment[] {
+  const tries = [...segments].sort((a, b) => +a.from - +b.from);
+  const trous: Segment[] = [];
+  let curseur = +periodStart;
+  for (const s of tries) {
+    if (+s.from > curseur) trous.push({ from: new Date(curseur), to: new Date(+s.from - JOUR) });
+    curseur = Math.max(curseur, +s.to + JOUR);
+  }
+  if (curseur <= +periodEnd) trous.push({ from: new Date(curseur), to: periodEnd });
+  return trous;
 }
 
 const totalUnites = (m: Map<string, { sold: number; returned: number }>) => {
@@ -277,6 +373,8 @@ export interface StatementLine {
   /** Part des unités retenues vendue hors France (taux contractuel réduit de moitié). */
   units_export: number;
   base_amount: number; rate: number; gross: number; advance_applied: number; net: number;
+  /** Portion de l'exercice couverte par ce contrat, quand il n'en couvre qu'une partie. */
+  segment_start?: string; segment_end?: string;
 }
 
 /** Provision sur retours applicable à un livre (% des ventes de l'exercice). */
@@ -319,81 +417,139 @@ async function reportPrecedent(authorId: string, periodStart: Date): Promise<num
  */
 export async function computeStatementForAuthor(authorId: string, periodStart: Date, periodEnd: Date) {
   const reglages = await getReglagesDroits();
+  // Les contrats terminés comptent aussi : ils ont pu être en vigueur une partie
+  // de l'exercice, et leur provision sur retours reste à reprendre l'année d'après.
   const contracts = await query<any>(
     `SELECT id, book, book.title AS book_title, book.price_paper AS price_paper, book.price_ebook AS price_ebook,
-        book.vat_rate AS vat_rate, role, tiers, scope, base, net_rate, advance, advance_recouped
-      FROM royalty_contract WHERE author = $a AND status = 'active'`,
+        book.vat_rate AS vat_rate, role, tiers, tiers_reset, scope, base, net_rate, advance, advance_recouped,
+        term_start, term_end
+      FROM royalty_contract WHERE author = $a AND status != 'draft'`,
     { a: recId('author', authorId) }
   );
+
   const lines: StatementLine[] = [];
+  const warnings: string[] = [];
   let gross_total = 0, advance_total = 0, net_total = 0;
+  const jourFr = (d: Date) => d.toLocaleDateString('fr-FR');
 
+  // Une « série » réunit les contrats successifs d'un même livre, même rôle,
+  // même périmètre : c'est là qu'un avenant prend la suite du contrat précédent.
+  const series = new Map<string, any[]>();
   for (const c of contracts) {
-    const bookId = String(c.book).replace(/^book:/, '');
-    const contractId = String(c.id);
-    const formats = FORMATS_FOR[c.scope] ?? FORMATS_FOR.all;
-    const vat = c.vat_rate ?? 5.5;
+    const k = `${String(c.book)}|${c.role}|${c.scope}`;
+    const l = series.get(k) ?? [];
+    l.push(c);
+    series.set(k, l);
+  }
 
-    const periode = await ventesParFormat(bookId, formats, { from: periodStart, to: periodEnd });
-    const anterieur = await ventesParFormat(bookId, formats, { before: periodStart });
-    const { sold, returned } = totalUnites(periode);
-    const exportees = [...periode.values()].reduce((n, v) => n + v.exported, 0);
-    const prior = totalUnites(anterieur).net;
-
-    // Provision : retenue sur les ventes PHYSIQUES de l'exercice (un fichier
-    // numérique ne revient pas), reprise de celle du précédent.
+  for (const liste of series.values()) {
+    // Ordre chronologique : un contrat sans date de prise d'effet vient en premier.
+    liste.sort((a, b) => (a.term_start ? +new Date(a.term_start) : 0) - (b.term_start ? +new Date(b.term_start) : 0));
+    const bookId = String(liste[0].book).replace(/^book:/, '');
+    const titre = liste[0].book_title;
+    const formats = FORMATS_FOR[liste[0].scope] ?? FORMATS_FOR.all;
+    const vat = liste[0].vat_rate ?? 5.5;
     const taux = await tauxProvision(bookId, reglages.provision_rate);
-    const soldPhysique = [...periode.entries()]
-      .filter(([f]) => f !== 'ebook')
-      .reduce((acc, [, v]) => acc + v.sold, 0);
-    const units_provision = Math.round((soldPhysique * taux) / 100);
-    const units_released = await provisionPrecedente(contractId, periodStart);
-    const units = sold - returned - units_provision + units_released;
-    if (sold === 0 && returned === 0 && units_released === 0) continue;
 
-    // Assiette : prix public HT (papier) ou prix réellement payé HT (numérique).
-    const pricedRevenue = [...periode.entries()]
-      .filter(([f]) => f === 'ebook')
-      .reduce((acc, [, v]) => acc + v.revenue_ttc, 0);
-    const pricedUnits = [...periode.entries()]
-      .filter(([f]) => f === 'ebook')
-      .reduce((acc, [, v]) => acc + v.priced_units, 0);
-    const baseUnit =
-      // Pleine précision ici : arrondir l'assiette unitaire au centime avant de la
-      // multiplier par les ventes décale le brut de quelques centimes. La ligne de
-      // reddition affiche l'assiette arrondie (base_amount), le calcul ne l'est pas.
-      c.scope === 'ebook' && pricedUnits > 0
-        ? pricedRevenue / pricedUnits / (1 + vat / 100)
-        : baseUnitPrice({ price_paper: c.price_paper, price_ebook: c.price_ebook, vat_rate: vat }, c.scope, c.base, c.net_rate ?? 60);
+    const segs = liste.map((c) => segmentContrat(c, periodStart, periodEnd));
+    const enVigueur = segs.filter((x): x is Segment => x !== null);
+    const trous = trousDeCouverture(enVigueur, periodStart, periodEnd);
+    const { parSegment, aCheval } = await ventesParSegments(bookId, formats, [...enVigueur, ...trous]);
+    if (aCheval) {
+      warnings.push(
+        `${titre} : un relevé de ventes chevauche un changement de contrat — les exemplaires ont été répartis au prorata des jours. Relever les ventes mois par mois lèverait l'approximation.`
+      );
+    }
 
-    // Redevance : à paliers sur le cumul ; un solde négatif reste négatif (dette).
-    const { gross: brutPlein, effRate } =
-      units >= 0
-        ? tieredRoyalty(prior, units, c.tiers ?? [], baseUnit)
-        : (() => {
-            const g = tieredRoyalty(Math.max(0, prior + units), -units, c.tiers ?? [], baseUnit);
-            return { gross: -g.gross, effRate: g.effRate };
-          })();
+    // Ventes antérieures à l'exercice : elles font avancer les paliers.
+    const { parSegment: avant } = await ventesParSegments(bookId, formats, [
+      { from: new Date(0), to: new Date(+periodStart - 1) }
+    ]);
+    let prior = totalUnites(avant[0] ?? new Map()).net;
 
-    // Hors France : « le taux applicable sera diminué de cinquante pour cent ».
-    // La part exportée suit la même proportion que les unités retenues (la
-    // provision sur retours s'applique aussi bien ici qu'ailleurs).
-    const netVendu = sold - returned;
-    const partExport = netVendu > 0 ? Math.min(1, exportees / netVendu) : 0;
-    const unitesExport = r2(units * partExport);
-    const abattement = r2(0.5 * unitesExport * baseUnit * (effRate / 100));
-    const gross = r2(brutPlein - abattement);
+    let rang = 0;
+    for (const [i, c] of liste.entries()) {
+      const seg = segs[i];
+      const periode = seg ? parSegment[rang++] : new Map<string, AgrFormat>();
+      const contractId = String(c.id);
+      // Un avenant peut remettre le compteur des paliers à zéro.
+      if (c.tiers_reset) prior = 0;
 
-    const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
-    const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
-    const net = r2(gross - advance_applied);
-    lines.push({
-      contract: contractId, book: bookId, book_title: c.book_title, role: c.role, format: c.scope,
-      units, units_sold: sold, units_returned: returned, units_provision, units_released,
-      units_export: unitesExport,
-      base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net
+      const { sold, returned } = totalUnites(periode);
+      const exportees = [...periode.values()].reduce((n, v) => n + v.exported, 0);
+
+      // Provision : retenue sur les ventes PHYSIQUES de la tranche (un fichier
+      // numérique ne revient pas), reprise de celle du précédent exercice.
+      const soldPhysique = [...periode.entries()]
+        .filter(([f]) => f !== 'ebook')
+        .reduce((acc, [, v]) => acc + v.sold, 0);
+      const units_provision = Math.round((soldPhysique * taux) / 100);
+      const units_released = await provisionPrecedente(contractId, periodStart);
+      const units = sold - returned - units_provision + units_released;
+      if (sold === 0 && returned === 0 && units_released === 0) continue;
+
+      // Assiette : prix public HT (papier) ou prix réellement payé HT (numérique).
+      const pricedRevenue = [...periode.entries()]
+        .filter(([f]) => f === 'ebook')
+        .reduce((acc, [, v]) => acc + v.revenue_ttc, 0);
+      const pricedUnits = [...periode.entries()]
+        .filter(([f]) => f === 'ebook')
+        .reduce((acc, [, v]) => acc + v.priced_units, 0);
+      const baseUnit =
+        // Pleine précision ici : arrondir l'assiette unitaire au centime avant de la
+        // multiplier par les ventes décale le brut de quelques centimes. La ligne de
+        // reddition affiche l'assiette arrondie (base_amount), le calcul ne l'est pas.
+        c.scope === 'ebook' && pricedUnits > 0
+          ? pricedRevenue / pricedUnits / (1 + vat / 100)
+          : baseUnitPrice({ price_paper: c.price_paper, price_ebook: c.price_ebook, vat_rate: vat }, c.scope, c.base, c.net_rate ?? 60);
+
+      // Redevance : à paliers sur le cumul ; un solde négatif reste négatif (dette).
+      const { gross: brutPlein, effRate } =
+        units >= 0
+          ? tieredRoyalty(prior, units, c.tiers ?? [], baseUnit)
+          : (() => {
+              const g = tieredRoyalty(Math.max(0, prior + units), -units, c.tiers ?? [], baseUnit);
+              return { gross: -g.gross, effRate: g.effRate };
+            })();
+
+      // Hors France : « le taux applicable sera diminué de cinquante pour cent ».
+      // La part exportée suit la même proportion que les unités retenues (la
+      // provision sur retours s'applique aussi bien ici qu'ailleurs).
+      const netVendu = sold - returned;
+      const partExport = netVendu > 0 ? Math.min(1, exportees / netVendu) : 0;
+      const unitesExport = r2(units * partExport);
+      const abattement = r2(0.5 * unitesExport * baseUnit * (effRate / 100));
+      const gross = r2(brutPlein - abattement);
+
+      const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
+      const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
+      const net = r2(gross - advance_applied);
+      // Les paliers continuent de courir d'un avenant à l'autre.
+      prior += Math.max(0, units);
+
+      const partiel = seg != null && (+seg.from > +periodStart || +seg.to < +periodEnd);
+      lines.push({
+        contract: contractId, book: bookId, book_title: titre, role: c.role, format: c.scope,
+        units, units_sold: sold, units_returned: returned, units_provision, units_released,
+        units_export: unitesExport,
+        base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net,
+        segment_start: partiel && seg ? seg.from.toISOString() : undefined,
+        segment_end: partiel && seg ? seg.to.toISOString() : undefined
+      });
+      gross_total += gross; advance_total += advance_applied; net_total += net;
+    }
+
+    // Ventes survenues alors qu'aucun contrat n'était en vigueur : rien n'est dû
+    // automatiquement, mais il faut le savoir avant d'émettre la reddition.
+    trous.forEach((t, j) => {
+      const m = parSegment[enVigueur.length + j];
+      const { net: n } = totalUnites(m ?? new Map());
+      if (n > 0) {
+        warnings.push(
+          `${titre} : ${n} ex. vendus du ${jourFr(t.from)} au ${jourFr(t.to)} sans contrat en vigueur — aucun droit calculé sur cette période.`
+        );
+      }
     });
-    gross_total += gross; advance_total += advance_applied; net_total += net;
   }
 
   // Report à nouveau et seuil de paiement (100 € chez Agone).
@@ -404,6 +560,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
 
   return {
     lines,
+    warnings,
     gross_total: r2(gross_total),
     advance_applied: r2(advance_total),
     carry_in: r2(carry_in),
@@ -416,7 +573,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
 /** Génère (draft) les redditions de tous les auteurs ayant des ventes sur la période. */
 export async function generateStatements(periodStart: Date, periodEnd: Date): Promise<number> {
   // auteurs concernés = ceux ayant un contrat actif dont le livre a des ventes sur la période
-  const authors = await query<any>(`SELECT author FROM royalty_contract WHERE status = 'active' GROUP BY author`);
+  const authors = await query<any>(`SELECT author FROM royalty_contract WHERE status != 'draft' GROUP BY author`);
   // purge les redditions draft existantes de cette période (idempotence)
   await query(`DELETE royalty_statement WHERE period_start = $s AND period_end = $e AND status = 'draft'`,
     { s: periodStart, e: periodEnd });
@@ -433,7 +590,7 @@ export async function generateStatements(periodStart: Date, periodEnd: Date): Pr
     await query(`CREATE royalty_statement CONTENT $c`, {
       c: {
         author: recId('author', authorId), period_start: periodStart, period_end: periodEnd, status: 'draft',
-        lines: res.lines, gross_total: res.gross_total, advance_applied: res.advance_applied,
+        lines: res.lines, warnings: res.warnings, gross_total: res.gross_total, advance_applied: res.advance_applied,
         carry_in: res.carry_in, total_due: res.total_due, payable: res.payable, carry_out: res.carry_out
       }
     });

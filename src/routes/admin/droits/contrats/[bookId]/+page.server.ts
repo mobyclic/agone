@@ -37,6 +37,7 @@ export const actions: Actions = {
     try { tiers = JSON.parse(S('tiers') || '[]'); } catch { /* noop */ }
 
     await upsertContract({
+      id: S('contractId') || undefined,
       bookId,
       authorId: S('authorId'),
       role: S('role') || 'author',
@@ -47,7 +48,10 @@ export const actions: Actions = {
       advance: N('advance') ?? 0,
       advance_recouped: N('advance_recouped') ?? 0,
       status: S('status') || 'active',
-      notes: S('notes') || undefined
+      notes: S('notes') || undefined,
+      term_start: S('term_start') || undefined,
+      term_end: S('term_end') || undefined,
+      tiers_reset: fd.get('tiers_reset') === 'on'
     });
     throw redirect(303, withFlash(`/admin/droits/contrats/${bookId}`, 'Contrat enregistré.', 'success'));
   },

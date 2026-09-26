@@ -372,6 +372,9 @@ DEFINE FIELD OVERWRITE role        ON royalty_contract TYPE string
 DEFINE FIELD OVERWRITE tiers       ON royalty_contract TYPE array<object> DEFAULT [];
 DEFINE FIELD OVERWRITE tiers.*.up_to ON royalty_contract TYPE option<int>;
 DEFINE FIELD OVERWRITE tiers.*.rate  ON royalty_contract TYPE number;
+-- Avenant : par défaut les paliers continuent de courir sur le cumul du titre ;
+-- certains avenants repartent de zéro, d'où ce drapeau.
+DEFINE FIELD OVERWRITE tiers_reset ON royalty_contract TYPE bool DEFAULT false VALUE $value ?? false;
 -- Périmètre & base de calcul
 DEFINE FIELD OVERWRITE scope       ON royalty_contract TYPE string
   ASSERT $value IN ['paper','ebook','all'] DEFAULT 'all';
@@ -383,6 +386,9 @@ DEFINE FIELD OVERWRITE advance          ON royalty_contract TYPE number DEFAULT 
 DEFINE FIELD OVERWRITE advance_recouped ON royalty_contract TYPE number DEFAULT 0;   -- déjà récupéré (cumul)
 DEFINE FIELD OVERWRITE min_guarantee    ON royalty_contract TYPE option<number>;
 DEFINE FIELD OVERWRITE signed_at   ON royalty_contract TYPE option<datetime>;
+-- Durée de validité. Vide = depuis toujours / jusqu'à nouvel ordre. Un contrat
+-- arrêté en cours d'année et reconduit à d'autres conditions = deux contrats
+-- successifs, chacun appliqué aux ventes de sa période.
 DEFINE FIELD OVERWRITE term_start  ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE term_end    ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE document    ON royalty_contract TYPE option<record<media>>;   -- contrat scanné
@@ -393,7 +399,9 @@ DEFINE FIELD OVERWRITE created_at  ON royalty_contract TYPE datetime DEFAULT tim
 DEFINE FIELD OVERWRITE updated_at  ON royalty_contract TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_contract_book   ON royalty_contract FIELDS book;
 DEFINE INDEX OVERWRITE idx_contract_author ON royalty_contract FIELDS author;
-DEFINE INDEX OVERWRITE idx_contract_uniq   ON royalty_contract FIELDS book, author, role UNIQUE;
+-- Un seul contrat par livre, contributeur, rôle ET date de prise d'effet :
+-- les avenants successifs coexistent, ils ne se marchent pas dessus.
+DEFINE INDEX OVERWRITE idx_contract_uniq   ON royalty_contract FIELDS book, author, role, term_start UNIQUE;
 
 -- RELEVÉ DE VENTES : une période × un canal (import ou saisie)
 DEFINE TABLE OVERWRITE sales_report SCHEMAFULL;
@@ -473,6 +481,9 @@ DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<
 DEFINE FIELD OVERWRITE lines.*.gross           ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.advance_applied  ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.net             ON royalty_statement TYPE option<number>;
+-- Portion de l'exercice couverte par ce contrat (avenant en cours d'année).
+DEFINE FIELD OVERWRITE lines.*.segment_start   ON royalty_statement TYPE option<string>;
+DEFINE FIELD OVERWRITE lines.*.segment_end     ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE gross_total      ON royalty_statement TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE advance_applied  ON royalty_statement TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE total_due        ON royalty_statement TYPE number DEFAULT 0;  -- dû de l'exercice, report compris
@@ -483,6 +494,8 @@ DEFINE FIELD OVERWRITE carry_out        ON royalty_statement TYPE number DEFAULT
 DEFINE FIELD OVERWRITE payable          ON royalty_statement TYPE number DEFAULT 0 VALUE $value ?? 0;  -- à régler à l'auteur
 -- L'amortissement de l'à-valoir n'est écrit sur le contrat qu'une fois, à l'émission.
 DEFINE FIELD OVERWRITE advance_posted   ON royalty_statement TYPE bool DEFAULT false VALUE $value ?? false;
+-- Réserves du calcul : ventes hors contrat, relevé réparti au prorata, etc.
+DEFINE FIELD OVERWRITE warnings     ON royalty_statement TYPE array<string> DEFAULT [] VALUE $value ?? [];
 DEFINE FIELD OVERWRITE issued_at    ON royalty_statement TYPE option<datetime>;
 DEFINE FIELD OVERWRITE paid_at      ON royalty_statement TYPE option<datetime>;
 DEFINE FIELD OVERWRITE document     ON royalty_statement TYPE option<record<media>>;
