@@ -66,7 +66,7 @@
   <div class="overflow-x-auto rounded-lg border border-border bg-card">
     <table class="w-full text-sm">
       <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-        <tr><th class="px-3 py-2 font-medium">Auteur</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 text-right font-medium">Brut</th><th class="px-3 py-2 text-right font-medium">À-valoir</th><th class="px-3 py-2 text-right font-medium">Net dû</th></tr>
+        <tr><th class="px-3 py-2 font-medium">Auteur</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 text-right font-medium">Brut</th><th class="px-3 py-2 text-right font-medium">À-valoir</th><th class="px-3 py-2 text-right font-medium">Report</th><th class="px-3 py-2 text-right font-medium">Net dû</th><th class="px-3 py-2 text-right font-medium">À payer</th></tr>
       </thead>
       <tbody class="divide-y divide-border">
         {#each data.statements as s (s.id)}
@@ -75,10 +75,15 @@
             <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[s.status] ?? s.status}</span></td>
             <td class="px-3 py-2 text-right text-muted-foreground">{eur(s.gross_total)}</td>
             <td class="px-3 py-2 text-right text-muted-foreground">−{eur(s.advance_applied)}</td>
-            <td class="px-3 py-2 text-right font-semibold">{eur(s.total_due)}</td>
+            <td class="px-3 py-2 text-right text-muted-foreground">{s.carry_in ? eur(s.carry_in) : '—'}</td>
+            <td class="px-3 py-2 text-right">{eur(s.total_due)}</td>
+            <td class="px-3 py-2 text-right font-semibold {s.payable ? '' : 'text-muted-foreground'}">
+              {s.payable ? eur(s.payable) : '—'}
+              {#if !s.payable && s.carry_out}<span class="block text-[11px] font-normal">reporté</span>{/if}
+            </td>
           </tr>
         {/each}
-        {#if data.statements.length === 0}<tr><td colspan="5" class="px-3 py-8 text-center text-muted-foreground">Aucune reddition pour cette période.</td></tr>{/if}
+        {#if data.statements.length === 0}<tr><td colspan="7" class="px-3 py-8 text-center text-muted-foreground">Aucune reddition pour cette période.</td></tr>{/if}
       </tbody>
     </table>
   </div>

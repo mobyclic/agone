@@ -37,6 +37,9 @@
         <th class="px-3 py-2 font-medium">Titre</th>
         <th class="px-3 py-2 font-medium">Rôle</th>
         <th class="px-3 py-2 text-right font-medium">Ventes nettes</th>
+        <th class="px-3 py-2 text-right font-medium">Vendus</th>
+        <th class="px-3 py-2 text-right font-medium">Retours</th>
+        <th class="px-3 py-2 text-right font-medium" title="Retenue au titre des retours à venir, reprise l’exercice suivant">Provision</th>
         <th class="px-3 py-2 text-right font-medium">Base unit.</th>
         <th class="px-3 py-2 text-right font-medium">Taux moy.</th>
         <th class="px-3 py-2 text-right font-medium">Brut</th>
@@ -49,7 +52,12 @@
         <tr>
           <td class="px-3 py-2 font-medium">{l.book_title}</td>
           <td class="px-3 py-2 text-muted-foreground">{ROLE_LABEL[l.role] ?? l.role}</td>
-          <td class="px-3 py-2 text-right">{l.units}</td>
+          <td class="px-3 py-2 text-right text-muted-foreground">{l.units_sold ?? '—'}</td>
+          <td class="px-3 py-2 text-right text-muted-foreground">{l.units_returned ? `−${l.units_returned}` : '—'}</td>
+          <td class="px-3 py-2 text-right text-muted-foreground">
+            {l.units_provision ? `−${l.units_provision}` : '—'}{#if l.units_released}<span class="text-success"> +{l.units_released}</span>{/if}
+          </td>
+          <td class="px-3 py-2 text-right font-medium">{l.units}</td>
           <td class="px-3 py-2 text-right text-muted-foreground">{eur(l.base_amount)}</td>
           <td class="px-3 py-2 text-right text-muted-foreground">{l.rate?.toFixed(1)} %</td>
           <td class="px-3 py-2 text-right">{eur(l.gross)}</td>
@@ -60,10 +68,26 @@
     </tbody>
     <tfoot class="border-t border-border bg-muted/30 font-semibold">
       <tr>
-        <td class="px-3 py-2" colspan="5">Total dû</td>
+        <td class="px-3 py-2" colspan="8">Exercice</td>
         <td class="px-3 py-2 text-right">{eur(s.gross_total)}</td>
         <td class="px-3 py-2 text-right">−{eur(s.advance_applied)}</td>
-        <td class="px-3 py-2 text-right text-link">{eur(s.total_due)}</td>
+        <td class="px-3 py-2 text-right">{eur(s.gross_total - s.advance_applied)}</td>
+      </tr>
+      {#if s.carry_in}
+        <tr class="font-normal"><td class="px-3 py-2 text-muted-foreground" colspan="10">Report de l'exercice précédent : {eur(s.carry_in)}</td></tr>
+      {/if}
+      <tr>
+        <td class="px-3 py-2" colspan="10">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span>Net dû : {eur(s.total_due)}</span>
+            <span class="text-link">À payer : {eur(s.payable ?? s.total_due)}</span>
+            {#if s.carry_out}
+              <span class="text-sm font-normal text-muted-foreground">
+                Reporté sur l'exercice suivant : {eur(s.carry_out)}{s.total_due >= 0 ? ' (sous le seuil de paiement)' : ' (retours supérieurs aux ventes)'}
+              </span>
+            {/if}
+          </div>
+        </td>
       </tr>
     </tfoot>
   </table>

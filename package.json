@@ -21,7 +21,8 @@
     "db:local:pull": "sh scripts/surreal-local.sh pull",
     "covers": "bun run scripts/sync-covers.ts",
     "ebooks:prive": "bun run scripts/ebooks-vers-bucket-prive.ts",
-    "portraits": "bun run scripts/portraits-wikimedia.ts"
+    "portraits": "bun run scripts/portraits-wikimedia.ts",
+    "test": "bun test"
   },
   "devDependencies": {
     "@fontsource-variable/oswald": "^5.3.0",
@@ -33,6 +34,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "^1.4.2",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^26.5.0",
     "dotenv": "^17.4.2",

@@ -1,17 +1,29 @@
 import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, type Tier } from '$lib/server/droits';
+import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, type Tier } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
   const book = await getBookLite(params.bookId);
   if (!book) throw error(404, { message: 'Livre introuvable' });
-  const contributors = await bookContributorsWithContracts(params.bookId);
-  return { book, contributors };
+  const [contributors, reglages] = await Promise.all([
+    bookContributorsWithContracts(params.bookId),
+    getReglagesDroits()
+  ]);
+  return { book, contributors, reglages };
 };
 
 export const actions: Actions = {
+  /** Provision sur retours propre à ce livre (vide = défaut global). */
+  provision: async ({ request, params, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const v = String(fd.get('returns_provision_rate') ?? '').trim();
+    await setProvisionLivre(params.bookId!, v === '' ? null : Number(v.replace(',', '.')));
+    throw redirect(303, withFlash(`/admin/droits/contrats/${params.bookId}`, 'Provision enregistrée.', 'success'));
+  },
+
   save: async ({ request, params, locals }) => {
     requireAdmin(locals);
     const bookId = params.bookId;

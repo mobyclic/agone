@@ -1,7 +1,7 @@
 import { redirect, fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { listReports, listChannels, createReport, addSalesLines, deleteReport } from '$lib/server/droits';
+import { listReports, listChannels, createReport, addSalesLines, deleteReport, genererRelevesDepuisCommandes } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
@@ -41,6 +41,20 @@ export const actions: Actions = {
     const raw = S('lines');
     if (raw) n = await addSalesLines(reportId, parseLines(raw));
     throw redirect(303, withFlash('/admin/droits/ventes', `Relevé créé (${n} lignes).`, 'success'));
+  },
+
+  /** Relevés des canaux directs, reconstruits depuis les commandes de la période. */
+  depuisCommandes: async ({ request, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const start = String(fd.get('period_start') || '');
+    const end = String(fd.get('period_end') || '');
+    if (!start || !end) return fail(400, { error: 'Période requise.' });
+    const res = await genererRelevesDepuisCommandes(new Date(start), new Date(end));
+    const resume = res.length
+      ? res.map((r) => `${r.canal} : ${r.lignes} ligne(s), ${r.unites} ex.`).join(' · ')
+      : 'aucune vente sur la période';
+    throw redirect(303, withFlash('/admin/droits/ventes', `Relevés générés — ${resume}`, 'success'));
   },
 
   delete: async ({ request, locals }) => {

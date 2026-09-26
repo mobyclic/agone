@@ -14,7 +14,20 @@
 
 <a href="/admin/droits/contrats" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Contrats</a>
 <h2 class="text-xl font-bold">{data.book.title}</h2>
-<p class="mb-6 text-sm text-muted-foreground">Un contrat par contributeur : barème par paliers de ventes, base de calcul et à-valoir.</p>
+<p class="mb-4 text-sm text-muted-foreground">Un contrat par contributeur : barème par paliers de ventes, base de calcul et à-valoir.</p>
+
+<!-- Provision sur retours : défaut de la maison, surchargeable pour ce titre. -->
+<form method="POST" action="?/provision" use:enhance class="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
+  <label class={lbl}>
+    Provision sur retours de ce livre (%)
+    <input name="returns_provision_rate" type="number" step="1" min="0" max="100" value={data.book.returns_provision_rate ?? ''}
+      placeholder={String(data.reglages.provision_rate)} class="{input} mt-1 w-32" />
+  </label>
+  <Button type="submit" variant="outline" size="sm">Enregistrer</Button>
+  <p class="text-xs text-muted-foreground">
+    Vide = défaut de la maison ({data.reglages.provision_rate} %). Retenue sur les ventes de l'exercice, reprise à l'exercice suivant.
+  </p>
+</form>
 
 {#if data.contributors.length === 0}
   <p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">Ce livre n’a pas encore de contributeur. Ajoutez-en depuis <a href="/admin/catalogue/{data.book.id ? String(data.book.id).replace('book:', '') : ''}" class="text-link hover:underline">la fiche catalogue</a>.</p>

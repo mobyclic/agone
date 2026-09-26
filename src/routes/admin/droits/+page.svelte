@@ -1,6 +1,7 @@
 <script lang="ts">
-  import Icon from '$lib/components/Icon.svelte';
-  import { FileText, Receipt, Coins } from 'phosphor-svelte';
+  import { enhance } from '$app/forms';
+  import { Button } from '$lib/components/ui/button';
+  import { FileText, Receipt, Coins, FloppyDisk } from 'phosphor-svelte';
   let { data } = $props();
 
   const sections = $derived([
@@ -41,6 +42,29 @@
       {#each data.channels as c (c.id)}<li class="flex justify-between"><span>{c.name}</span><span class="font-mono text-xs text-muted-foreground">{c.code}</span></li>{/each}
     </ul>
   </div>
+  <div class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Règles de calcul</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Valeurs par défaut de la maison. La provision se règle livre par livre depuis la page des contrats.
+    </p>
+    <form method="POST" action="?/reglages" use:enhance class="flex flex-wrap items-end gap-3">
+      <label class="text-xs font-medium text-muted-foreground">
+        Provision sur retours (%)
+        <input name="provision_rate" type="number" step="1" min="0" max="100" value={data.reglages.provision_rate}
+          class="mt-1 h-10 w-28 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+      </label>
+      <label class="text-xs font-medium text-muted-foreground">
+        Seuil de paiement (€)
+        <input name="threshold" type="number" step="1" min="0" value={data.reglages.threshold}
+          class="mt-1 h-10 w-28 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+      </label>
+      <Button type="submit" variant="outline"><FloppyDisk size={15} /> Enregistrer</Button>
+    </form>
+    <p class="mt-2 text-xs text-muted-foreground">
+      Sous le seuil, le net n'est pas versé : il est reporté sur l'exercice suivant (contrats Agone : 100 €).
+    </p>
+  </div>
+
   <div class="rounded-lg border border-border bg-card p-5">
     <h3 class="eyebrow mb-3">Redditions récentes</h3>
     {#if data.periods.length === 0}

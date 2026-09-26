@@ -24,3 +24,4 @@ scripts/.merge-rubriques-backup-*.json
 static/_r2-local/
 *.tmp.ts
 portraits-wikimedia-*.json
+tmp/

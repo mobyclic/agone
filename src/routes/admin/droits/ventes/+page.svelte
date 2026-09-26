@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Trash, Plus } from 'phosphor-svelte';
+  import { ArrowLeft, Trash, Plus, ArrowsClockwise } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -44,6 +44,24 @@
     </div>
   </div>
 
+  <div class="space-y-6">
+  <!-- Ventes directes : reprises des commandes, sans ressaisie -->
+  <div class="rounded-lg border border-link/40 bg-link/5 p-5">
+    <h3 class="eyebrow mb-1">Depuis les commandes</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Reconstruit les relevés des canaux directs (site, comptoir, VPC, sortie éditeur) à partir des commandes payées
+      de la période, au prix réellement encaissé ; les commandes remboursées comptent en retours. Relançable : les
+      relevés automatiques de la même période sont refaits.
+    </p>
+    <form method="POST" action="?/depuisCommandes" use:enhance class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <label class={lbl}>Début <input name="period_start" type="date" required class={input} /></label>
+        <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
+      </div>
+      <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Générer les relevés</Button>
+    </form>
+  </div>
+
   <!-- Nouveau relevé -->
   <div class="rounded-lg border border-border bg-card p-5">
     <h3 class="eyebrow mb-3">Nouveau relevé</h3>
@@ -65,5 +83,6 @@
       <p class="text-xs text-muted-foreground">Une ligne par titre. Colonnes : ISBN, unités vendues, retours (opt.), format (paper/ebook, opt.), prix (opt.). Le livre est retrouvé par ISBN.</p>
       <Button type="submit" class="w-full"><Plus size={15} /> Créer le relevé</Button>
     </form>
+  </div>
   </div>
 </div>

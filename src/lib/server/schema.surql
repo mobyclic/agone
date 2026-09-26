@@ -241,6 +241,10 @@ DEFINE FIELD OVERWRITE primary_collection ON book TYPE option<record<collection>
 DEFINE FIELD OVERWRITE keywords ON book TYPE array<string> DEFAULT [] VALUE $value ?? [];
 -- Anciens slugs : /livre/<ancien> redirige (301) vers le slug actuel après un renommage.
 DEFINE FIELD OVERWRITE old_slugs ON book TYPE array<string> DEFAULT [] VALUE $value ?? [];
+-- Provision sur retours propre au livre (%), sinon le défaut global (réglage
+-- « royalties »). Prévue par les contrats : « retenue provisionnelle établie par
+-- l'Éditeur en fonction du flux des retours constatés et prévisibles ».
+DEFINE FIELD OVERWRITE returns_provision_rate ON book TYPE option<number>;
 
 -- RUBRIQUE (thèmes/rayons — taxonomie partagée livres & blog)
 DEFINE TABLE OVERWRITE rubrique SCHEMAFULL;
@@ -425,7 +429,12 @@ DEFINE FIELD OVERWRITE lines.*.contract        ON royalty_statement TYPE option<
 DEFINE FIELD OVERWRITE lines.*.book            ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE lines.*.book_title       ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE lines.*.role            ON royalty_statement TYPE option<string>;
-DEFINE FIELD OVERWRITE lines.*.units           ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.units           ON royalty_statement TYPE option<number>;  -- unités retenues (nettes, après provision)
+DEFINE FIELD OVERWRITE lines.*.units_sold      ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.units_returned  ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.units_provision ON royalty_statement TYPE option<number>;  -- retenues au titre des retours à venir
+DEFINE FIELD OVERWRITE lines.*.units_released  ON royalty_statement TYPE option<number>;  -- provision de l'exercice précédent, reprise
+DEFINE FIELD OVERWRITE lines.*.format          ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE lines.*.base_amount      ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.gross           ON royalty_statement TYPE option<number>;
@@ -433,7 +442,14 @@ DEFINE FIELD OVERWRITE lines.*.advance_applied  ON royalty_statement TYPE option
 DEFINE FIELD OVERWRITE lines.*.net             ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE gross_total      ON royalty_statement TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE advance_applied  ON royalty_statement TYPE number DEFAULT 0;
-DEFINE FIELD OVERWRITE total_due        ON royalty_statement TYPE number DEFAULT 0;
+DEFINE FIELD OVERWRITE total_due        ON royalty_statement TYPE number DEFAULT 0;  -- dû de l'exercice, report compris
+-- Report à nouveau : sous le seuil contractuel (100 € chez Agone) ou solde négatif
+-- (retours supérieurs aux ventes), le montant n'est pas payé mais reporté.
+DEFINE FIELD OVERWRITE carry_in         ON royalty_statement TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE carry_out        ON royalty_statement TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE payable          ON royalty_statement TYPE number DEFAULT 0 VALUE $value ?? 0;  -- à régler à l'auteur
+-- L'amortissement de l'à-valoir n'est écrit sur le contrat qu'une fois, à l'émission.
+DEFINE FIELD OVERWRITE advance_posted   ON royalty_statement TYPE bool DEFAULT false VALUE $value ?? false;
 DEFINE FIELD OVERWRITE issued_at    ON royalty_statement TYPE option<datetime>;
 DEFINE FIELD OVERWRITE paid_at      ON royalty_statement TYPE option<datetime>;
 DEFINE FIELD OVERWRITE document     ON royalty_statement TYPE option<record<media>>;

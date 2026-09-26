@@ -7,6 +7,7 @@
  * (+ `sales_line`). La reddition (`royalty_statement`) agrège par auteur × période.
  */
 import { query, recId } from './surreal';
+import { getSetting, setSetting } from './site';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -14,14 +15,44 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 export async function ensureChannels() {
   const existing = await query<any>(`SELECT code FROM sales_channel`);
   const codes = new Set(existing.map((c) => c.code));
+  // Les canaux couvrent les deux origines de ventes : les commandes du site
+  // (order.channel) et les relevés du distributeur.
   const defaults = [
     { code: 'web', name: 'Vente directe (site)', sort: 0 },
-    { code: 'bldd', name: 'Les Belles Lettres (distribution)', sort: 1 }
+    { code: 'bldd', name: 'Les Belles Lettres (distribution)', sort: 1 },
+    { code: 'comptoir', name: 'Comptoir & rencontres', sort: 2 },
+    { code: 'vpc', name: 'Vente par correspondance', sort: 3 },
+    { code: 'sortie_editeur', name: 'Sortie éditeur', sort: 4 }
   ];
   for (const d of defaults) if (!codes.has(d.code)) await query(`CREATE sales_channel CONTENT $d`, { d });
 }
 export async function listChannels() {
   return query<any>(`SELECT id, code, name, sort FROM sales_channel ORDER BY sort ASC`);
+}
+
+// ── Réglages ──────────────────────────────────────────────────
+export interface ReglagesDroits {
+  /** Part des ventes de l'exercice retenue en provision sur retours (%). */
+  provision_rate: number;
+  /** En deçà, le net n'est pas payé mais reporté sur l'exercice suivant (€). */
+  threshold: number;
+}
+const REGLAGES_DEFAUT: ReglagesDroits = { provision_rate: 15, threshold: 100 };
+
+export async function getReglagesDroits(): Promise<ReglagesDroits> {
+  const v = ((await getSetting('royalties')) ?? {}) as Record<string, unknown>;
+  const n = (x: unknown, d: number) => (Number.isFinite(Number(x)) ? Number(x) : d);
+  return {
+    provision_rate: n(v.provision_rate, REGLAGES_DEFAUT.provision_rate),
+    threshold: n(v.threshold, REGLAGES_DEFAUT.threshold)
+  };
+}
+
+export async function setReglagesDroits(r: ReglagesDroits) {
+  await setSetting('royalties', {
+    provision_rate: Math.min(100, Math.max(0, Number(r.provision_rate) || 0)),
+    threshold: Math.max(0, Number(r.threshold) || 0)
+  });
 }
 
 // ── Contrats ──────────────────────────────────────────────────
@@ -85,7 +116,7 @@ export async function bookContributorsWithContracts(bookId: string) {
 }
 
 export async function getBookLite(bookId: string) {
-  const rows = await query<any>(`SELECT id, title, slug FROM book WHERE id = $id LIMIT 1`, { id: recId('book', bookId) });
+  const rows = await query<any>(`SELECT id, title, slug, returns_provision_rate FROM book WHERE id = $id LIMIT 1`, { id: recId('book', bookId) });
   return rows[0] ?? null;
 }
 
@@ -197,27 +228,94 @@ export function tieredRoyalty(prior: number, units: number, tiers: Tier[], baseU
   return { gross: r2(gross), effRate: r2((gross / (units * baseUnit)) * 100) };
 }
 
-/** Unités nettes (vendues - retournées) d'un livre pour des formats, sur une borne temporelle. */
-async function netUnits(bookId: string, formats: string[], bound: { before?: Date; from?: Date; to?: Date }): Promise<number> {
+/**
+ * Ventes d'un livre sur une borne temporelle, PAR FORMAT : unités vendues,
+ * retournées, et recette réellement encaissée (HT). `gross_price` est le prix
+ * unitaire TTC réellement payé quand la source le fournit — indispensable au
+ * numérique, dont le contrat calcule les droits sur « le prix de vente hors
+ * taxes payé par le public », et non sur le prix catalogue.
+ */
+async function ventesParFormat(
+  bookId: string,
+  formats: string[],
+  bound: { before?: Date; from?: Date; to?: Date }
+): Promise<Map<string, { sold: number; returned: number; revenue_ttc: number; priced_units: number }>> {
   const cond: string[] = ['book = $book', 'format IN $formats'];
   const vars: Record<string, unknown> = { book: recId('book', bookId), formats };
   if (bound.before) { cond.push('report.period_end < $before'); vars.before = bound.before; }
   if (bound.from) { cond.push('report.period_end >= $from'); vars.from = bound.from; }
   if (bound.to) { cond.push('report.period_end <= $to'); vars.to = bound.to; }
   const rows = await query<any>(
-    `SELECT math::sum(units_sold) AS s, math::sum(units_returned) AS r
-       FROM sales_line WHERE ${cond.join(' AND ')} GROUP ALL`, vars
+    `SELECT format,
+        math::sum(units_sold) AS sold,
+        math::sum(units_returned) AS returned,
+        math::sum(IF gross_price != NONE THEN (units_sold - units_returned) * gross_price ELSE 0 END) AS revenue_ttc,
+        math::sum(IF gross_price != NONE THEN units_sold - units_returned ELSE 0 END) AS priced_units
+       FROM sales_line WHERE ${cond.join(' AND ')} GROUP BY format`,
+    vars
   );
-  return (rows[0]?.s ?? 0) - (rows[0]?.r ?? 0);
+  const out = new Map<string, { sold: number; returned: number; revenue_ttc: number; priced_units: number }>();
+  for (const r of rows) {
+    out.set(r.format, {
+      sold: r.sold ?? 0, returned: r.returned ?? 0,
+      revenue_ttc: r.revenue_ttc ?? 0, priced_units: r.priced_units ?? 0
+    });
+  }
+  return out;
 }
+
+const totalUnites = (m: Map<string, { sold: number; returned: number }>) => {
+  let sold = 0, returned = 0;
+  for (const v of m.values()) { sold += v.sold; returned += v.returned; }
+  return { sold, returned, net: sold - returned };
+};
 
 export interface StatementLine {
-  contract: string; book: string; book_title: string; role: string;
-  units: number; base_amount: number; rate: number; gross: number; advance_applied: number; net: number;
+  contract: string; book: string; book_title: string; role: string; format?: string;
+  units: number; units_sold: number; units_returned: number; units_provision: number; units_released: number;
+  base_amount: number; rate: number; gross: number; advance_applied: number; net: number;
 }
 
-/** Calcule la reddition d'un auteur sur une période (sans persister). */
+/** Provision sur retours applicable à un livre (% des ventes de l'exercice). */
+async function tauxProvision(bookId: string, defaut: number): Promise<number> {
+  const rows = await query<any>(`SELECT returns_provision_rate AS r FROM $id`, { id: recId('book', bookId) });
+  const r = rows[0]?.r;
+  return Number.isFinite(Number(r)) ? Number(r) : defaut;
+}
+
+/** Provision retenue à l'exercice PRÉCÉDENT pour ce contrat — reprise cet exercice. */
+async function provisionPrecedente(contractId: string, periodStart: Date): Promise<number> {
+  const rows = await query<any>(
+    `SELECT lines FROM royalty_statement
+       WHERE period_end < $s AND array::len(lines[WHERE contract = $c]) > 0
+       ORDER BY period_end DESC LIMIT 1`,
+    { s: periodStart, c: contractId }
+  );
+  const ligne = (rows[0]?.lines ?? []).find((l: any) => String(l.contract) === contractId);
+  return Number(ligne?.units_provision ?? 0);
+}
+
+/** Report à nouveau : solde non payé (trop faible ou négatif) de l'exercice précédent. */
+async function reportPrecedent(authorId: string, periodStart: Date): Promise<number> {
+  const rows = await query<any>(
+    `SELECT carry_out FROM royalty_statement
+       WHERE author = $a AND period_end < $s AND status != 'draft'
+       ORDER BY period_end DESC LIMIT 1`,
+    { a: recId('author', authorId), s: periodStart }
+  );
+  return Number(rows[0]?.carry_out ?? 0);
+}
+
+/**
+ * Calcule la reddition d'un auteur sur une période (sans persister).
+ *
+ * Suit les contrats Agone : assiette = prix public HT du catalogue pour le papier,
+ * prix réellement payé HT pour le numérique ; paliers progressifs sur le CUMUL des
+ * ventes ; provision sur retours retenue puis reprise l'exercice suivant ;
+ * à-valoir amorti ; report à nouveau et seuil de paiement.
+ */
 export async function computeStatementForAuthor(authorId: string, periodStart: Date, periodEnd: Date) {
+  const reglages = await getReglagesDroits();
   const contracts = await query<any>(
     `SELECT id, book, book.title AS book_title, book.price_paper AS price_paper, book.price_ebook AS price_ebook,
         book.vat_rate AS vat_rate, role, tiers, scope, base, net_rate, advance, advance_recouped
@@ -226,25 +324,79 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
   );
   const lines: StatementLine[] = [];
   let gross_total = 0, advance_total = 0, net_total = 0;
+
   for (const c of contracts) {
-    const bookId = String(c.book);
+    const bookId = String(c.book).replace(/^book:/, '');
+    const contractId = String(c.id);
     const formats = FORMATS_FOR[c.scope] ?? FORMATS_FOR.all;
-    const book = { price_paper: c.price_paper, price_ebook: c.price_ebook, vat_rate: c.vat_rate };
-    const baseUnit = baseUnitPrice(book, c.scope, c.base, c.net_rate ?? 60);
-    const prior = await netUnits(bookId, formats, { before: periodStart });
-    const period = await netUnits(bookId, formats, { from: periodStart, to: periodEnd });
-    if (period <= 0) continue;
-    const { gross, effRate } = tieredRoyalty(prior, period, c.tiers ?? [], baseUnit);
+    const vat = c.vat_rate ?? 5.5;
+
+    const periode = await ventesParFormat(bookId, formats, { from: periodStart, to: periodEnd });
+    const anterieur = await ventesParFormat(bookId, formats, { before: periodStart });
+    const { sold, returned } = totalUnites(periode);
+    const prior = totalUnites(anterieur).net;
+
+    // Provision : retenue sur les ventes PHYSIQUES de l'exercice (un fichier
+    // numérique ne revient pas), reprise de celle du précédent.
+    const taux = await tauxProvision(bookId, reglages.provision_rate);
+    const soldPhysique = [...periode.entries()]
+      .filter(([f]) => f !== 'ebook')
+      .reduce((acc, [, v]) => acc + v.sold, 0);
+    const units_provision = Math.round((soldPhysique * taux) / 100);
+    const units_released = await provisionPrecedente(contractId, periodStart);
+    const units = sold - returned - units_provision + units_released;
+    if (sold === 0 && returned === 0 && units_released === 0) continue;
+
+    // Assiette : prix public HT (papier) ou prix réellement payé HT (numérique).
+    const pricedRevenue = [...periode.entries()]
+      .filter(([f]) => f === 'ebook')
+      .reduce((acc, [, v]) => acc + v.revenue_ttc, 0);
+    const pricedUnits = [...periode.entries()]
+      .filter(([f]) => f === 'ebook')
+      .reduce((acc, [, v]) => acc + v.priced_units, 0);
+    const baseUnit =
+      // Pleine précision ici : arrondir l'assiette unitaire au centime avant de la
+      // multiplier par les ventes décale le brut de quelques centimes. La ligne de
+      // reddition affiche l'assiette arrondie (base_amount), le calcul ne l'est pas.
+      c.scope === 'ebook' && pricedUnits > 0
+        ? pricedRevenue / pricedUnits / (1 + vat / 100)
+        : baseUnitPrice({ price_paper: c.price_paper, price_ebook: c.price_ebook, vat_rate: vat }, c.scope, c.base, c.net_rate ?? 60);
+
+    // Redevance : à paliers sur le cumul ; un solde négatif reste négatif (dette).
+    const { gross, effRate } =
+      units >= 0
+        ? tieredRoyalty(prior, units, c.tiers ?? [], baseUnit)
+        : (() => {
+            const g = tieredRoyalty(Math.max(0, prior + units), -units, c.tiers ?? [], baseUnit);
+            return { gross: -g.gross, effRate: g.effRate };
+          })();
+
     const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
-    const advance_applied = r2(Math.min(gross, outstanding));
+    const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
     const net = r2(gross - advance_applied);
     lines.push({
-      contract: String(c.id), book: bookId, book_title: c.book_title, role: c.role,
-      units: period, base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net
+      contract: contractId, book: bookId, book_title: c.book_title, role: c.role, format: c.scope,
+      units, units_sold: sold, units_returned: returned, units_provision, units_released,
+      base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net
     });
     gross_total += gross; advance_total += advance_applied; net_total += net;
   }
-  return { lines, gross_total: r2(gross_total), advance_applied: r2(advance_total), total_due: r2(net_total) };
+
+  // Report à nouveau et seuil de paiement (100 € chez Agone).
+  const carry_in = await reportPrecedent(authorId, periodStart);
+  const total_due = r2(net_total + carry_in);
+  const payable = total_due >= reglages.threshold ? total_due : 0;
+  const carry_out = r2(total_due - payable);
+
+  return {
+    lines,
+    gross_total: r2(gross_total),
+    advance_applied: r2(advance_total),
+    carry_in: r2(carry_in),
+    total_due,
+    payable: r2(payable),
+    carry_out
+  };
 }
 
 /** Génère (draft) les redditions de tous les auteurs ayant des ventes sur la période. */
@@ -267,7 +419,8 @@ export async function generateStatements(periodStart: Date, periodEnd: Date): Pr
     await query(`CREATE royalty_statement CONTENT $c`, {
       c: {
         author: recId('author', authorId), period_start: periodStart, period_end: periodEnd, status: 'draft',
-        lines: res.lines, gross_total: res.gross_total, advance_applied: res.advance_applied, total_due: res.total_due
+        lines: res.lines, gross_total: res.gross_total, advance_applied: res.advance_applied,
+        carry_in: res.carry_in, total_due: res.total_due, payable: res.payable, carry_out: res.carry_out
       }
     });
     created++;
@@ -279,7 +432,7 @@ export async function listStatements(periodStart?: Date, periodEnd?: Date) {
   const where = periodStart && periodEnd ? 'WHERE period_start = $s AND period_end = $e' : '';
   return query<any>(
     `SELECT id, author.full_name AS author_name, author.slug AS author_slug, period_start, period_end,
-        status, gross_total, advance_applied, total_due
+        status, gross_total, advance_applied, carry_in, total_due, payable, carry_out
       FROM royalty_statement ${where} ORDER BY total_due DESC`,
     periodStart && periodEnd ? { s: periodStart, e: periodEnd } : {}
   );
@@ -301,9 +454,41 @@ export async function statementsForAuthor(authorId: string) {
   );
 }
 
+/**
+ * Change le statut d'une reddition et, à l'ÉMISSION, écrit l'amortissement de
+ * l'à-valoir sur les contrats concernés — sans quoi le même à-valoir se déduirait
+ * de chaque exercice et l'auteur ne serait jamais payé. `advance_posted` rend
+ * l'écriture idempotente ; un retour en brouillon la reprend.
+ */
 export async function setStatementStatus(id: string, status: 'draft' | 'issued' | 'paid') {
+  const sid = recId('royalty_statement', id);
+  const st = (await query<any>(`SELECT lines, advance_posted FROM $id`, { id: sid }))[0];
+  if (!st) return;
+  const lignes: any[] = st.lines ?? [];
+  const poste = st.advance_posted === true;
+
+  if ((status === 'issued' || status === 'paid') && !poste) {
+    for (const l of lignes) {
+      const montant = Number(l.advance_applied ?? 0);
+      if (!montant || !l.contract) continue;
+      await query(`UPDATE $id SET advance_recouped = (advance_recouped ?? 0) + $m`, {
+        id: recId('royalty_contract', String(l.contract).replace(/^royalty_contract:/, '')), m: montant
+      });
+    }
+  } else if (status === 'draft' && poste) {
+    for (const l of lignes) {
+      const montant = Number(l.advance_applied ?? 0);
+      if (!montant || !l.contract) continue;
+      await query(`UPDATE $id SET advance_recouped = math::max([0, (advance_recouped ?? 0) - $m])`, {
+        id: recId('royalty_contract', String(l.contract).replace(/^royalty_contract:/, '')), m: montant
+      });
+    }
+  }
+
   const stamp = status === 'issued' ? ', issued_at = time::now()' : status === 'paid' ? ', paid_at = time::now()' : '';
-  await query(`UPDATE $id SET status = $s${stamp}`, { id: recId('royalty_statement', id), s: status });
+  await query(`UPDATE $id SET status = $s, advance_posted = $p${stamp}`, {
+    id: sid, s: status, p: status !== 'draft'
+  });
 }
 
 /** Périodes de reddition existantes (pour le sélecteur). */
@@ -312,4 +497,104 @@ export async function listPeriods() {
     `SELECT period_start, period_end, count() AS n, math::sum(total_due) AS total
        FROM royalty_statement GROUP BY period_start, period_end ORDER BY period_start DESC`
   );
+}
+
+// ── Ventes directes : relevés produits depuis les commandes ────────────────
+
+/** Statuts de commande qui valent vente (même définition que les statistiques). */
+const COMMANDES_PAYEES = ['completed', 'paid', 'processing', 'sent_to_bl'];
+/** Format de commande → format de ligne de vente. */
+const FORMAT_VENTE: Record<string, string> = { papier: 'paper', epub: 'ebook', souscription: 'souscription' };
+
+/**
+ * Produit les relevés de ventes des canaux directs (site, comptoir, VPC, sortie
+ * éditeur) à partir des commandes déjà en base, un relevé par canal.
+ *
+ * Sans cela, les droits ignoraient purement et simplement les ventes du site : le
+ * moteur ne lit que `sales_line`, qu'aucun code n'alimentait. Les commandes
+ * remboursées de la période comptent en retours. Idempotent : les relevés
+ * automatiques (label « auto ») du même canal et de la même période sont refaits.
+ */
+export async function genererRelevesDepuisCommandes(periodStart: Date, periodEnd: Date) {
+  await ensureChannels();
+  const canaux = await listChannels();
+  const parCode = new Map<string, string>();
+  for (const c of canaux) parCode.set(c.code, String(c.id).replace(/^sales_channel:/, ''));
+
+  const resultats: { canal: string; lignes: number; unites: number }[] = [];
+  for (const code of ['web', 'comptoir', 'vpc', 'sortie_editeur']) {
+    const channelId = parCode.get(code);
+    if (!channelId) continue;
+
+    // Ventes et retours de la période, par livre et par format.
+    const agrege = async (statuts: string[]) =>
+      query<any>(
+        `SELECT out AS book, format, math::sum(qty) AS q, math::sum(line_total) AS ca
+           FROM contains
+          WHERE in.status IN $statuts AND in.channel = $code
+            AND (in.paid_at ?? in.created_at) >= $s AND (in.paid_at ?? in.created_at) <= $e
+          GROUP BY book, format`,
+        { statuts, code, s: periodStart, e: periodEnd }
+      );
+    const ventes = await agrege(COMMANDES_PAYEES);
+    const retours = await agrege(['refunded']);
+    if (!ventes.length && !retours.length) continue;
+
+    const cle = (b: unknown, f: unknown) => `${String(b)}|${String(f)}`;
+    const lignes = new Map<string, { book: string; format: string; sold: number; returned: number; ca: number }>();
+    for (const v of ventes) {
+      lignes.set(cle(v.book, v.format), {
+        book: String(v.book), format: FORMAT_VENTE[v.format] ?? 'paper',
+        sold: v.q ?? 0, returned: 0, ca: v.ca ?? 0
+      });
+    }
+    for (const r of retours) {
+      const k = cle(r.book, r.format);
+      const l = lignes.get(k);
+      if (l) l.returned += r.q ?? 0;
+      else lignes.set(k, { book: String(r.book), format: FORMAT_VENTE[r.format] ?? 'paper', sold: 0, returned: r.q ?? 0, ca: 0 });
+    }
+
+    // Remplace le relevé automatique existant de cette période (idempotence).
+    const anciens = await query<any>(
+      `SELECT id FROM sales_report WHERE channel = $c AND period_start = $s AND period_end = $e AND label = 'auto'`,
+      { c: recId('sales_channel', channelId), s: periodStart, e: periodEnd }
+    );
+    for (const a of anciens) await deleteReport(String(a.id).replace(/^sales_report:/, ''));
+
+    const reportId = await createReport({
+      channelId, period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(), label: 'auto'
+    });
+    const rows = [...lignes.values()].map((l) => ({
+      report: recId('sales_report', reportId),
+      book: recId('book', l.book.replace(/^book:/, '')),
+      format: l.format,
+      units_sold: Math.round(l.sold),
+      units_returned: Math.round(l.returned),
+      units_free: 0,
+      // Prix unitaire TTC réellement encaissé (remises et promotions comprises).
+      gross_price: l.sold > 0 ? r2(l.ca / l.sold) : undefined
+    }));
+    for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
+    resultats.push({
+      canal: code,
+      lignes: rows.length,
+      unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0)
+    });
+  }
+  return resultats;
+}
+
+/** Provision sur retours propre à un livre (null = défaut global). */
+export async function setProvisionLivre(bookId: string, rate: number | null) {
+  const v = rate == null || !Number.isFinite(rate) ? undefined : Math.min(100, Math.max(0, rate));
+  await query(`UPDATE $id SET returns_provision_rate = $v`, { id: recId('book', bookId), v });
+}
+
+/** Provision appliquée à un livre, et si elle lui est propre (pour l'affichage). */
+export async function getProvisionLivre(bookId: string): Promise<{ rate: number; propre: boolean }> {
+  const reglages = await getReglagesDroits();
+  const rows = await query<any>(`SELECT returns_provision_rate AS r FROM $id`, { id: recId('book', bookId) });
+  const r = rows[0]?.r;
+  return Number.isFinite(Number(r)) ? { rate: Number(r), propre: true } : { rate: reglages.provision_rate, propre: false };
 }
