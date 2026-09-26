@@ -6,6 +6,7 @@ import { subscriberStats } from '$lib/server/newsletter';
 import { lancerEnvoi, envoyerTest, etatEnvoi } from '$lib/server/newsletterEnvoi';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   if (params.id === 'nouveau') return { isNew: true, issue: null };
@@ -55,6 +56,7 @@ export const actions: Actions = {
     if (!params.id || params.id === 'nouveau') return fail(400, { error: 'Enregistrez d’abord le numéro.' });
     const r = await lancerEnvoi(params.id);
     if ('error' in r) return fail(400, { error: r.error });
+    await journaliser(locals, { action: 'lettrinfo.envoi', cible: { type: 'newsletter', id: params.id, libelle: r.titre }, details: { abonnes: r.total } });
     return { lance: true };
   },
 

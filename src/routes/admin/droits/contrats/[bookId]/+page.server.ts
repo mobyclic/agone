@@ -4,6 +4,7 @@ import { requireAdmin } from '$lib/server/access';
 import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, mouvementsLivreTous, ventesParExerciceLivre, type Tier } from '$lib/server/droits';
 import { dealsForBook } from '$lib/server/cessions';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const book = await getBookLite(params.bookId);
@@ -58,6 +59,7 @@ export const actions: Actions = {
       term_end: S('term_end') || undefined,
       tiers_reset: fd.get('tiers_reset') === 'on'
     });
+    await journaliser(locals, { action: 'contrat.enregistre', cible: { type: 'royalty_contract', id: S('contractId') || 'nouveau', libelle: `Contrat ${S('role') || 'author'}` }, details: { book_id: bookId, paliers: tiers, part: N('share') ?? 100, avaloir: N('advance') ?? 0, statut: S('status') || 'active', validite: `${S('term_start') || '…'} → ${S('term_end') || '…'}` } });
     throw redirect(303, withFlash(`/admin/droits/contrats/${bookId}`, 'Contrat enregistré.', 'success'));
   },
 
@@ -65,7 +67,10 @@ export const actions: Actions = {
     requireAdmin(locals);
     const fd = await request.formData();
     const id = String(fd.get('contractId') || '');
-    if (id) await deleteContract(id);
+    if (id) {
+      await deleteContract(id);
+      await journaliser(locals, { action: 'contrat.supprime', cible: { type: 'royalty_contract', id, libelle: 'Contrat' }, details: { book_id: params.bookId } });
+    }
     throw redirect(303, withFlash(`/admin/droits/contrats/${params.bookId}`, 'Contrat supprimé.', 'success'));
   }
 };

@@ -6,6 +6,7 @@ import { getCompany } from '$lib/server/invoice';
 import { wpConfigured } from '$lib/server/wp-db';
 import { lancerSynchro } from '$lib/server/sync-job';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async () => {
   const [contact, banner, company, tracking, syncState, stock] = await Promise.all([
@@ -48,6 +49,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const n = Number(String(fd.get('alert_threshold') ?? '').replace(',', '.'));
     await setSetting('stock', { alert_threshold: Number.isFinite(n) && n >= 0 ? Math.round(n) : 10 });
+    await journaliser(locals, { action: 'stock.seuil', cible: { type: 'site_setting', id: 'stock', libelle: 'Seuil d’alerte de stock' }, details: { seuil: n } });
     throw redirect(303, withFlash('/admin/parametres', 'Seuil d’alerte enregistré.', 'success'));
   },
 

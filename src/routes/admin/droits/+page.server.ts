@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
 import { ensureChannels, listChannels, getReglagesDroits, setReglagesDroits, recapDroits } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 import { query } from '$lib/server/surreal';
 
 const countOf = (t: string) =>
@@ -31,6 +32,7 @@ export const actions: Actions = {
       provision_rate: Number(String(fd.get('provision_rate') ?? '').replace(',', '.')),
       threshold: Number(String(fd.get('threshold') ?? '').replace(',', '.'))
     });
+    await journaliser(locals, { action: 'reglages.droits', cible: { type: 'site_setting', id: 'droits', libelle: 'Règles de calcul des droits' }, details: { provision: String(fd.get('provision_rate') ?? ''), seuil: String(fd.get('threshold') ?? '') } });
     throw redirect(303, withFlash('/admin/droits', 'Règles de calcul enregistrées.', 'success'));
   }
 };

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import Wordmark from './Wordmark.svelte';
+  import AdminSearch from './AdminSearch.svelte';
   import Icon from './Icon.svelte';
   import type { NavItem, NavSection } from '$lib/nav';
   import { List, X, SignOut, ArrowSquareOut, ArrowRight } from 'phosphor-svelte';
@@ -113,6 +114,7 @@
         <List size={20} />
       </button>
       <h1 class="text-base font-semibold">{title}</h1>
+      {#if page.url.pathname.startsWith('/admin')}<AdminSearch />{/if}
     </header>
     <main class="flex-1 p-5 sm:p-6 lg:p-8">
       {@render children()}

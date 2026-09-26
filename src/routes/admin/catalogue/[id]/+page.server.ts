@@ -8,6 +8,7 @@ import {
 import { ventesParExerciceLivre } from '$lib/server/droits';
 import { isAdmin } from '$lib/roles';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const [collections, rubriques, allKeywords] = await Promise.all([allCollections(), allRubriques(), allBookKeywords()]);
@@ -87,6 +88,7 @@ export const actions: Actions = {
     const editId = params.id && params.id !== 'nouveau' ? ((await resoudreLivreAdmin(params.id))?.id ?? null) : null;
     if (params.id !== 'nouveau' && !editId) return fail(404, { error: 'Livre introuvable.' });
     const id = await upsertBook(editId, input);
+    await journaliser(locals, { action: 'livre.enregistre', cible: { type: 'book', id, libelle: input.title }, details: { slug: input.slug, statut: input.status, prix_papier: input.price_paper, prix_ebook: input.price_ebook, stock: input.stock_qty } });
     let contribs: { authorId: string; role: string; share?: number }[] = [];
     try { contribs = JSON.parse(S('contributors') || '[]'); } catch { /* noop */ }
     await setBookContributors(id, contribs);
@@ -123,7 +125,10 @@ export const actions: Actions = {
   delete: async ({ params, locals }) => {
     requireStaff(locals);
     const livre = params.id && params.id !== 'nouveau' ? await resoudreLivreAdmin(params.id) : null;
-    if (livre) await deleteBook(livre.id);
+    if (livre) {
+      await deleteBook(livre.id);
+      await journaliser(locals, { action: 'livre.supprime', cible: { type: 'book', id: livre.id, libelle: livre.slug } });
+    }
     throw redirect(303, withFlash('/admin/catalogue', 'Livre supprimé.', 'success'));
   }
 };

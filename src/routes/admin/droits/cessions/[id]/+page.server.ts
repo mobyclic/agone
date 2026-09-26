@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
 import { getDeal, upsertDeal, deleteDeal, listPayments, addPayment, setPaymentSettled, deletePayment } from '$lib/server/cessions';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const deal = await getDeal(params.id);
@@ -39,6 +40,7 @@ export const actions: Actions = {
       status: S('status'),
       notes: S('notes') || undefined
     });
+    await journaliser(locals, { action: 'cession.enregistree', cible: { type: 'rights_deal', id: params.id!, libelle: `Cession ${S('counterparty')}` }, details: { sens: S('direction'), avaloir: N('advance') ?? 0, part_auteurs: N('author_share') ?? 50 } });
     throw redirect(303, withFlash(`/admin/droits/cessions/${params.id}`, 'Cession enregistrée.', 'success'));
   },
 

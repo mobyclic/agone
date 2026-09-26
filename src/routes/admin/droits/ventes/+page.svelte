@@ -9,7 +9,7 @@
   import { enhance } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Trash, Plus, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle } from 'phosphor-svelte';
+  import { ArrowLeft, Trash, Plus, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle , DownloadSimple } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -124,6 +124,11 @@
 {/if}
 
 <!-- Relevés enregistrés -->
+<div class="mb-2 flex justify-end">
+  <a href="/admin/droits/ventes/export.csv?annee={annee}" class="inline-flex items-center gap-1.5 text-xs text-link hover:underline">
+    <DownloadSimple size={14} /> Export CSV des ventes {annee}
+  </a>
+</div>
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">

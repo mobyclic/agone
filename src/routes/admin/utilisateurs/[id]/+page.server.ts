@@ -4,6 +4,7 @@ import { requireAdmin } from '$lib/server/access';
 import { getUserForEdit, updateUser, setPassword } from '$lib/server/account';
 import { destroyUserSessions, SESSION_COOKIE } from '$lib/server/auth/session';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const user = await getUserForEdit(params.id);
@@ -28,6 +29,7 @@ export const actions: Actions = {
         accepts_newsletter: fd.get('accepts_newsletter') === 'on',
         notes: S('notes')
       });
+      await journaliser(locals, { action: 'compte.modifie', cible: { type: 'user', id, libelle: `${S('first_name')} ${S('last_name')}`.trim() || S('email') }, details: { role: S('role'), email: S('email') } });
     } catch (e) {
       return fail(400, { error: 'Impossible d’enregistrer (email déjà utilisé ?).' });
     }

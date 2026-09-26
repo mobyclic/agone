@@ -418,6 +418,21 @@ DEFINE INDEX OVERWRITE idx_contract_author ON royalty_contract FIELDS author;
 -- les avenants successifs coexistent, ils ne se marchent pas dessus.
 DEFINE INDEX OVERWRITE idx_contract_uniq   ON royalty_contract FIELDS book, author, role, term_start UNIQUE;
 
+-- JOURNAL DES ACTIONS du back-office : qui a fait quoi, sur quoi, quand.
+-- Écrit par journaliser() dans les actions qui engagent (statut de commande,
+-- remboursement, prix, contrat, reddition, envoi de LettrInfo, rôle d'un compte).
+DEFINE TABLE OVERWRITE admin_log SCHEMAFULL;
+DEFINE FIELD OVERWRITE actor        ON admin_log TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE actor_name   ON admin_log TYPE option<string>;
+DEFINE FIELD OVERWRITE action       ON admin_log TYPE string;                  -- ex. commande.statut, livre.enregistre
+DEFINE FIELD OVERWRITE target_type  ON admin_log TYPE option<string>;          -- order, book, royalty_contract…
+DEFINE FIELD OVERWRITE target_id    ON admin_log TYPE option<string>;
+DEFINE FIELD OVERWRITE target_label ON admin_log TYPE option<string>;          -- ce qu'on lira dans la liste
+DEFINE FIELD OVERWRITE details      ON admin_log TYPE option<object> FLEXIBLE;  -- avant/après, montants…
+DEFINE FIELD OVERWRITE created_at   ON admin_log TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_log_date   ON admin_log FIELDS created_at;
+DEFINE INDEX OVERWRITE idx_log_target ON admin_log FIELDS target_type, target_id;
+
 -- CESSION DE DROITS : droits VENDUS à un éditeur étranger (Agone encaisse) ou
 -- droits ACQUIS auprès d'un ayant droit étranger (Agone paie). Les deux se
 -- suivent de la même façon : un contrat, un à-valoir, des taux, des échéances.

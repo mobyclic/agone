@@ -7,6 +7,7 @@ import {
 import { getInvoiceIdForOrder, createInvoiceForOrder } from '$lib/server/invoice';
 import { sendOrderConfirmation } from '$lib/server/orderMail';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 const bareId = (v: unknown) => String(v).replace(/^order:/, '');
 const retour = (n: string, message: string, type: 'success' | 'error' | 'info' = 'success') =>
@@ -26,6 +27,7 @@ export const actions: Actions = {
     const status = String(fd.get('status') ?? '');
     if (!(ORDER_STATUSES as readonly string[]).includes(status)) return fail(400, { error: 'Statut invalide.' });
     await setOrderStatus(Number(params.number), status);
+    await journaliser(locals, { action: 'commande.statut', cible: { type: 'order', id: params.number!, libelle: `Commande n°${params.number}` }, details: { number: params.number, statut: status } });
     throw retour(params.number!, status === 'completed' ? 'Statut mis à jour — le client est prévenu si sa commande est papier.' : 'Statut mis à jour.');
   },
 
@@ -46,6 +48,7 @@ export const actions: Actions = {
       tracking_number: String(fd.get('tracking_number') ?? ''),
       tracking_url: String(fd.get('tracking_url') ?? '')
     }, prevenir);
+    await journaliser(locals, { action: 'commande.suivi', cible: { type: 'order', id: params.number!, libelle: `Commande n°${params.number}` }, details: { number: params.number, suivi: String(fd.get('tracking_number') ?? ''), client_prevenu: prevenir } });
     if (!r.ok) return fail(400, { error: `Suivi enregistré, mais l’email n’est pas parti : ${r.error}` });
     throw retour(params.number!, prevenir ? 'Suivi enregistré et client prévenu.' : 'Suivi enregistré.');
   },
@@ -63,6 +66,7 @@ export const actions: Actions = {
     if (!order) throw error(404, { message: 'Commande introuvable' });
     const r = await sendOrderConfirmation(bareId(order.id), { force: true });
     if (!r.ok) return fail(400, { error: `Envoi impossible : ${r.error}` });
+    await journaliser(locals, { action: 'commande.confirmation', cible: { type: 'order', id: params.number!, libelle: `Commande n°${params.number}` }, details: { number: params.number } });
     throw retour(params.number!, 'Confirmation renvoyée au client.');
   },
 
@@ -73,6 +77,7 @@ export const actions: Actions = {
     try {
       const r = await refundOrder(Number(params.number), montant);
       if (!r.ok) return fail(400, { error: r.error });
+      await journaliser(locals, { action: 'commande.remboursement', cible: { type: 'order', id: params.number!, libelle: `Commande n°${params.number}` }, details: { number: params.number, montant: r.montant } });
       throw retour(params.number!, `Remboursement de ${r.montant.toFixed(2).replace('.', ',')} € effectué.`);
     } catch (e) {
       if ((e as any)?.status === 303) throw e;

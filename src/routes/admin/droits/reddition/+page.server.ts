@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
 import { listStatements, listPeriods, generateStatements, couvertureExercices, diagnosticReddition } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ url }) => {
   const start = url.searchParams.get('start') ?? undefined;
@@ -27,6 +28,7 @@ export const actions: Actions = {
     const end = exercice ? `${annee}-12-31` : String(fd.get('period_end') || '');
     if (!start || !end) return fail(400, { error: 'Période requise.' });
     const n = await generateStatements(new Date(start), new Date(end));
+    await journaliser(locals, { action: 'reddition.generee', cible: { type: 'royalty_statement', id: start.slice(0, 4), libelle: `Exercice ${start} → ${end}` }, details: { redditions: n } });
     if (n > 0) {
       throw redirect(303, withFlash(`/admin/droits/reddition?start=${start}&end=${end}`, `${n} reddition(s) générée(s).`, 'success'));
     }
