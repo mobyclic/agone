@@ -18,16 +18,16 @@ export async function ensureChannels() {
   // Les canaux couvrent les deux origines de ventes : les commandes du site
   // (order.channel) et les relevés du distributeur.
   const defaults = [
-    { code: 'web', name: 'Vente directe (site)', sort: 0 },
-    { code: 'bldd', name: 'Les Belles Lettres (distribution)', sort: 1 },
-    { code: 'comptoir', name: 'Comptoir & rencontres', sort: 2 },
-    { code: 'vpc', name: 'Vente par correspondance', sort: 3 },
-    { code: 'sortie_editeur', name: 'Sortie éditeur', sort: 4 }
+    { code: 'web', name: 'Vente directe (site)', sort: 0, physical_via_bldd: true },
+    { code: 'bldd', name: 'Les Belles Lettres (distribution)', sort: 1, physical_via_bldd: false },
+    { code: 'comptoir', name: 'Comptoir & rencontres', sort: 2, physical_via_bldd: false },
+    { code: 'vpc', name: 'Vente par correspondance', sort: 3, physical_via_bldd: true },
+    { code: 'sortie_editeur', name: 'Sortie éditeur', sort: 4, physical_via_bldd: false }
   ];
   for (const d of defaults) if (!codes.has(d.code)) await query(`CREATE sales_channel CONTENT $d`, { d });
 }
 export async function listChannels() {
-  return query<any>(`SELECT id, code, name, sort FROM sales_channel ORDER BY sort ASC`);
+  return query<any>(`SELECT id, code, name, sort, physical_via_bldd FROM sales_channel ORDER BY sort ASC`);
 }
 
 // ── Réglages ──────────────────────────────────────────────────
@@ -521,20 +521,27 @@ export async function genererRelevesDepuisCommandes(periodStart: Date, periodEnd
   const parCode = new Map<string, string>();
   for (const c of canaux) parCode.set(c.code, String(c.id).replace(/^sales_channel:/, ''));
 
-  const resultats: { canal: string; lignes: number; unites: number }[] = [];
+  const viaBldd = new Map<string, boolean>();
+  for (const c of canaux) viaBldd.set(c.code, c.physical_via_bldd === true);
+
+  const resultats: { canal: string; lignes: number; unites: number; note?: string }[] = [];
   for (const code of ['web', 'comptoir', 'vpc', 'sortie_editeur']) {
     const channelId = parCode.get(code);
     if (!channelId) continue;
+    // Papier du site et de la VPC : expédié et facturé par Les Belles Lettres, donc
+    // déjà compté dans le relevé BLDD. On ne retient ici que le numérique, que le
+    // distributeur ne voit jamais.
+    const formatsRetenus = viaBldd.get(code) ? ['epub'] : ['papier', 'epub', 'souscription'];
 
     // Ventes et retours de la période, par livre et par format.
     const agrege = async (statuts: string[]) =>
       query<any>(
         `SELECT out AS book, format, math::sum(qty) AS q, math::sum(line_total) AS ca
            FROM contains
-          WHERE in.status IN $statuts AND in.channel = $code
+          WHERE in.status IN $statuts AND in.channel = $code AND format IN $formats
             AND (in.paid_at ?? in.created_at) >= $s AND (in.paid_at ?? in.created_at) <= $e
           GROUP BY book, format`,
-        { statuts, code, s: periodStart, e: periodEnd }
+        { statuts, code, formats: formatsRetenus, s: periodStart, e: periodEnd }
       );
     const ventes = await agrege(COMMANDES_PAYEES);
     const retours = await agrege(['refunded']);
@@ -579,7 +586,8 @@ export async function genererRelevesDepuisCommandes(periodStart: Date, periodEnd
     resultats.push({
       canal: code,
       lignes: rows.length,
-      unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0)
+      unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0),
+      note: viaBldd.get(code) ? 'numérique seul — le papier est facturé par BLDD' : undefined
     });
   }
   return resultats;
@@ -597,4 +605,71 @@ export async function getProvisionLivre(bookId: string): Promise<{ rate: number;
   const rows = await query<any>(`SELECT returns_provision_rate AS r FROM $id`, { id: recId('book', bookId) });
   const r = rows[0]?.r;
   return Number.isFinite(Number(r)) ? { rate: Number(r), propre: true } : { rate: reglages.provision_rate, propre: false };
+}
+
+// ── Ventes du distributeur : import de l'état BLDD ─────────────────────────
+
+/**
+ * Importe l'« État des ventes et retours » de l'extranet BLDD sur une période,
+ * dans un relevé du canal « bldd ». Lecture seule côté distributeur.
+ *
+ * Le relevé porte, par ISBN : exemplaires vendus et retournés, chiffre au prix
+ * public HT, et montant réellement facturé par BLDD (après remise libraire) —
+ * cette dernière colonne servira aux contrats calculés sur le net encaissé.
+ * Idempotent : le relevé automatique de la même période est refait.
+ */
+export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
+  const { fetchBlSales } = await import('./belleslettres');
+  await ensureChannels();
+  const canal = (await listChannels()).find((c: any) => c.code === 'bldd');
+  if (!canal) throw new Error('Canal « bldd » introuvable.');
+  const channelId = String(canal.id).replace(/^sales_channel:/, '');
+
+  const ventes = await fetchBlSales(periodStart, periodEnd);
+  const utiles = ventes.filter((v) => v.units_sold || v.units_returned);
+
+  // Résolution par ISBN (papier ou numérique).
+  const books = await query<any>(`SELECT id, isbn_paper, isbn_ebook FROM book WHERE isbn_paper != NONE OR isbn_ebook != NONE`);
+  const parIsbn = new Map<string, string>();
+  for (const b of books) {
+    if (b.isbn_paper) parIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), String(b.id));
+    if (b.isbn_ebook) parIsbn.set(String(b.isbn_ebook).replace(/\D/g, ''), String(b.id));
+  }
+
+  const anciens = await query<any>(
+    `SELECT id FROM sales_report WHERE channel = $c AND period_start = $s AND period_end = $e AND label = 'auto'`,
+    { c: recId('sales_channel', channelId), s: periodStart, e: periodEnd }
+  );
+  for (const a of anciens) await deleteReport(String(a.id).replace(/^sales_report:/, ''));
+
+  const reportId = await createReport({
+    channelId, period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(), label: 'auto'
+  });
+
+  const inconnus: string[] = [];
+  const rows = utiles.map((v) => {
+    const bookId = parIsbn.get(v.isbn);
+    if (!bookId) inconnus.push(`${v.isbn} — ${v.title}`);
+    return {
+      report: recId('sales_report', reportId),
+      book: bookId ? recId('book', bookId.replace(/^book:/, '')) : undefined,
+      isbn: v.isbn,
+      format: 'paper',
+      units_sold: v.units_sold,
+      units_returned: v.units_returned,
+      units_free: 0,
+      gross_ht: r2(v.net_ht),
+      net_receipt: r2(v.invoiced_ht)
+    };
+  });
+  for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
+
+  return {
+    lignes: rows.length,
+    vendus: utiles.reduce((n, v) => n + v.units_sold, 0),
+    retours: utiles.reduce((n, v) => n + v.units_returned, 0),
+    prix_public_ht: r2(utiles.reduce((n, v) => n + v.net_ht, 0)),
+    facture_ht: r2(utiles.reduce((n, v) => n + v.invoiced_ht, 0)),
+    inconnus
+  };
 }

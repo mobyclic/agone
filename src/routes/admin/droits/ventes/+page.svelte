@@ -49,9 +49,10 @@
   <div class="rounded-lg border border-link/40 bg-link/5 p-5">
     <h3 class="eyebrow mb-1">Depuis les commandes</h3>
     <p class="mb-3 text-xs text-muted-foreground">
-      Reconstruit les relevés des canaux directs (site, comptoir, VPC, sortie éditeur) à partir des commandes payées
-      de la période, au prix réellement encaissé ; les commandes remboursées comptent en retours. Relançable : les
-      relevés automatiques de la même période sont refaits.
+      Reconstruit les relevés des canaux directs à partir des commandes payées de la période, au prix réellement
+      encaissé ; les commandes remboursées comptent en retours. <strong>Le papier du site et de la VPC est exclu</strong> :
+      ces commandes sont expédiées et facturées par Les Belles Lettres, donc déjà comptées dans leur relevé. Seul le
+      numérique en est repris. Relançable : les relevés automatiques de la même période sont refaits.
     </p>
     <form method="POST" action="?/depuisCommandes" use:enhance class="space-y-3">
       <div class="grid grid-cols-2 gap-3">
@@ -59,6 +60,22 @@
         <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
       </div>
       <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Générer les relevés</Button>
+    </form>
+  </div>
+
+  <!-- Distributeur : état des ventes et retours de l'extranet BLDD -->
+  <div class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Depuis Les Belles Lettres</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Récupère l'« État des ventes et retours » de l'extranet BLDD : par ISBN, exemplaires vendus et retournés,
+      chiffre au prix public HT et montant facturé. C'est le gros du volume — les ventes en librairie.
+    </p>
+    <form method="POST" action="?/depuisBldd" use:enhance class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <label class={lbl}>Début <input name="period_start" type="date" required class={input} /></label>
+        <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
+      </div>
+      <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Importer depuis BLDD</Button>
     </form>
   </div>
 

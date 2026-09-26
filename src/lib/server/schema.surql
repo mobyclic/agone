@@ -353,6 +353,11 @@ DEFINE TABLE OVERWRITE sales_channel SCHEMAFULL;
 DEFINE FIELD OVERWRITE code       ON sales_channel TYPE string;         -- 'web' | 'bldd' | …
 DEFINE FIELD OVERWRITE name       ON sales_channel TYPE string;
 DEFINE FIELD OVERWRITE sort       ON sales_channel TYPE int DEFAULT 0;
+-- Les commandes du site et de la VPC sont expédiées ET FACTURÉES par Les Belles
+-- Lettres : leurs exemplaires papier reviennent dans le relevé BLDD. Sans ce
+-- drapeau, ils seraient comptés deux fois dans les droits. Le numérique, lui,
+-- ne passe jamais par le distributeur.
+DEFINE FIELD OVERWRITE physical_via_bldd ON sales_channel TYPE bool DEFAULT false VALUE $value ?? false;
 DEFINE FIELD OVERWRITE created_at ON sales_channel TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_channel_code ON sales_channel FIELDS code UNIQUE;
 
@@ -411,7 +416,12 @@ DEFINE FIELD OVERWRITE format         ON sales_line TYPE string
 DEFINE FIELD OVERWRITE units_sold     ON sales_line TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE units_returned ON sales_line TYPE int DEFAULT 0;
 DEFINE FIELD OVERWRITE units_free     ON sales_line TYPE int DEFAULT 0;   -- SP / service de presse
-DEFINE FIELD OVERWRITE gross_price    ON sales_line TYPE option<number>;  -- prix unitaire de référence
+DEFINE FIELD OVERWRITE gross_price    ON sales_line TYPE option<number>;  -- prix unitaire TTC réellement payé
+-- Recettes de la ligne, telles que le distributeur les rend : prix public HT net
+-- de retours, et montant HT réellement facturé (après remise libraire). La seconde
+-- est l'assiette des contrats calculés « sur le net encaissé ».
+DEFINE FIELD OVERWRITE gross_ht       ON sales_line TYPE option<number>;
+DEFINE FIELD OVERWRITE net_receipt    ON sales_line TYPE option<number>;
 DEFINE FIELD OVERWRITE created_at     ON sales_line TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_saleline_report ON sales_line FIELDS report;
 DEFINE INDEX OVERWRITE idx_saleline_book   ON sales_line FIELDS book;

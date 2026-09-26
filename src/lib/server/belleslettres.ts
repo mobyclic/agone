@@ -271,3 +271,72 @@ export async function syncBldStock(opts: { html?: string; sendReport?: boolean }
 
   return { matched, updated, changes };
 }
+
+// ══════════════════════════════════════════════════════════════
+// IMPORT VENTES (scrape extranet BLDD — « État des ventes et retours »)
+// ══════════════════════════════════════════════════════════════
+
+export interface BlSalesLine {
+  isbn: string; author: string; title: string;
+  units_sold: number; units_returned: number;
+  /** Prix public HT : chiffre des ventes, des retours, et net des deux. */
+  gross_ht: number; returns_ht: number; net_ht: number;
+  /** Montant HT réellement facturé par le distributeur (après remise libraire). */
+  invoiced_ht: number;
+}
+
+/** « 1 234,56 » → 1234.56 ; vide → 0. */
+function nombreFr(s: string): number {
+  const n = Number(String(s).replace(/\s/g, '').replace(/\u00a0/g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Parse « État des ventes et retours » de l'extranet BLDD.
+ * Colonnes du détail : 0 auteur, 1 ISBN, 2 titre, 3 ventes, 4 retours,
+ * 5 CA PP HT vente, 6 CA PP HT retour, 7 net, 8 facturé.
+ */
+export function parseBlSalesHtml(html: string): BlSalesLine[] {
+  const out: BlSalesLine[] = [];
+  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
+  for (const row of rows) {
+    const cells = (row.match(/<td[^>]*>[\s\S]*?<\/td>/gi) ?? []).map(parseCell);
+    if (cells.length < 9) continue;
+    const isbn = (cells[1] ?? '').replace(/\D/g, '');
+    if (isbn.length < 12) continue; // en-têtes et lignes de synthèse
+    out.push({
+      isbn, author: cells[0] ?? '', title: cells[2] ?? '',
+      units_sold: Math.round(nombreFr(cells[3])),
+      units_returned: Math.abs(Math.round(nombreFr(cells[4]))),
+      gross_ht: nombreFr(cells[5]), returns_ht: nombreFr(cells[6]),
+      net_ht: nombreFr(cells[7]), invoiced_ht: nombreFr(cells[8])
+    });
+  }
+  return out;
+}
+
+/** Session ASP de l'extranet (login commun au stock et aux ventes). */
+async function cookieBldd(): Promise<string> {
+  const user = env.BL_EXTRANET_USER, pass = env.BL_EXTRANET_PASS;
+  if (!user || !pass) throw new Error('Identifiants extranet BLDD manquants (BL_EXTRANET_USER/PASS)');
+  const login = await fetch(`${BLDD_BASE}/traitlog.asp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
+    body: new URLSearchParams({ login: user, mdp: pass, Submit: 'Envoyer' }),
+    redirect: 'manual'
+  });
+  const setCookie = login.headers.get('set-cookie') ?? '';
+  return (setCookie.match(/ASPSESSIONID\w+=\w+/) ?? [])[0] ?? '';
+}
+
+const jjmmaaaa = (d: Date) =>
+  `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+/** Récupère l'état des ventes BLDD sur une période (lecture seule côté BLDD). */
+export async function fetchBlSales(from: Date, to: Date): Promise<BlSalesLine[]> {
+  const cookie = await cookieBldd();
+  const url = `${BLDD_BASE}/ventes.asp?DateFrom=${encodeURIComponent(jjmmaaaa(from))}&DateTo=${encodeURIComponent(jjmmaaaa(to))}&Filtre=`;
+  const res = await fetch(url, { headers: { Cookie: cookie, 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`Extranet BLDD : HTTP ${res.status}`);
+  return parseBlSalesHtml(await res.text());
+}
