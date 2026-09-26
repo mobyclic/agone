@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
-  import ApercuDroitsLivre from '$lib/components/ApercuDroitsLivre.svelte';
+  import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown, CaretRight } from 'phosphor-svelte';
+  import ResumeVentesLivre from '$lib/components/ResumeVentesLivre.svelte';
   let { data } = $props();
 
-  /** Livre dont l'aperçu est ouvert (contrats, ventes, mouvements). */
-  let apercu = $state<any>(null);
+  /** Livre déplié sous sa ligne : le résumé de ses ventes. */
+  let ouvert = $state<string | null>(null);
+  const bascule = (id: string) => (ouvert = ouvert === id ? null : id);
 
   type Col = 'title' | 'date' | 'author' | 'contributor' | 'editor' | 'contract';
   const parution = (d?: string) =>
@@ -73,9 +74,10 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each sorted as b (b.id)}
-        <tr class="cursor-pointer hover:bg-muted/30" onclick={() => (apercu = b)}
-          tabindex="0" role="button" aria-label="Aperçu de {b.title}"
-          onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apercu = b; } }}>
+        {@const id = String(b.id).replace('book:', '')}
+        <tr class="cursor-pointer hover:bg-muted/30 {ouvert === id ? 'bg-muted/40' : ''}" onclick={() => bascule(id)}
+          tabindex="0" role="button" aria-expanded={ouvert === id} aria-label="Ventes de {b.title}"
+          onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bascule(id); } }}>
           <td class="py-1.5 pl-3">
             <span class="block w-9 shrink-0 overflow-hidden rounded-sm border border-border bg-muted">
               {#if b.cover_url}
@@ -85,7 +87,12 @@
               {/if}
             </span>
           </td>
-          <td class="px-3 py-2 font-medium">{b.title}</td>
+          <td class="px-3 py-2 font-medium">
+            <span class="inline-flex items-center gap-1.5">
+              <CaretRight size={12} weight="bold" class="shrink-0 text-muted-foreground transition-transform {ouvert === id ? 'rotate-90' : ''}" />
+              {b.title}
+            </span>
+          </td>
           <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{parution(b.published_at)}</td>
           <td class="px-3 py-2 text-right tabular-nums {b.author_count ? '' : 'text-muted-foreground'}">{b.author_count}</td>
           <td class="px-3 py-2 text-right tabular-nums {b.contributor_count ? '' : 'text-muted-foreground'}">{b.contributor_count}</td>
@@ -100,6 +107,9 @@
             {/if}
           </td>
         </tr>
+        {#if ouvert === id}
+          <tr><td colspan="7" class="p-0"><ResumeVentesLivre bookId={id} /></td></tr>
+        {/if}
       {/each}
       {#if sorted.length === 0}
         <tr><td colspan="7" class="px-3 py-10 text-center text-muted-foreground">Aucun livre.</td></tr>
@@ -107,5 +117,3 @@
     </tbody>
   </table>
 </div>
-
-<ApercuDroitsLivre bind:livre={apercu} />

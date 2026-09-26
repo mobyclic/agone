@@ -53,10 +53,11 @@
         <tr>
           <th class="px-4 py-2 text-left font-medium">Exercice</th>
           <th class="px-3 py-2 text-right font-medium">Stock début</th>
-          <th class="px-3 py-2 text-right font-medium">Entrées</th>
+          <th class="px-3 py-2 text-right font-medium" title="Fabrication et réassorts reçus par le distributeur">Entrées</th>
+          <th class="px-3 py-2 text-right font-medium" title="Sorties de stock autres que les ventes : pilon, destructions, transferts">Sorties</th>
           <th class="px-3 py-2 text-right font-medium">Ventes brutes</th>
           <th class="px-3 py-2 text-right font-medium">Retours</th>
-          <th class="px-3 py-2 text-right font-medium">SP &amp; gratuits</th>
+          <th class="px-3 py-2 text-right font-medium" title="Services de presse et exemplaires gratuits (« SceP &amp; Gratuits » chez Les Belles Lettres)">SP &amp; gratuits</th>
           <th class="px-4 py-2 text-right font-medium">Stock fin</th>
         </tr>
       </thead>
@@ -66,6 +67,7 @@
             <td class="px-4 py-2">{new Date(m.period_start).toLocaleDateString('fr-FR')} → {new Date(m.period_end).toLocaleDateString('fr-FR')}</td>
             <td class="px-3 py-2 text-right tabular-nums">{m.stock_start}</td>
             <td class="px-3 py-2 text-right tabular-nums">{m.entries}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{m.exits}</td>
             <td class="px-3 py-2 text-right tabular-nums font-medium">{m.gross_sales}</td>
             <td class="px-3 py-2 text-right tabular-nums">{Math.abs(m.returns_credited)}</td>
             <td class="px-3 py-2 text-right tabular-nums">{m.free_copies}</td>
