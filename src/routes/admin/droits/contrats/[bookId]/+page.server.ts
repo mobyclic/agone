@@ -45,6 +45,7 @@ export const actions: Actions = {
       scope: S('scope') || 'all',
       base: S('base') || 'ppht',
       net_rate: N('net_rate') ?? 60,
+      share: N('share') ?? 100,
       advance: N('advance') ?? 0,
       advance_recouped: N('advance_recouped') ?? 0,
       status: S('status') || 'active',

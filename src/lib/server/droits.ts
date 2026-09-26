@@ -62,6 +62,8 @@ export interface ContractInput {
   id?: string;
   bookId: string; authorId: string; role: string;
   tiers: Tier[]; scope: string; base: string; net_rate?: number;
+  /** Part du barème revenant à ce contributeur (100 = tout ; 50 pour deux coauteurs). */
+  share?: number;
   advance?: number; advance_recouped?: number; status?: string; notes?: string;
   /** Validité : un avenant en cours d'année = un second contrat qui prend la suite. */
   term_start?: string; term_end?: string; tiers_reset?: boolean;
@@ -70,7 +72,7 @@ export interface ContractInput {
 /** Contrats d'un livre (avec nom d'auteur), indexés par authorId+role. */
 export async function contractsForBook(bookId: string) {
   return query<any>(
-    `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate,
+    `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate, share,
         advance, advance_recouped, status, notes, term_start, term_end
       FROM royalty_contract WHERE book = $b ORDER BY role, term_start`,
     { b: recId('book', bookId) }
@@ -84,6 +86,7 @@ export async function upsertContract(d: ContractInput) {
   const fields = {
     book: recId('book', d.bookId), author: recId('author', d.authorId), role: d.role || 'author',
     tiers, scope: d.scope || 'all', base: d.base || 'ppht', net_rate: d.net_rate ?? 60,
+    share: Math.min(100, Math.max(0, d.share ?? 100)),
     advance: d.advance ?? 0, advance_recouped: d.advance_recouped ?? 0,
     status: d.status || 'active', notes: d.notes || undefined,
     term_start: d.term_start ? new Date(d.term_start) : undefined,
@@ -372,7 +375,7 @@ export interface StatementLine {
   units: number; units_sold: number; units_returned: number; units_provision: number; units_released: number;
   /** Part des unités retenues vendue hors France (taux contractuel réduit de moitié). */
   units_export: number;
-  base_amount: number; rate: number; gross: number; advance_applied: number; net: number;
+  base_amount: number; rate: number; share: number; gross: number; advance_applied: number; net: number;
   /** Portion de l'exercice couverte par ce contrat, quand il n'en couvre qu'une partie. */
   segment_start?: string; segment_end?: string;
 }
@@ -421,7 +424,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
   // de l'exercice, et leur provision sur retours reste à reprendre l'année d'après.
   const contracts = await query<any>(
     `SELECT id, book, book.title AS book_title, book.price_paper AS price_paper, book.price_ebook AS price_ebook,
-        book.vat_rate AS vat_rate, role, tiers, tiers_reset, scope, base, net_rate, advance, advance_recouped,
+        book.vat_rate AS vat_rate, role, tiers, tiers_reset, scope, base, net_rate, share, advance, advance_recouped,
         term_start, term_end
       FROM royalty_contract WHERE author = $a AND status != 'draft'`,
     { a: recId('author', authorId) }
@@ -519,7 +522,10 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
       const partExport = netVendu > 0 ? Math.min(1, exportees / netVendu) : 0;
       const unitesExport = r2(units * partExport);
       const abattement = r2(0.5 * unitesExport * baseUnit * (effRate / 100));
-      const gross = r2(brutPlein - abattement);
+      // Part du contributeur : un barème partagé entre coauteurs se saisit en
+      // pourcentage, les paliers restant comptés sur les ventes du livre.
+      const part = Math.min(100, Math.max(0, Number(c.share ?? 100))) / 100;
+      const gross = r2((brutPlein - abattement) * part);
 
       const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
       const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
@@ -532,7 +538,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
         contract: contractId, book: bookId, book_title: titre, role: c.role, format: c.scope,
         units, units_sold: sold, units_returned: returned, units_provision, units_released,
         units_export: unitesExport,
-        base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net,
+        base_amount: r2(baseUnit), rate: effRate, share: r2(part * 100), gross, advance_applied, net,
         segment_start: partiel && seg ? seg.from.toISOString() : undefined,
         segment_end: partiel && seg ? seg.to.toISOString() : undefined
       });

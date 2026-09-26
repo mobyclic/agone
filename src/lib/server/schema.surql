@@ -381,6 +381,10 @@ DEFINE FIELD OVERWRITE scope       ON royalty_contract TYPE string
 DEFINE FIELD OVERWRITE base        ON royalty_contract TYPE string
   ASSERT $value IN ['ppht','ppttc','net'] DEFAULT 'ppht';   -- prix public HT / TTC / net éditeur
 DEFINE FIELD OVERWRITE net_rate    ON royalty_contract TYPE number DEFAULT 60;  -- % du prix public si base='net'
+-- Part du barème revenant à ce contributeur : un barème 8/9/10 % partagé entre
+-- deux coauteurs se saisit à 50 % chacun (les paliers restent comptés en
+-- exemplaires du livre, seule la somme est partagée).
+DEFINE FIELD OVERWRITE share       ON royalty_contract TYPE number DEFAULT 100 VALUE $value ?? 100;
 -- À-valoir / avance
 DEFINE FIELD OVERWRITE advance          ON royalty_contract TYPE number DEFAULT 0;   -- montant à-valoir
 DEFINE FIELD OVERWRITE advance_recouped ON royalty_contract TYPE number DEFAULT 0;   -- déjà récupéré (cumul)
@@ -478,6 +482,7 @@ DEFINE FIELD OVERWRITE lines.*.units_export    ON royalty_statement TYPE option<
 DEFINE FIELD OVERWRITE lines.*.format          ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE lines.*.base_amount      ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<number>;
+DEFINE FIELD OVERWRITE lines.*.share           ON royalty_statement TYPE option<number>;  -- part du barème (coauteurs)
 DEFINE FIELD OVERWRITE lines.*.gross           ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.advance_applied  ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.net             ON royalty_statement TYPE option<number>;

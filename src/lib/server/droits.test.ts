@@ -196,3 +196,18 @@ test('paliers : l’avenant continue le cumul, sauf s’il repart de zéro', asy
   eq('avenant qui repart de zéro', remise.lines[1].gross, 1000 * 0.06 * PPHT);
   CONTRACTS = [];
 });
+
+// ── Barème partagé entre coauteurs ─────────────────────────────────────────
+test('part du barème : deux coauteurs se partagent la même redevance', async () => {
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [{ format: 'paper', sold: 1000, returned: 0, price: null, end: new Date('2026-06-30') }];
+  CONTRACT = { ...base, tiers: [{ rate: 8 }], advance: 0, advance_recouped: 0 };
+  const entier = await computeStatementForAuthor('a1', P1, P2);
+  eq('sans part, barème entier', entier.lines[0].gross, 1000 * 0.08 * PPHT);
+
+  CONTRACT = { ...base, tiers: [{ rate: 8 }], advance: 0, advance_recouped: 0, share: 50 };
+  const moitie = await computeStatementForAuthor('a1', P1, P2);
+  // Au centime près : la moitié d'un brut déjà arrondi.
+  eq('moitié du barème', moitie.lines[0].gross, entier.lines[0].gross / 2);
+  eq('part enregistrée sur la ligne', moitie.lines[0].share, 50);
+});

@@ -148,7 +148,7 @@
       <TiersEditor initial={ct?.tiers ?? []} />
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-5">
       <label class={lbl}>Périmètre
         <select name="scope" class={input}>
           <option value="all" selected={!ct || ct.scope === 'all'}>Tous supports</option>
@@ -165,6 +165,10 @@
       </label>
       <label class={lbl}>Net éditeur (%)
         <input name="net_rate" type="number" step="1" value={ct?.net_rate ?? 60} class={input} />
+      </label>
+      <label class={lbl} title="Part du barème revenant à ce contributeur : 50 pour un barème partagé entre deux coauteurs">
+        Part du barème (%)
+        <input name="share" type="number" step="1" min="0" max="100" value={ct?.share ?? 100} class={input} />
       </label>
       <label class={lbl}>Statut
         <select name="status" class={input}>
