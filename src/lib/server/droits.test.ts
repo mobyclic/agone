@@ -277,3 +277,11 @@ test('traducteur : 10 % de ce qui reste à l’éditeur sur une cession', async 
   expect(r.lines[0].kind, 'ligne de cession').toBe('cession');
   DEALS = []; PAIEMENTS = [];
 });
+
+test('taux réduit sans à-valoir renseigné : la reddition le signale', async () => {
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0; DEALS = []; PAIEMENTS = [];
+  SALES = [{ format: 'paper', sold: 100, returned: 0, price: null, end: new Date('2026-06-30') }];
+  CONTRACT = { ...base, role: 'translator', tiers: [{ rate: 2 }], advance: 0, advance_recouped: 0, rate_after_advance: 1 };
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  expect(r.warnings.join(' '), 'réserve sur l’à-valoir manquant').toContain('faute d’à-valoir renseigné');
+});

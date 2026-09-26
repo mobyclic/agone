@@ -13,7 +13,7 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // ── Canaux ────────────────────────────────────────────────────
 export async function ensureChannels() {
-  const existing = await query<any>(`SELECT code FROM sales_channel`);
+  const existing = await query<any>(`SELECT code, physical_via_bldd FROM sales_channel`);
   const codes = new Set(existing.map((c) => c.code));
   // Les canaux couvrent les deux origines de ventes : les commandes du site
   // (order.channel) et les relevés du distributeur.
@@ -25,6 +25,17 @@ export async function ensureChannels() {
     { code: 'sortie_editeur', name: 'Sortie éditeur', sort: 4, physical_via_bldd: false }
   ];
   for (const d of defaults) if (!codes.has(d.code)) await query(`CREATE sales_channel CONTENT $d`, { d });
+
+  // Réparation : le drapeau « papier facturé par Les Belles Lettres » a été
+  // ajouté après coup, et un DEFAULT ne vaut qu'à la création — les canaux
+  // existants restaient à NONE. Sans lui, le papier vendu sur le site était
+  // compté deux fois : dans le relevé du site ET dans celui du distributeur.
+  const aReparer = existing.filter((c) => c.physical_via_bldd === undefined || c.physical_via_bldd === null);
+  for (const c of aReparer) {
+    const d = defaults.find((x) => x.code === c.code);
+    if (!d) continue;
+    await query(`UPDATE sales_channel SET physical_via_bldd = $v WHERE code = $c`, { v: d.physical_via_bldd, c: d.code });
+  }
 }
 export async function listChannels() {
   return query<any>(`SELECT id, code, name, sort, physical_via_bldd FROM sales_channel ORDER BY sort ASC`);
@@ -570,6 +581,12 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
       // la part du brut qui solde l'à-valoir reste au premier taux, le reste
       // passe au second.
       const tauxApres = Number(c.rate_after_advance);
+      // Taux dégressif sans à-valoir connu : le taux réduit s'appliquerait dès
+      // le premier exemplaire, ce qui est rarement l'intention. On le dit.
+      if (Number.isFinite(tauxApres) && !(c.advance > 0)) {
+        const alerte = `${titre} — ${ROLE_LABEL_SERVEUR[c.role] ?? c.role} : le taux réduit après amortissement (${tauxApres} %) s’applique dès le premier exemplaire, faute d’à-valoir renseigné sur le contrat.`;
+        if (!warnings.includes(alerte)) warnings.push(alerte);
+      }
       let gross = r2((brutPlein - abattement) * part);
       let effRateAffiche = effRate;
       if (Number.isFinite(tauxApres) && tauxApres >= 0 && effRate > 0 && gross > outstanding && outstanding >= 0) {
@@ -1078,6 +1095,12 @@ export async function detaillerExportBldd(reportId: string) {
   return { traites, avecExport, unitesExport, sansCode };
 }
 
+/** Rôles en clair pour les réserves de calcul (le client a son propre libellé). */
+const ROLE_LABEL_SERVEUR: Record<string, string> = {
+  author: 'auteur', translator: 'traducteur', preface: 'préface', postface: 'postface',
+  illustrator: 'illustration', editor: 'édition', other: 'autre'
+};
+
 // ── Résultats par exercice ─────────────────────────────────────────────────
 
 export interface ExerciceVentes {
@@ -1215,5 +1238,159 @@ export async function diagnosticReddition(periodStart: Date, periodEnd: Date) {
     livres_vendus: avecVentes.size,
     livres_calculables: communs.length,
     vendus_sans_contrat: avecVentes.size - communs.length
+  };
+}
+
+// ── Tableau de bord des droits ─────────────────────────────────────────────
+
+export interface RecapDroits {
+  annee: number;
+  annees: number[];
+  /** Relevés de ventes de l'exercice. */
+  ventes: {
+    mois_couverts: number;
+    vendus: number;
+    retours: number;
+    net: number;
+    ca_ht: number;
+    titres: number;
+    canaux: { code: string; nom: string; vendus: number; retours: number; ca_ht: number }[];
+  };
+  /** Mouvements de stock relevés chez le distributeur. */
+  mouvements: { titres: number; fabriques: number; sp: number };
+  /** Redditions de l'exercice. */
+  redditions: {
+    total: number; brouillons: number; emises: number; payees: number;
+    du: number; a_payer: number; reporte: number;
+  };
+  /** Cessions de droits, sur l'exercice. */
+  cessions: {
+    actives: number;
+    encaisse: number;      // droits vendus, sommes réglées dans l'année
+    du_aux_auteurs: number;
+    a_payer: number;       // droits acquis, sommes réglées dans l'année
+    en_attente: number;    // échéances non pointées, tous sens confondus
+  };
+  /** Couverture contractuelle. */
+  contrats: {
+    total: number; actifs: number; brouillons: number;
+    livres_sous_contrat: number; livres_vendus: number; livres_sans_contrat: number;
+  };
+}
+
+/** Tout ce qu'il faut savoir d'un exercice, en une lecture. */
+export async function recapDroits(anneeDemandee?: number): Promise<RecapDroits> {
+  const courante = new Date().getUTCFullYear();
+  const annee = anneeDemandee && anneeDemandee > 2000 ? anneeDemandee : courante;
+  const debut = new Date(Date.UTC(annee, 0, 1));
+  const fin = new Date(Date.UTC(annee, 11, 31, 23, 59, 59));
+
+  const [lignes, mvts, statements, deals, paiements, contrats, couverture] = await Promise.all([
+    query<any>(
+      `SELECT book, units_sold, units_returned, gross_ht, gross_price,
+              report.channel.code AS canal, report.channel.name AS canal_nom,
+              report.period_start AS ps
+         FROM sales_line WHERE report.period_end >= $s AND report.period_start <= $e`,
+      { s: debut, e: fin }
+    ),
+    query<any>(
+      `SELECT book, entries, free_copies FROM book_period_stock WHERE period_end >= $s AND period_start <= $e`,
+      { s: debut, e: fin }
+    ),
+    query<any>(
+      `SELECT status, total_due, payable, carry_out FROM royalty_statement WHERE period_start >= $s AND period_end <= $e`,
+      { s: debut, e: fin }
+    ),
+    query<any>(`SELECT meta::id(id) AS id, direction, author_share, status FROM rights_deal`),
+    query<any>(`SELECT deal, amount, settled_at FROM rights_payment`),
+    query<any>(`SELECT book, status FROM royalty_contract`),
+    couvertureExercices([annee])
+  ]);
+
+  // Ventes, par canal.
+  const parCanal = new Map<string, any>();
+  const titres = new Set<string>();
+  let vendus = 0, retours = 0, ca = 0;
+  for (const l of lignes) {
+    const v = Number(l.units_sold ?? 0), r = Number(l.units_returned ?? 0);
+    const montant = Number(l.gross_ht ?? 0) || Number(l.gross_price ?? 0) * v;
+    vendus += v; retours += r; ca += montant;
+    if (l.book) titres.add(String(l.book));
+    const code = String(l.canal ?? 'autre');
+    const c = parCanal.get(code) ?? { code, nom: String(l.canal_nom ?? code), vendus: 0, retours: 0, ca_ht: 0 };
+    c.vendus += v; c.retours += r; c.ca_ht += montant;
+    parCanal.set(code, c);
+  }
+
+  // Redditions.
+  const red = { total: statements.length, brouillons: 0, emises: 0, payees: 0, du: 0, a_payer: 0, reporte: 0 };
+  for (const s of statements) {
+    if (s.status === 'draft') red.brouillons++;
+    else if (s.status === 'issued') red.emises++;
+    else if (s.status === 'paid') red.payees++;
+    red.du += Number(s.total_due ?? 0);
+    red.a_payer += Number(s.payable ?? 0);
+    red.reporte += Number(s.carry_out ?? 0);
+  }
+
+  // Cessions : ce qui a été réglé dans l'année, dans un sens comme dans l'autre.
+  const sens = new Map<string, { direction: string; author_share: number }>();
+  for (const d of deals) sens.set(`rights_deal:${d.id}`, { direction: d.direction, author_share: Number(d.author_share ?? 50) });
+  const cess = { actives: deals.filter((d: any) => d.status === 'active').length, encaisse: 0, du_aux_auteurs: 0, a_payer: 0, en_attente: 0 };
+  for (const p of paiements) {
+    const d = sens.get(String(p.deal));
+    if (!d) continue;
+    const montant = Number(p.amount ?? 0);
+    if (!p.settled_at) { cess.en_attente += montant; continue; }
+    const quand = new Date(p.settled_at);
+    if (quand < debut || quand > fin) continue;
+    if (d.direction === 'out') {
+      cess.encaisse += montant;
+      cess.du_aux_auteurs += (montant * d.author_share) / 100;
+    } else cess.a_payer += montant;
+  }
+
+  // Couverture contractuelle.
+  const livresSousContrat = new Set<string>();
+  let actifs = 0, brouillons = 0;
+  for (const c of contrats) {
+    if (c.book) livresSousContrat.add(String(c.book));
+    if (c.status === 'draft') brouillons++;
+    else actifs++;
+  }
+  const sansContrat = [...titres].filter((b) => !livresSousContrat.has(b)).length;
+
+  // Années proposées : celles qui portent des relevés ou des redditions.
+  const [anneesVentes, anneesRed] = await Promise.all([
+    query<any>(`SELECT period_start FROM sales_report`),
+    query<any>(`SELECT period_start FROM royalty_statement`)
+  ]);
+  const annees = new Set<number>([annee, courante, courante - 1]);
+  for (const r of [...anneesVentes, ...anneesRed]) if (r.period_start) annees.add(new Date(r.period_start).getUTCFullYear());
+
+  return {
+    annee,
+    annees: [...annees].sort((a, b) => b - a),
+    ventes: {
+      mois_couverts: couverture[annee] ?? 0,
+      vendus, retours, net: vendus - retours, ca_ht: r2(ca), titres: titres.size,
+      canaux: [...parCanal.values()].map((c) => ({ ...c, ca_ht: r2(c.ca_ht) })).sort((a, b) => b.vendus - a.vendus)
+    },
+    mouvements: {
+      titres: new Set(mvts.map((m: any) => String(m.book))).size,
+      fabriques: mvts.reduce((n: number, m: any) => n + Number(m.entries ?? 0), 0),
+      sp: mvts.reduce((n: number, m: any) => n + Number(m.free_copies ?? 0), 0)
+    },
+    redditions: { ...red, du: r2(red.du), a_payer: r2(red.a_payer), reporte: r2(red.reporte) },
+    cessions: {
+      actives: cess.actives, encaisse: r2(cess.encaisse), du_aux_auteurs: r2(cess.du_aux_auteurs),
+      a_payer: r2(cess.a_payer), en_attente: r2(cess.en_attente)
+    },
+    contrats: {
+      total: contrats.length, actifs, brouillons,
+      livres_sous_contrat: livresSousContrat.size,
+      livres_vendus: titres.size,
+      livres_sans_contrat: sansContrat
+    }
   };
 }

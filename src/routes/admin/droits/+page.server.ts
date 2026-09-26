@@ -1,25 +1,26 @@
 import { redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { ensureChannels, listChannels, listPeriods, getReglagesDroits, setReglagesDroits } from '$lib/server/droits';
+import { ensureChannels, listChannels, getReglagesDroits, setReglagesDroits, recapDroits } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 import { query } from '$lib/server/surreal';
 
 const countOf = (t: string) =>
   query<any>(`SELECT count() AS n FROM ${t} GROUP ALL`).then((r) => r[0]?.n ?? 0);
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
   await ensureChannels();
-  const [channels, periods, contracts, reports, statements, cessions, reglages] = await Promise.all([
+  const annee = Number(url.searchParams.get('annee')) || undefined;
+  const [channels, recap, contracts, reports, statements, cessions, reglages] = await Promise.all([
     listChannels(),
-    listPeriods(),
+    recapDroits(annee),
     countOf('royalty_contract'),
     countOf('sales_report'),
     countOf('royalty_statement'),
     countOf('rights_deal'),
     getReglagesDroits()
   ]);
-  return { channels, periods, reglages, stats: { contracts, reports, statements, cessions } };
+  return { channels, recap, reglages, stats: { contracts, reports, statements, cessions } };
 };
 
 export const actions: Actions = {
