@@ -13,6 +13,8 @@
   const b = $derived(data.book);
   let dirty = $state(false);
   let saving = $state(false);
+  let confirmeSuppression = $state(false);
+  let motSuppression = $state('');
 
   // La fiche contient des liens sortants (contributeurs) : on prévient avant de
   // quitter avec des modifications non enregistrées.
@@ -201,6 +203,49 @@
         <label class={label}>Langue originale <input name="language_original" value={b?.language_original ?? ''} class={input} /></label>
       </div>
 
+      {#if !data.isNew}
+        <!-- Fichier ebook, juste sous le prix numérique auquel il conditionne la vente.
+             Les formulaires d'envoi et de retrait vivent en bas de page (pas de <form>
+             imbriqué) : ces boutons leur sont rattachés par l'attribut form=. -->
+        <div class="rounded-lg border border-border bg-card p-4">
+          <h3 class="eyebrow mb-1">Fichier ebook</h3>
+          <p class="mb-3 text-xs text-muted-foreground">
+            ePub ou PDF, 60 Mo maximum. Jamais public : téléchargeable seulement depuis la bibliothèque des clients
+            qui l'ont acheté. Sans fichier déposé, le format numérique n'est pas mis en vente.
+          </p>
+
+          {#if (form as any)?.ebookError}
+            <p class="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{(form as any).ebookError}</p>
+          {/if}
+
+          {#if data.ebooks.length}
+            <ul class="mb-3 divide-y divide-border rounded-md border border-border">
+              {#each data.ebooks as f (f.id)}
+                <li class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                  <FileText size={18} class="shrink-0 text-muted-foreground" />
+                  <span class="min-w-0 flex-1 truncate font-medium">{f.filename ?? f.id}</span>
+                  <span class="shrink-0 text-xs uppercase text-muted-foreground">{f.format}{f.size ? ` · ${poids(f.size)}` : ''}</span>
+                  <span class="shrink-0 rounded px-2 py-0.5 text-xs {f.status === 'available' ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}">{f.status === 'available' ? 'Disponible' : f.status}</span>
+                  <button type="submit" form="ebook-del-{f.id}" class="grid size-8 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-destructive" aria-label="Retirer le fichier"><Trash size={15} /></button>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="mb-3 flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <Info size={15} /> Aucun fichier déposé{b?.price_ebook ? ' — le prix numérique est renseigné, mais le livre n’est pas vendable en ePub.' : '.'}
+            </p>
+          {/if}
+
+          <div class="flex flex-wrap items-center gap-3">
+            <input type="file" name="file" form="ebook-upload" accept=".epub,.pdf,application/epub+zip,application/pdf" required
+              class="min-w-0 flex-1 text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted" />
+            <Button type="submit" form="ebook-upload" variant="outline" disabled={envoiEbook}>
+              {#if envoiEbook}<Spinner size={16} class="animate-spin" /> Dépôt…{:else}<FileArrowUp size={16} /> Déposer{/if}
+            </Button>
+          </div>
+        </div>
+      {/if}
+
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Autres images (4e de couverture, photos…)</h3>
         {#key b?.id}<GalleryUpload name="galleryIds" initial={b?.gallery ?? []} folder="livres/galerie" label="" />{/key}
@@ -221,51 +266,16 @@
 </form>
 
 {#if !data.isNew}
-  <!-- Fichiers ebook : déposés sur le stockage privé, servis seulement aux acheteurs
-       (cf. /api/ebook/[id]/download) et à l'équipe. -->
-  <section class="mb-8 rounded-lg border border-border bg-card p-4 lg:max-w-3xl">
-    <h3 class="eyebrow mb-1">Fichier ebook</h3>
-    <p class="mb-3 text-xs text-muted-foreground">
-      ePub ou PDF, 60 Mo maximum. Le fichier n'est jamais public : il n'est téléchargeable que depuis la
-      bibliothèque des clients qui l'ont acheté. Sans fichier déposé, le format numérique n'est pas mis en vente.
-    </p>
-
-    {#if (form as any)?.ebookError}
-      <p class="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{(form as any).ebookError}</p>
-    {/if}
-
-    {#if data.ebooks.length}
-      <ul class="mb-3 divide-y divide-border rounded-md border border-border">
-        {#each data.ebooks as f (f.id)}
-          <li class="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
-            <FileText size={18} class="shrink-0 text-muted-foreground" />
-            <span class="min-w-0 flex-1 truncate font-medium">{f.filename ?? f.id}</span>
-            <span class="shrink-0 text-xs uppercase text-muted-foreground">{f.format}{f.size ? ` · ${poids(f.size)}` : ''}</span>
-            <span class="shrink-0 rounded px-2 py-0.5 text-xs {f.status === 'available' ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}">{f.status === 'available' ? 'Disponible' : f.status}</span>
-            <form method="POST" action="?/ebookSupprimer" use:enhance class="shrink-0"
-              onsubmit={(e) => { if (!confirm('Retirer ce fichier ? Les clients qui l’ont acheté n’y auront plus accès.')) e.preventDefault(); }}>
-              <input type="hidden" name="assetId" value={f.id} />
-              <button type="submit" class="grid size-8 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-destructive" aria-label="Retirer le fichier"><Trash size={15} /></button>
-            </form>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="mb-3 flex items-center gap-1.5 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-        <Info size={15} /> Aucun fichier déposé{b?.price_ebook ? ' — le prix numérique est renseigné, mais le livre n’est pas vendable en ePub.' : '.'}
-      </p>
-    {/if}
-
-    <form method="POST" action="?/ebook" enctype="multipart/form-data"
-      use:enhance={() => { envoiEbook = true; return async ({ update }) => { await update({ reset: true }); envoiEbook = false; }; }}
-      class="flex flex-wrap items-center gap-3">
-      <input type="file" name="file" accept=".epub,.pdf,application/epub+zip,application/pdf" required
-        class="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted" />
-      <Button type="submit" variant="outline" disabled={envoiEbook}>
-        {#if envoiEbook}<Spinner size={16} class="animate-spin" /> Dépôt…{:else}<FileArrowUp size={16} /> Déposer{/if}
-      </Button>
+  <!-- Formulaires rattachés aux boutons de la colonne de droite (un <form> ne peut
+       pas en contenir un autre : l'attribut form= fait le lien). -->
+  <form id="ebook-upload" method="POST" action="?/ebook" enctype="multipart/form-data"
+    use:enhance={() => { envoiEbook = true; return async ({ update }) => { await update({ reset: true }); envoiEbook = false; }; }}></form>
+  {#each data.ebooks as f (f.id)}
+    <form id="ebook-del-{f.id}" method="POST" action="?/ebookSupprimer" use:enhance
+      onsubmit={(e) => { if (!confirm('Retirer ce fichier ? Les clients qui l’ont acheté n’y auront plus accès.')) e.preventDefault(); }}>
+      <input type="hidden" name="assetId" value={f.id} />
     </form>
-  </section>
+  {/each}
 
   <!-- Ce que ce titre a vendu, année par année (administrateurs). -->
   {#if data.ventes.length}
@@ -277,10 +287,37 @@
     </section>
   {/if}
 
-  <form method="POST" action="?/delete" use:enhance class="border-t border-border pt-4 pb-24">
-    <Button type="submit" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10"
-      onclick={(e: Event) => { if (!confirm('Supprimer définitivement ce livre ?')) e.preventDefault(); }}>
+  <!-- Suppression : irréversible, et le livre emporte contrats, ventes et commandes
+       passées. D'où la saisie du mot plutôt qu'un simple « êtes-vous sûr ? ». -->
+  <form id="supprimer-livre" method="POST" action="?/delete" use:enhance class="border-t border-border pt-4 pb-24">
+    <Button type="button" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10" onclick={() => { motSuppression = ''; confirmeSuppression = true; }}>
       <Trash size={15} /> Supprimer ce livre
     </Button>
   </form>
+
+  {#if confirmeSuppression}
+    <div class="fixed inset-0 z-[80] grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="titre-suppression">
+      <button type="button" class="absolute inset-0 cursor-default bg-black/60" aria-label="Annuler" onclick={() => (confirmeSuppression = false)}></button>
+      <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-2xl">
+        <h3 id="titre-suppression" class="text-lg font-bold">Supprimer « {b?.title} » ?</h3>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Cette suppression est définitive : la fiche, ses contributeurs, ses contrats de droits et son historique de
+          ventes disparaissent. Les commandes déjà passées perdent leur référence.
+        </p>
+        <label class="mt-4 block text-sm font-medium">
+          Tapez <span class="font-mono font-bold">SUPPRIMER</span> pour confirmer
+          <!-- svelte-ignore a11y_autofocus -->
+          <input bind:value={motSuppression} autofocus autocomplete="off" spellcheck="false"
+            class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none focus:border-destructive" />
+        </label>
+        <div class="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="outline" size="sm" onclick={() => (confirmeSuppression = false)}>Annuler</Button>
+          <Button type="submit" form="supprimer-livre" size="sm" disabled={motSuppression.trim() !== 'SUPPRIMER'}
+            class="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-40">
+            <Trash size={15} /> Supprimer définitivement
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
 {/if}

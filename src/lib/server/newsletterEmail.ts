@@ -70,12 +70,15 @@ async function resolveBooks(blocks: NlBlock[]): Promise<Map<string, { title: str
 
 export async function renderIssueEmail(articleId: string): Promise<string | null> {
   const rows = await query<any>(
-    `SELECT title, newsletter_blocks AS blocks FROM article WHERE id = $id LIMIT 1`,
+    `SELECT title, newsletter_blocks AS blocks, body_html FROM article WHERE id = $id LIMIT 1`,
     { id: recId('article', articleId) }
   );
   const a = rows[0];
   if (!a) return null;
-  const blocks: NlBlock[] = Array.isArray(a.blocks) ? a.blocks : [];
+  // Numéros migrés de WordPress : aucun bloc, tout est dans body_html. Sans ce
+  // repli, l'aperçu ne montrait qu'un en-tête et un pied de page vides.
+  let blocks: NlBlock[] = Array.isArray(a.blocks) ? a.blocks : [];
+  if (!blocks.length && a.body_html) blocks = [{ type: 'text', html: String(a.body_html) } as NlBlock];
   const [company, bookMap] = await Promise.all([getCompany(), resolveBooks(blocks)]);
   const { title, numero } = splitNumero(a.title);
   const address = (company.address || '18, boulevard de Paris\n13003 Marseille')
@@ -105,8 +108,11 @@ export async function renderIssueEmail(articleId: string): Promise<string | null
 <body style="margin:0;padding:0;background:#f4f4f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;"><tr><td align="center" style="padding:16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;">
-  <tr><td style="padding:22px;text-align:center;border-bottom:3px solid ${INK};">
-    <span style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:bold;letter-spacing:2px;color:${INK};text-transform:uppercase;">Agone</span>
+  <!-- Le wordmark du site : bande encre, A initial en italique, A et E agrandis. -->
+  <tr><td style="background:${INK};padding:16px 24px;">
+    <a href="${SITE}" target="_blank" style="text-decoration:none;color:#ffffff;">
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:32px;line-height:1;color:#ffffff;text-transform:uppercase;letter-spacing:-0.5px;"><span style="font-style:italic;font-size:45px;">A</span>GON<span style="font-size:45px;">E</span></span>
+    </a>
   </td></tr>
   <tr><td style="padding:26px 32px 4px;text-align:center;">
     <h1 style="margin:0;color:${RED};font-family:Verdana,Geneva,sans-serif;font-size:24px;line-height:1.25;">${esc(title)}</h1>

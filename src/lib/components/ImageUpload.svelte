@@ -56,10 +56,12 @@
 
 <div class={klass}>
   <span class="mb-1.5 block text-sm font-medium">{label}</span>
-  <div class="flex items-center gap-3">
+  <!-- L'aperçu montre l'image ENTIÈRE (une couverture rognée ne se relit pas),
+       sur un tiers du cadre ; la zone de dépôt occupe le reste. -->
+  <div class="flex items-start gap-3">
     {#if url}
-      <div class="relative">
-        <img src={url} alt="" class="size-20 rounded-lg border border-border object-cover" />
+      <div class="relative w-1/3 shrink-0">
+        <img src={url} alt="" class="block w-full rounded-lg border border-border object-contain" />
         <button type="button" onclick={clear} class="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-destructive text-destructive-foreground shadow">
           <X size={13} />
         </button>
@@ -69,7 +71,7 @@
       type="button"
       onclick={() => input.click()}
       disabled={busy}
-      class="flex h-20 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-link disabled:opacity-60"
+      class="flex min-h-20 flex-1 items-center justify-center gap-2 self-stretch rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-link disabled:opacity-60"
     >
       {#if busy}<Spinner size={18} class="animate-spin" /> Envoi…{:else}<UploadSimple size={18} /> {url ? 'Remplacer' : 'Choisir un fichier'}{/if}
     </button>

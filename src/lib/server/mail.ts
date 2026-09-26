@@ -76,7 +76,8 @@ export async function sendMail(
 function layout(title: string, inner: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Georgia,'Times New Roman',serif;color:#171717">
   <div style="max-width:520px;margin:0 auto;padding:32px 20px">
-    <div style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#141414">AGONE</div>
+    <!-- Le wordmark du site : A initial en italique, A et E agrandis. -->
+    <div style="font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:24px;line-height:1;text-transform:uppercase;letter-spacing:-0.5px;color:#141414"><span style="font-style:italic;font-size:34px;">A</span>GON<span style="font-size:34px;">E</span></div>
     <div style="background:#fff;border:1px solid #e7e5e4;border-radius:14px;padding:28px;margin-top:16px">
       <h1 style="font-size:19px;margin:0 0 12px">${title}</h1>
       ${inner}
