@@ -10,24 +10,13 @@
   const STATUS: Record<string, string> = { draft: 'Brouillon', issued: 'Émise', paid: 'Payée' };
   const input = 'h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
 
-  // Champs de période liés + raccourcis.
+  // L'arrêté des comptes se fait par exercice ; la période libre reste possible
+  // pour les cas particuliers (un semestre, un rattrapage).
+  let annee = $state(new Date().getUTCFullYear());
+  let periodeLibre = $state(false);
   let start = $state(untrack(() => data.start ?? ''));
   let end = $state(untrack(() => data.end ?? ''));
-  const iso = (d: Date) => {
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  };
-  function setPeriod(kind: 'month' | 'prevMonth' | 'year' | 'prevYear') {
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    let s: Date, e: Date;
-    if (kind === 'year') { s = new Date(y, 0, 1); e = new Date(y, 11, 31); }
-    else if (kind === 'prevYear') { s = new Date(y - 1, 0, 1); e = new Date(y - 1, 11, 31); }
-    else if (kind === 'month') { s = new Date(y, m, 1); e = new Date(y, m + 1, 0); }
-    else { s = new Date(y, m - 1, 1); e = new Date(y, m, 0); }
-    start = iso(s); end = iso(e);
-  }
-  const preset = 'rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground';
+  const moisReleves = $derived(data.couverture?.[annee] ?? 0);
 </script>
 
 <svelte:head><title>Reddition de comptes · Admin</title></svelte:head>
@@ -37,19 +26,47 @@
 <p class="mb-6 text-sm text-muted-foreground">Génère les droits dus par auteur sur une période, à partir des contrats et des ventes.</p>
 
 <div class="mb-6 rounded-lg border border-border bg-card p-5">
-  <h3 class="eyebrow mb-3">Générer une reddition</h3>
+  <h3 class="eyebrow mb-1">Arrêter un exercice</h3>
+  <p class="mb-3 max-w-3xl text-xs text-muted-foreground">
+    Calcule, pour chaque auteur, les droits dus sur l’exercice : ventes relevées, provision sur retours, à-valoir amorti,
+    report à nouveau et seuil de paiement. Les redditions sont créées en brouillon — rien n’est engagé tant qu’elles ne
+    sont pas émises. Relancer refait les brouillons sans toucher à ce qui est déjà émis ou payé.
+  </p>
   {#if form?.error}<p class="mb-3 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
-  <div class="mb-3 flex flex-wrap gap-1.5">
-    <button type="button" class={preset} onclick={() => setPeriod('month')}>Mois en cours</button>
-    <button type="button" class={preset} onclick={() => setPeriod('prevMonth')}>Mois précédent</button>
-    <button type="button" class={preset} onclick={() => setPeriod('year')}>Année en cours</button>
-    <button type="button" class={preset} onclick={() => setPeriod('prevYear')}>Année précédente</button>
-  </div>
+
   <form method="POST" action="?/generate" use:enhance class="flex flex-wrap items-end gap-3">
-    <label class="text-xs font-medium text-muted-foreground">Début<br /><input name="period_start" type="date" required bind:value={start} class="{input} mt-1" /></label>
-    <label class="text-xs font-medium text-muted-foreground">Fin<br /><input name="period_end" type="date" required bind:value={end} class="{input} mt-1" /></label>
-    <Button type="submit"><Coins size={15} /> Générer</Button>
+    {#if periodeLibre}
+      <label class="text-xs font-medium text-muted-foreground">Début<br /><input name="period_start" type="date" required bind:value={start} class="{input} mt-1" /></label>
+      <label class="text-xs font-medium text-muted-foreground">Fin<br /><input name="period_end" type="date" required bind:value={end} class="{input} mt-1" /></label>
+    {:else}
+      <label class="text-xs font-medium text-muted-foreground">Exercice<br />
+        <select name="annee" bind:value={annee} class="{input} mt-1 w-40">
+          {#each data.annees as a (a)}<option value={a}>{a}</option>{/each}
+        </select>
+      </label>
+    {/if}
+    <Button type="submit"><Coins size={15} /> Générer la reddition</Button>
   </form>
+
+  {#if !periodeLibre}
+    <!-- Un exercice incomplet donne des droits provisoires : autant le dire avant. -->
+    <p class="mt-3 text-xs {moisReleves === 12 ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-500'}">
+      {#if moisReleves === 12}
+        Ventes relevées sur les douze mois de {annee}.
+      {:else if moisReleves === 0}
+        Aucune vente relevée sur {annee} — commencez par <a href="/admin/droits/ventes" class="underline">relever l’exercice</a>.
+      {:else}
+        Attention : {annee} n’est relevé que sur {moisReleves} mois sur douze. Les droits calculés seront provisoires —
+        <a href="/admin/droits/ventes" class="underline">compléter le relevé</a>.
+      {/if}
+    </p>
+  {/if}
+  <p class="mt-2 text-xs text-muted-foreground">
+    <button type="button" class="text-link hover:underline" onclick={() => (periodeLibre = !periodeLibre)}>
+      {periodeLibre ? 'Revenir à un exercice entier' : 'Arrêter une autre période (un semestre, un rattrapage)'}
+    </button>
+  </p>
+
   {#if data.periods.length}
     <div class="mt-4 flex flex-wrap gap-2">
       {#each data.periods as p (p.period_start)}

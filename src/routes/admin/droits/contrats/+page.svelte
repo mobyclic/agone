@@ -1,16 +1,26 @@
 <script lang="ts">
   import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
+  import ApercuDroitsLivre from '$lib/components/ApercuDroitsLivre.svelte';
   let { data } = $props();
 
-  type Col = 'title' | 'author' | 'contributor' | 'editor' | 'contract';
+  /** Livre dont l'aperçu est ouvert (contrats, ventes, mouvements). */
+  let apercu = $state<any>(null);
+
+  type Col = 'title' | 'date' | 'author' | 'contributor' | 'editor' | 'contract';
+  const parution = (d?: string) =>
+    d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
   let sortCol = $state<Col>('title');
   let sortDir = $state<'asc' | 'desc'>('asc');
   function sortBy(col: Col) {
     if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    // Un titre se lit de A à Z, un nombre et une date du plus grand au plus petit.
     else { sortCol = col; sortDir = col === 'title' ? 'asc' : 'desc'; }
   }
   const val = (b: any, col: Col) =>
-    col === 'author' ? b.author_count
+    // Sans date de parution, le livre part en fin de liste dans les deux sens.
+    col === 'date' ? (b.published_at ? +new Date(b.published_at) : 0)
+    : col === 'author' ? b.author_count
     : col === 'contributor' ? b.contributor_count
     : col === 'editor' ? b.editor_count
     : col === 'contract' ? b.contract_total
@@ -28,7 +38,7 @@
 
 <a href="/admin/droits" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Droits d’auteur</a>
 <h2 class="text-xl font-bold">Contrats par livre</h2>
-<p class="mb-4 text-sm text-muted-foreground">Sélectionnez un livre pour définir les contrats de ses contributeurs.</p>
+<p class="mb-4 text-sm text-muted-foreground">Cliquez sur un livre pour voir ses contrats, ses ventes et ses mouvements de stock.</p>
 
 <form method="GET" class="mb-4 max-w-md">
   <div class="relative">
@@ -52,7 +62,9 @@
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
       <tr>
+        <th class="w-10 px-3 py-2"></th>
         {@render sortable('Livre', 'title')}
+        {@render sortable('Parution', 'date')}
         {@render sortable('Auteurs', 'author', 'right')}
         {@render sortable('Contributeurs', 'contributor', 'right')}
         {@render sortable('Éditeurs', 'editor', 'right')}
@@ -61,8 +73,20 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each sorted as b (b.id)}
-        <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2"><a href="/admin/droits/contrats/{String(b.id).replace('book:', '')}" class="font-medium hover:text-link">{b.title}</a></td>
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={() => (apercu = b)}
+          tabindex="0" role="button" aria-label="Aperçu de {b.title}"
+          onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apercu = b; } }}>
+          <td class="py-1.5 pl-3">
+            <span class="block w-9 shrink-0 overflow-hidden rounded-sm border border-border bg-muted">
+              {#if b.cover_url}
+                <img src={b.cover_url} alt="" loading="lazy" class="block aspect-[2/3] w-full object-cover" />
+              {:else}
+                <span class="block aspect-[2/3] w-full bg-ink"></span>
+              {/if}
+            </span>
+          </td>
+          <td class="px-3 py-2 font-medium">{b.title}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{parution(b.published_at)}</td>
           <td class="px-3 py-2 text-right tabular-nums {b.author_count ? '' : 'text-muted-foreground'}">{b.author_count}</td>
           <td class="px-3 py-2 text-right tabular-nums {b.contributor_count ? '' : 'text-muted-foreground'}">{b.contributor_count}</td>
           <td class="px-3 py-2 text-right tabular-nums {b.editor_count ? '' : 'text-muted-foreground'}">{b.editor_count}</td>
@@ -78,8 +102,10 @@
         </tr>
       {/each}
       {#if sorted.length === 0}
-        <tr><td colspan="5" class="px-3 py-10 text-center text-muted-foreground">Aucun livre.</td></tr>
+        <tr><td colspan="7" class="px-3 py-10 text-center text-muted-foreground">Aucun livre.</td></tr>
       {/if}
     </tbody>
   </table>
 </div>
+
+<ApercuDroitsLivre bind:livre={apercu} />

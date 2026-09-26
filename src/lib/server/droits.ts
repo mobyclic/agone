@@ -137,11 +137,11 @@ export async function getBookLite(bookId: string) {
 
 /** Couverture contractuelle du catalogue : livres ayant ≥1 contributeur, avec nb de contrats. */
 export async function contractCoverage(opts: { q?: string; limit?: number } = {}) {
-  const vars: Record<string, unknown> = { limit: opts.limit ?? 100 };
+  const vars: Record<string, unknown> = { limit: opts.limit ?? 1000 };
   let where = 'array::len(->contributed_by) > 0';
   if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where += ' AND string::lowercase(title) CONTAINS $q'; }
   const books = await query<any>(
-    `SELECT id, title, slug,
+    `SELECT id, title, slug, published_at, cover.url AS cover_url,
         array::len(->contributed_by[WHERE role = 'author']) AS author_count,
         array::len(->contributed_by[WHERE role = 'editor']) AS editor_count,
         array::len(->contributed_by[WHERE role != 'author' AND role != 'editor']) AS contributor_count
@@ -1070,4 +1070,26 @@ export async function ventesParExerciceAuteur(authorId: string) {
   const ids = (Array.isArray(livres) ? livres.flat() : []).map((b: any) => String(b));
   if (!ids.length) return [];
   return ventesParExercice(`book IN $livres`, { livres: ids.map((i) => recId('book', i.replace(/^book:/, ''))) });
+}
+
+/**
+ * Couverture des relevés de ventes, exercice par exercice : combien de mois de
+ * l'année sont couverts. Avant d'arrêter les comptes, mieux vaut savoir que
+ * l'exercice n'est relevé que sur huit mois.
+ */
+export async function couvertureExercices(annees: number[]): Promise<Record<number, number>> {
+  const rapports = await query<any>(`SELECT period_start, period_end FROM sales_report`);
+  const parAnnee: Record<number, Set<number>> = {};
+  for (const a of annees) parAnnee[a] = new Set<number>();
+  for (const r of rapports) {
+    if (!r.period_start) continue;
+    const debut = new Date(r.period_start), fin = new Date(r.period_end ?? r.period_start);
+    for (const a of annees) {
+      if (debut.getUTCFullYear() > a || fin.getUTCFullYear() < a) continue;
+      const premier = debut.getUTCFullYear() === a ? debut.getUTCMonth() : 0;
+      const dernier = fin.getUTCFullYear() === a ? fin.getUTCMonth() : 11;
+      for (let m = premier; m <= dernier; m++) parAnnee[a].add(m);
+    }
+  }
+  return Object.fromEntries(annees.map((a) => [a, parAnnee[a].size]));
 }
