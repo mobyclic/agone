@@ -5,12 +5,14 @@ import {
   getBookAdmin, upsertBook, setBookContributors, deleteBook, allCollections, allRubriques, allBookKeywords, resoudreLivreAdmin,
   ebookAssetsForBook, ajouterEbookAsset, supprimerEbookAsset, type BookInput
 } from '$lib/server/catalogue';
+import { ventesParExerciceLivre } from '$lib/server/droits';
+import { isAdmin } from '$lib/roles';
 import { withFlash } from '$lib/toasts';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
   const [collections, rubriques, allKeywords] = await Promise.all([allCollections(), allRubriques(), allBookKeywords()]);
   if (params.id === 'nouveau') {
-    return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords, ebooks: [] };
+    return { isNew: true, book: null, contributors: [], collections, rubriques, allKeywords, ebooks: [], ventes: [] };
   }
   // Adresse lisible : /admin/catalogue/<slug>. Les anciens liens par id redirigent.
   const livre = await resoudreLivreAdmin(params.id);
@@ -25,7 +27,9 @@ export const load: PageServerLoad = async ({ params }) => {
     role: c.role,
     share: c.share ?? 100
   }));
-  return { isNew: false, book: data.book, contributors, collections, rubriques, allKeywords, ebooks: await ebookAssetsForBook(livre.id) };
+    // Ventes par exercice : chiffres de droits d'auteur, réservés aux administrateurs.
+  const ventes = isAdmin(locals.user?.role) ? await ventesParExerciceLivre(livre.id) : [];
+  return { isNew: false, book: data.book, contributors, collections, rubriques, allKeywords, ebooks: await ebookAssetsForBook(livre.id), ventes };
 };
 
 export const actions: Actions = {

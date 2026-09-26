@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button';
   import { ROLE_LABEL } from '$lib/labels';
   import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
+  import VentesExercices from '$lib/components/VentesExercices.svelte';
 
   let { data } = $props();
   const input = 'h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary';
@@ -28,6 +29,8 @@
     Vide = défaut de la maison ({data.reglages.provision_rate} %). Retenue sur les ventes de l'exercice, reprise à l'exercice suivant.
   </p>
 </form>
+
+<div class="mb-6"><VentesExercices exercices={data.ventes} /></div>
 
 <!-- Mouvements de stock relevés chez le distributeur : ce qui a été fabriqué,
      vendu, rendu et donné en service de presse sur chaque exercice importé. -->

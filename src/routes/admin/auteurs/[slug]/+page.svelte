@@ -4,6 +4,7 @@
   import RichEditor from '$lib/components/RichEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Coins, Warning, Eye, Spinner, Books } from 'phosphor-svelte';
+  import VentesExercices from '$lib/components/VentesExercices.svelte';
   import { euros, BOOK_STATUS_LABEL } from '$lib/labels';
 
   let { data, form } = $props();
@@ -143,8 +144,11 @@
     {/if}
   </div>
 
-  <!-- Droits d'auteur par année — admins uniquement. -->
+  <!-- Ventes puis droits, par année — admins uniquement. -->
   {#if data.canSeeRoyalties}
+  <div class="mt-8">
+    <VentesExercices exercices={data.ventes} titre="Ventes de ses titres, par exercice" />
+  </div>
   <div class="mt-8">
     <h3 class="mb-3 flex items-center gap-2 text-base font-semibold"><Coins size={17} /> Droits d'auteur par année</h3>
     {#if byYear.length}

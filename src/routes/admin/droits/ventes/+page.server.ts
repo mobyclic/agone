@@ -1,12 +1,13 @@
 import { redirect, fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { listReports, listChannels, createReport, addSalesLines, deleteReport, genererRelevesDepuisCommandes, importVentesBldd, importMouvementsBldd, detaillerExportBldd } from '$lib/server/droits';
+import { listReports, listChannels, createReport, addSalesLines, deleteReport } from '$lib/server/droits';
+import { lancerCollecte, etatCollecte } from '$lib/server/droits-job';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
   const [reports, channels] = await Promise.all([listReports(), listChannels()]);
-  return { reports, channels };
+  return { reports, channels, collecte: etatCollecte() };
 };
 
 /** Parse un collage CSV/TSV : ISBN, unités_vendues[, retours][, format][, prix]. */
@@ -43,69 +44,22 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/droits/ventes', `Relevé créé (${n} lignes).`, 'success'));
   },
 
-  /** Relevés des canaux directs, reconstruits depuis les commandes de la période. */
-  depuisCommandes: async ({ request, locals }) => {
+  /**
+   * Relevé complet d'une période : toutes les sources, en tâche de fond.
+   * L'action rend la main aussitôt ; la page suit l'avancement.
+   */
+  collecte: async ({ request, locals }) => {
     requireAdmin(locals);
     const fd = await request.formData();
+    const annee = Number(fd.get('annee'));
     const start = String(fd.get('period_start') || '');
     const end = String(fd.get('period_end') || '');
-    if (!start || !end) return fail(400, { error: 'Période requise.' });
-    const res = await genererRelevesDepuisCommandes(new Date(start), new Date(end));
-    const resume = res.length
-      ? res.map((r) => `${r.canal} : ${r.lignes} ligne(s), ${r.unites} ex.`).join(' · ')
-      : 'aucune vente sur la période';
-    throw redirect(303, withFlash('/admin/droits/ventes', `Relevés générés — ${resume}`, 'success'));
-  },
-
-  /** Relevé du distributeur, récupéré sur l'extranet BLDD (lecture seule). */
-  depuisBldd: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    const start = String(fd.get('period_start') || '');
-    const end = String(fd.get('period_end') || '');
-    if (!start || !end) return fail(400, { error: 'Période requise.' });
-    try {
-      const r = await importVentesBldd(new Date(start), new Date(end));
-      const inconnus = r.inconnus.length ? ` · ${r.inconnus.length} ISBN inconnus du catalogue` : '';
-      throw redirect(303, withFlash('/admin/droits/ventes',
-        `BLDD : ${r.lignes} titres, ${r.vendus} vendus, ${r.retours} retours, ${r.prix_public_ht} € prix public HT (facturé ${r.facture_ht} €)${inconnus}`, 'success'));
-    } catch (e) {
-      if (e instanceof Response || (e as any)?.status === 303) throw e;
-      return fail(502, { error: `Extranet BLDD : ${e instanceof Error ? e.message : 'échec'}` });
-    }
-  },
-
-  /** Mouvements de stock du distributeur : ouverture, fabrication, SP, clôture. */
-  mouvements: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    const start = String(fd.get('period_start') || '');
-    const end = String(fd.get('period_end') || '');
-    if (!start || !end) return fail(400, { error: 'Période requise.' });
-    try {
-      const r = await importMouvementsBldd(new Date(start), new Date(end));
-      throw redirect(303, withFlash('/admin/droits/ventes',
-        `Mouvements BLDD : ${r.titres} titres sur ${r.mois} mois${r.inconnus ? ` · ${r.inconnus} ISBN inconnus` : ''}`, 'success'));
-    } catch (e) {
-      if (e instanceof Response || (e as any)?.status === 303) throw e;
-      return fail(502, { error: `Extranet BLDD : ${e instanceof Error ? e.message : 'échec'}` });
-    }
-  },
-
-  /** Part des ventes hors France d'un relevé (une requête par titre, c'est long). */
-  export: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    const id = String(fd.get('reportId') || '');
-    if (!id) return fail(400, { error: 'Relevé manquant.' });
-    try {
-      const r = await detaillerExportBldd(id);
-      throw redirect(303, withFlash('/admin/droits/ventes',
-        `Export : ${r.unitesExport} ex. hors France sur ${r.avecExport} titres (${r.traites} examinés${r.sansCode ? `, ${r.sansCode} sans code BLDD` : ''})`, 'success'));
-    } catch (e) {
-      if (e instanceof Response || (e as any)?.status === 303) throw e;
-      return fail(502, { error: `Extranet BLDD : ${e instanceof Error ? e.message : 'échec'}` });
-    }
+    const debut = Number.isFinite(annee) && annee > 2000 ? new Date(Date.UTC(annee, 0, 1)) : start ? new Date(start) : null;
+    const fin = Number.isFinite(annee) && annee > 2000 ? new Date(Date.UTC(annee, 11, 31)) : end ? new Date(end) : null;
+    if (!debut || !fin || Number.isNaN(+debut) || Number.isNaN(+fin)) return fail(400, { error: 'Période requise.' });
+    if (fin < debut) return fail(400, { error: 'La fin de période précède son début.' });
+    lancerCollecte({ start: debut, end: fin, avecExport: fd.get('avecExport') === 'on' });
+    return { lance: true };
   },
 
   delete: async ({ request, locals }) => {

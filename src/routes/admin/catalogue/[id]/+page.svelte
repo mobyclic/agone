@@ -7,6 +7,7 @@
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner, Lock, LockOpen, Warning, FileArrowUp, FileText, Info } from 'phosphor-svelte';
+  import VentesExercices from '$lib/components/VentesExercices.svelte';
 
   let { data, form } = $props();
   const b = $derived(data.book);
@@ -265,6 +266,16 @@
       </Button>
     </form>
   </section>
+
+  <!-- Ce que ce titre a vendu, année par année (administrateurs). -->
+  {#if data.ventes.length}
+    <section class="mb-8">
+      <VentesExercices exercices={data.ventes} />
+      <a href="/admin/droits/contrats/{String(b?.id ?? '').replace('book:', '')}" class="mt-2 inline-block text-sm text-link hover:underline">
+        Contrats, provision et mouvements de stock de ce titre →
+      </a>
+    </section>
+  {/if}
 
   <form method="POST" action="?/delete" use:enhance class="border-t border-border pt-4 pb-24">
     <Button type="submit" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10"

@@ -657,6 +657,9 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
   );
   for (const a of anciens) await deleteReport(String(a.id).replace(/^sales_report:/, ''));
 
+  // Période sans aucune vente : on ne laisse pas un relevé vide derrière nous.
+  if (!utiles.length) return { reportId: '', lignes: 0, vendus: 0, retours: 0, prix_public_ht: 0, facture_ht: 0, inconnus: [] as string[] };
+
   const reportId = await createReport({
     channelId, period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(), label: 'auto'
   });
@@ -680,6 +683,7 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
   for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
 
   return {
+    reportId,
     lignes: rows.length,
     vendus: utiles.reduce((n, v) => n + v.units_sold, 0),
     retours: utiles.reduce((n, v) => n + v.units_returned, 0),
@@ -817,4 +821,96 @@ export async function detaillerExportBldd(reportId: string) {
     await new Promise((r) => setTimeout(r, 120)); // courtoisie envers l'extranet
   }
   return { traites, avecExport, unitesExport, sansCode };
+}
+
+// ── Résultats par exercice ─────────────────────────────────────────────────
+
+export interface ExerciceVentes {
+  annee: number;
+  vendus: number;
+  retours: number;
+  net: number;
+  export: number;
+  ca_ht: number;
+  mois_couverts: number;
+  complete: boolean;
+  canaux: { code: string; nom: string; vendus: number; retours: number }[];
+}
+
+/**
+ * Ventes relevées, regroupées par exercice (année civile) et par canal.
+ *
+ * `complete` dit si les douze mois de l'année sont couverts par des relevés ET
+ * si l'année est révolue : un exercice incomplet ne peut pas être arrêté, et
+ * les chiffres affichés n'y valent qu'à titre indicatif.
+ */
+async function ventesParExercice(filtre: string, vars: Record<string, unknown>): Promise<ExerciceVentes[]> {
+  const lignes = await query<any>(
+    `SELECT report.period_start AS ps, report.period_end AS pe,
+            report.channel.code AS canal, report.channel.name AS canal_nom,
+            units_sold, units_returned, units_export, gross_ht, gross_price
+       FROM sales_line WHERE ${filtre}`,
+    vars
+  );
+
+  const parAnnee = new Map<number, ExerciceVentes & { _mois: Set<number>; _canaux: Map<string, any> }>();
+  for (const l of lignes) {
+    if (!l.ps) continue;
+    const debut = new Date(l.ps), fin = new Date(l.pe ?? l.ps);
+    const annee = debut.getUTCFullYear();
+    let e = parAnnee.get(annee);
+    if (!e) {
+      e = {
+        annee, vendus: 0, retours: 0, net: 0, export: 0, ca_ht: 0,
+        mois_couverts: 0, complete: false, canaux: [],
+        _mois: new Set<number>(), _canaux: new Map()
+      };
+      parAnnee.set(annee, e);
+    }
+    // Mois couverts par le relevé dont vient la ligne (bornés à l'année).
+    const premier = debut.getUTCFullYear() === annee ? debut.getUTCMonth() : 0;
+    const dernier = fin.getUTCFullYear() === annee ? fin.getUTCMonth() : 11;
+    for (let m = premier; m <= dernier; m++) e._mois.add(m);
+
+    const vendus = Number(l.units_sold ?? 0), retours = Number(l.units_returned ?? 0);
+    e.vendus += vendus;
+    e.retours += retours;
+    e.export += Number(l.units_export ?? 0);
+    // BLDD donne le chiffre HT du relevé ; les canaux directs, un prix unitaire.
+    e.ca_ht += Number(l.gross_ht ?? 0) || Number(l.gross_price ?? 0) * vendus;
+
+    const code = String(l.canal ?? 'autre');
+    const c = e._canaux.get(code) ?? { code, nom: String(l.canal_nom ?? code), vendus: 0, retours: 0 };
+    c.vendus += vendus; c.retours += retours;
+    e._canaux.set(code, c);
+  }
+
+  const anneeCourante = new Date().getUTCFullYear();
+  return [...parAnnee.values()]
+    .map((e) => {
+      const { _mois, _canaux, ...reste } = e;
+      return {
+        ...reste,
+        net: e.vendus - e.retours,
+        ca_ht: r2(e.ca_ht),
+        mois_couverts: _mois.size,
+        complete: _mois.size === 12 && e.annee < anneeCourante,
+        canaux: [..._canaux.values()].sort((a, b) => b.vendus - a.vendus)
+      };
+    })
+    .sort((a, b) => b.annee - a.annee);
+}
+
+/** Ventes d'un livre, par exercice. */
+export const ventesParExerciceLivre = (bookId: string) =>
+  ventesParExercice(`book = $b`, { b: recId('book', bookId) });
+
+/** Ventes de tous les livres d'un auteur, par exercice. */
+export async function ventesParExerciceAuteur(authorId: string) {
+  const livres = await query<any>(
+    `SELECT VALUE <-contributed_by<-book FROM ONLY $a`, { a: recId('author', authorId) }
+  );
+  const ids = (Array.isArray(livres) ? livres.flat() : []).map((b: any) => String(b));
+  if (!ids.length) return [];
+  return ventesParExercice(`book IN $livres`, { livres: ids.map((i) => recId('book', i.replace(/^book:/, ''))) });
 }

@@ -1,12 +1,14 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { FileText, Receipt, Coins, FloppyDisk } from 'phosphor-svelte';
+  import { FileText, Receipt, Coins, FloppyDisk, ArrowsClockwise } from 'phosphor-svelte';
   let { data } = $props();
+
+  const exercice = new Date().getUTCFullYear();
 
   const sections = $derived([
     { href: '/admin/droits/contrats', title: 'Contrats', desc: 'Barèmes par paliers, à-valoir, périmètre — par livre et contributeur.', n: data.stats.contracts, icon: FileText },
-    { href: '/admin/droits/ventes', title: 'Relevés de ventes', desc: 'Import des ventes par canal (site, Belles Lettres, …).', n: data.stats.reports, icon: Receipt },
+    { href: '/admin/droits/ventes', title: 'Ventes de l’exercice', desc: 'Ventes en librairie, ventes du site et mouvements de stock, année par année.', n: data.stats.reports, icon: Receipt },
     { href: '/admin/droits/reddition', title: 'Reddition de comptes', desc: 'États de droits par auteur et par période.', n: data.stats.statements, icon: Coins }
   ]);
   const fmtP = (s: string, e: string) =>
@@ -20,6 +22,22 @@
   <p class="eyebrow">Back-office</p>
   <h2 class="mt-1 text-xl font-bold">Droits d’auteur</h2>
   <p class="mt-1 text-sm text-muted-foreground">Contrats à paliers, ventes multi-canaux, reddition de comptes.</p>
+</div>
+
+<!-- Le parcours, dans l'ordre : relever les ventes, vérifier les contrats, arrêter les comptes. -->
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-link/40 bg-link/5 p-5">
+  <div class="max-w-2xl">
+    <h3 class="eyebrow mb-1">Arrêté des comptes</h3>
+    <p class="text-sm text-muted-foreground">
+      Trois temps : <strong>relever les ventes</strong> de l’année, vérifier les contrats des titres concernés, puis
+      générer la reddition. Le relevé va chercher lui-même les ventes en librairie chez Les Belles Lettres, les ventes
+      du site et les mouvements de stock — rien à saisir.
+    </p>
+  </div>
+  <form method="POST" action="/admin/droits/ventes?/collecte">
+    <input type="hidden" name="annee" value={exercice} />
+    <Button type="submit"><ArrowsClockwise size={15} /> Relever l’exercice {exercice}</Button>
+  </form>
 </div>
 
 <div class="grid gap-4 sm:grid-cols-3">

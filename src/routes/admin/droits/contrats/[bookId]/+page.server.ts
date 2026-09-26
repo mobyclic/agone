@@ -1,18 +1,19 @@
 import { error, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, mouvementsLivreTous, type Tier } from '$lib/server/droits';
+import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, mouvementsLivreTous, ventesParExerciceLivre, type Tier } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params }) => {
   const book = await getBookLite(params.bookId);
   if (!book) throw error(404, { message: 'Livre introuvable' });
-  const [contributors, reglages, mouvements] = await Promise.all([
+  const [contributors, reglages, mouvements, ventes] = await Promise.all([
     bookContributorsWithContracts(params.bookId),
     getReglagesDroits(),
-    mouvementsLivreTous(params.bookId)
+    mouvementsLivreTous(params.bookId),
+    ventesParExerciceLivre(params.bookId)
   ]);
-  return { book, contributors, reglages, mouvements };
+  return { book, contributors, reglages, mouvements, ventes };
 };
 
 export const actions: Actions = {
