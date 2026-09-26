@@ -16,7 +16,8 @@
   // Facturation et livraison séparables ; le devis suit le pays de LIVRAISON
   // effectif (recalculé côté serveur à la validation).
   let country = $state(untrack(() => (form?.values as any)?.country ?? data.user?.billing?.country ?? 'FR'));
-  let separee = $state(untrack(() => !!(form?.values as any)?.ship_different));
+  // Une adresse de livraison mémorisée dans le profil ouvre le bloc d'emblée.
+  let separee = $state(untrack(() => (form?.values as any)?.ship_different ?? !!data.user?.shipping?.address_1));
   let shipCountry = $state(untrack(() => (form?.values as any)?.ship?.country ?? data.user?.shipping?.country ?? 'FR'));
   const shipCountries = $derived(data.shipCountries.length ? data.shipCountries : [{ code: 'FR', name: 'France' }]);
   const paysLivraison = $derived(separee ? shipCountry : country);

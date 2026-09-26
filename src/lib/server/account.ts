@@ -142,3 +142,28 @@ export async function setPassword(userId: string, password: string): Promise<voi
     h: hashPassword(password)
   });
 }
+
+/**
+ * Suppression d'un compte à la demande de son titulaire (RGPD).
+ *
+ * Le compte est ANONYMISÉ, pas effacé : les commandes et les factures doivent
+ * être conservées (obligation comptable, dix ans), et elles pointent vers lui.
+ * On retire tout ce qui identifie la personne — email, nom, téléphone,
+ * adresses, mot de passe — on ferme ses sessions et on la désabonne de la
+ * LettrInfo. Les factures déjà émises gardent leur libellé, comme la loi le veut.
+ */
+export async function anonymiserCompte(userId: string): Promise<void> {
+  const id = recId('user', userId);
+  const u = (await query<any>(`SELECT email FROM $id`, { id }))[0];
+  if (u?.email) {
+    const { unsubscribeByEmail } = await import('./newsletter');
+    await unsubscribeByEmail(u.email).catch(() => {});
+  }
+  await query(`DELETE session WHERE user = $id`, { id });
+  await query(
+    `UPDATE $id SET email = $e, first_name = '', last_name = '', phone = NONE, billing = NONE, shipping = NONE,
+       password_hash = NONE, avatar = NONE, stripe_customer_id = NONE, is_active = false,
+       accepts_newsletter = false, notes = 'Compte supprimé à la demande de la personne.'`,
+    { id, e: `supprime-${userId}@compte-supprime.invalid` }
+  );
+}
