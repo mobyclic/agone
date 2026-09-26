@@ -30,6 +30,14 @@
               <td class="px-3 py-2">{r.channel_name}</td>
               <td class="px-3 py-2 text-right">{r.line_count}</td>
               <td class="px-3 py-2 text-right">
+                {#if r.channel_code === 'bldd'}
+                  <!-- Une requête par titre : réservé aux relevés du distributeur. -->
+                  <form method="POST" action="?/export" use:enhance class="mb-1 inline-block"
+                    onsubmit={(e: Event) => { if (!confirm('Examiner le journal des ventes titre par titre ? Cela peut prendre plusieurs minutes.')) e.preventDefault(); }}>
+                    <input type="hidden" name="reportId" value={String(r.id).replace('sales_report:', '')} />
+                    <button type="submit" class="text-xs text-link hover:underline" title="Repérer les ventes hors France (taux réduit de moitié)">Part export</button>
+                  </form>
+                {/if}
                 <form method="POST" action="?/delete" use:enhance>
                   <input type="hidden" name="reportId" value={String(r.id).replace('sales_report:', '')} />
                   <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Supprimer"
@@ -76,6 +84,23 @@
         <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
       </div>
       <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Importer depuis BLDD</Button>
+    </form>
+  </div>
+
+  <!-- Mouvements de stock : ce que l'article 6 des contrats impose de mentionner -->
+  <div class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Mouvements de stock (BLDD)</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Stock d'ouverture et de clôture, exemplaires fabriqués, sorties et services de presse, mois par mois puis
+      consolidés. Ce sont les mentions qu'impose l'article 6 des contrats d'auteur. Douze requêtes pour une année,
+      quel que soit le nombre de titres.
+    </p>
+    <form method="POST" action="?/mouvements" use:enhance class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <label class={lbl}>Début <input name="period_start" type="date" required class={input} /></label>
+        <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
+      </div>
+      <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Relever les mouvements</Button>
     </form>
   </div>
 

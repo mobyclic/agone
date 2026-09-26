@@ -29,6 +29,43 @@
   </p>
 </form>
 
+<!-- Mouvements de stock relevés chez le distributeur : ce qui a été fabriqué,
+     vendu, rendu et donné en service de presse sur chaque exercice importé. -->
+{#if data.mouvements.length}
+  <div class="mb-6 overflow-hidden rounded-lg border border-border bg-card">
+    <div class="flex items-baseline justify-between border-b border-border px-4 py-3">
+      <h3 class="text-sm font-semibold">Mouvements de stock (Belles Lettres)</h3>
+      <span class="text-xs text-muted-foreground">Importés depuis <a href="/admin/droits/ventes" class="text-link hover:underline">Ventes &amp; rapports</a></span>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <tr>
+          <th class="px-4 py-2 text-left font-medium">Exercice</th>
+          <th class="px-3 py-2 text-right font-medium">Stock début</th>
+          <th class="px-3 py-2 text-right font-medium">Entrées</th>
+          <th class="px-3 py-2 text-right font-medium">Ventes brutes</th>
+          <th class="px-3 py-2 text-right font-medium">Retours</th>
+          <th class="px-3 py-2 text-right font-medium">SP &amp; gratuits</th>
+          <th class="px-4 py-2 text-right font-medium">Stock fin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each data.mouvements as m (m.period_start)}
+          <tr class="border-t border-border">
+            <td class="px-4 py-2">{new Date(m.period_start).toLocaleDateString('fr-FR')} → {new Date(m.period_end).toLocaleDateString('fr-FR')}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{m.stock_start}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{m.entries}</td>
+            <td class="px-3 py-2 text-right tabular-nums font-medium">{m.gross_sales}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{Math.abs(m.returns_credited)}</td>
+            <td class="px-3 py-2 text-right tabular-nums">{m.free_copies}</td>
+            <td class="px-4 py-2 text-right tabular-nums">{m.stock_end}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
 {#if data.contributors.length === 0}
   <p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">Ce livre n’a pas encore de contributeur. Ajoutez-en depuis <a href="/admin/catalogue/{data.book.id ? String(data.book.id).replace('book:', '') : ''}" class="text-link hover:underline">la fiche catalogue</a>.</p>
 {/if}

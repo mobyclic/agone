@@ -10,7 +10,7 @@
 
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   // Options du filtre : les 3 statuts stockés, puis les 2 états dérivés (filtres virtuels).
-  const STATUS: Record<string, string> = { ...BOOK_STATUS_LABEL, forthcoming: 'À paraître', epuise: 'Épuisé' };
+  const STATUS: Record<string, string> = { ...BOOK_STATUS_LABEL, forthcoming: 'À paraître', epuise: 'Épuisé', stock_bas: 'Stock bas' };
   const euro = (n?: number) => (n != null ? `${n.toFixed(2).replace('.', ',')} €` : '—');
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
   const nu = (id: string) => String(id).replace('book:', '');

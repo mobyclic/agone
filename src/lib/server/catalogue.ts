@@ -9,6 +9,7 @@ import { wpautop } from './wpautop';
 import { sansScripts, notesDeBasDePage } from '$lib/text';
 import { uploadBuffer, deleteFile } from './storage';
 import { ROLE_ORDER, ROLE_LABEL, formatsEnVente, estEpuise } from '$lib/labels';
+import { getSetting } from './site';
 export { ROLE_LABEL };
 
 export interface BookCard {
@@ -368,12 +369,24 @@ const ADMIN_SORT: Record<string, string> = {
   stock: 'stock_qty', date: 'published_at', recent: 'updated_at'
 };
 
+/** Seuil d'alerte de stock (réglage « stock », 10 exemplaires par défaut). */
+export async function seuilAlerteStock(): Promise<number> {
+  const v = ((await getSetting('stock')) ?? {}) as Record<string, unknown>;
+  const n = Number(v.alert_threshold);
+  return Number.isFinite(n) && n >= 0 ? n : 10;
+}
+
 export async function listBooksAdmin(opts: { q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.status === 'forthcoming') {
     // Filtre virtuel « à paraître » : publié + date de parution strictement future.
     where.push("status = 'published' AND published_at != NONE AND published_at > time::now()");
+  } else if (opts.status === 'stock_bas') {
+    // Alerte de stock : en vente, déjà paru, stock faible mais pas encore nul.
+    // Inutile d'aller chercher les alertes du distributeur : nous avons le stock.
+    vars.seuil = await seuilAlerteStock();
+    where.push("status = 'published' AND (published_at = NONE OR published_at <= time::now()) AND stock_qty > 0 AND stock_qty <= $seuil");
   } else if (opts.status === 'epuise') {
     // Filtre virtuel « épuisé » : en ligne, déjà paru, plus de stock.
     where.push("status = 'published' AND (published_at = NONE OR published_at <= time::now()) AND stock_qty <= 0");

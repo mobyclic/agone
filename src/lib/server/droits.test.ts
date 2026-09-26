@@ -25,8 +25,8 @@ mock.module(`${R}/surreal.ts`, () => ({
         vars.before ? l.end < vars.before : l.end >= vars.from && l.end <= vars.to;
       const par = new Map<string, any>();
       for (const l of SALES.filter(dans)) {
-        const e = par.get(l.format) ?? { format: l.format, sold: 0, returned: 0, revenue_ttc: 0, priced_units: 0 };
-        e.sold += l.sold; e.returned += l.returned;
+        const e = par.get(l.format) ?? { format: l.format, sold: 0, returned: 0, exported: 0, revenue_ttc: 0, priced_units: 0 };
+        e.sold += l.sold; e.returned += l.returned; e.exported += l.exported ?? 0;
         if (l.price != null) { e.revenue_ttc += (l.sold - l.returned) * l.price; e.priced_units += l.sold - l.returned; }
         par.set(l.format, e);
       }
@@ -123,4 +123,16 @@ BOOK = { returns_provision_rate: 0 };
 SALES = [{ format: 'paper', sold: 1000, returned: 0, price: null, end: new Date('2026-06-30') }];
 const r = await computeStatementForAuthor('a1', P1, P2);
 eq('provision désactivée pour ce livre', r.lines[0].units, 1000);
+});
+
+test('ventes hors France : taux réduit de moitié', async () => {
+  // 1 000 ex. dont 200 hors France, sans provision pour isoler l'effet du taux.
+  CONTRACT = { ...base, advance: 0, advance_recouped: 0 };
+  BOOK = { returns_provision_rate: 0 };
+  PREV_LINES = []; PREV_CARRY = 0;
+  SALES = [{ format: 'paper', sold: 1000, returned: 0, exported: 200, price: null, end: new Date('2026-06-30') }];
+  const r = await computeStatementForAuthor('a1', P1, P2);
+  eq('unités hors France', r.lines[0].units_export, 200);
+  // 800 ex. à 6 % + 200 ex. à 3 % (la moitié du taux)
+  eq('brut', r.lines[0].gross, (800 * 0.06 + 200 * 0.03) * PPHT);
 });

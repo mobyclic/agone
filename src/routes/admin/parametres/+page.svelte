@@ -109,6 +109,18 @@
   </form>
 
   <!-- Traceurs & consentement -->
+  <form method="POST" action="?/stock" use:enhance class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Alerte de stock</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Au-dessous de ce nombre d'exemplaires, un livre en vente est signalé au réassort, sur le tableau de bord et
+      dans le catalogue (filtre « Stock bas »). Le stock vient du relevé des Belles Lettres.
+    </p>
+    <label class={label}>Seuil (exemplaires)
+      <input name="alert_threshold" type="number" min="0" step="1" value={data.stock.alert_threshold} class="{input} w-32" />
+    </label>
+    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
+  </form>
+
   <form method="POST" action="?/tracking" use:enhance class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
     <h3 class="mb-1 text-base font-semibold">Traceurs & mesure d'audience</h3>
     <p class="mb-4 text-sm text-muted-foreground">Renseignez l'ID Google Tag Manager (recommandé — configurez GA4 et le Pixel Meta/Instagram dans GTM). Les traceurs ne se déclenchent qu'après consentement (CMP + Consent Mode v2). Les événements <span class="font-mono text-xs">add_to_cart</span>, <span class="font-mono text-xs">begin_checkout</span> et <span class="font-mono text-xs">purchase</span> sont poussés automatiquement dans le dataLayer.</p>

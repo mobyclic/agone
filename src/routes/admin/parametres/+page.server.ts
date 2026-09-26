@@ -8,8 +8,8 @@ import { lancerSynchro } from '$lib/server/sync-job';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async () => {
-  const [contact, banner, company, tracking, syncState] = await Promise.all([
-    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking'), getSetting('sync_state')
+  const [contact, banner, company, tracking, syncState, stock] = await Promise.all([
+    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking'), getSetting('sync_state'), getSetting('stock')
   ]);
   const c = (contact ?? {}) as Record<string, any>;
   const b = (banner ?? {}) as Record<string, any>;
@@ -25,6 +25,7 @@ export const load: PageServerLoad = async () => {
     },
     tracking: { gtm_id: String(t.gtm_id ?? ''), ga_id: String(t.ga_id ?? ''), meta_pixel_id: String(t.meta_pixel_id ?? '') },
     syncState: (syncState ?? {}) as Record<string, any>,
+    stock: { alert_threshold: Number((stock as any)?.alert_threshold ?? 10) },
     company
   };
 };
@@ -39,6 +40,15 @@ export const actions: Actions = {
       address: String(fd.get('address') ?? '').trim()
     });
     throw redirect(303, withFlash('/admin/parametres', 'Coordonnées enregistrées.', 'success'));
+  },
+
+  /** Seuil d'alerte de stock : au-dessous, le livre est signalé au réassort. */
+  stock: async ({ request, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const n = Number(String(fd.get('alert_threshold') ?? '').replace(',', '.'));
+    await setSetting('stock', { alert_threshold: Number.isFinite(n) && n >= 0 ? Math.round(n) : 10 });
+    throw redirect(303, withFlash('/admin/parametres', 'Seuil d’alerte enregistré.', 'success'));
   },
 
   tracking: async ({ request, locals }) => {

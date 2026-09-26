@@ -239,7 +239,7 @@ async function ventesParFormat(
   bookId: string,
   formats: string[],
   bound: { before?: Date; from?: Date; to?: Date }
-): Promise<Map<string, { sold: number; returned: number; revenue_ttc: number; priced_units: number }>> {
+): Promise<Map<string, { sold: number; returned: number; exported: number; revenue_ttc: number; priced_units: number }>> {
   const cond: string[] = ['book = $book', 'format IN $formats'];
   const vars: Record<string, unknown> = { book: recId('book', bookId), formats };
   if (bound.before) { cond.push('report.period_end < $before'); vars.before = bound.before; }
@@ -249,15 +249,16 @@ async function ventesParFormat(
     `SELECT format,
         math::sum(units_sold) AS sold,
         math::sum(units_returned) AS returned,
+        math::sum(units_export ?? 0) AS exported,
         math::sum(IF gross_price != NONE THEN (units_sold - units_returned) * gross_price ELSE 0 END) AS revenue_ttc,
         math::sum(IF gross_price != NONE THEN units_sold - units_returned ELSE 0 END) AS priced_units
        FROM sales_line WHERE ${cond.join(' AND ')} GROUP BY format`,
     vars
   );
-  const out = new Map<string, { sold: number; returned: number; revenue_ttc: number; priced_units: number }>();
+  const out = new Map<string, { sold: number; returned: number; exported: number; revenue_ttc: number; priced_units: number }>();
   for (const r of rows) {
     out.set(r.format, {
-      sold: r.sold ?? 0, returned: r.returned ?? 0,
+      sold: r.sold ?? 0, returned: r.returned ?? 0, exported: r.exported ?? 0,
       revenue_ttc: r.revenue_ttc ?? 0, priced_units: r.priced_units ?? 0
     });
   }
@@ -273,6 +274,8 @@ const totalUnites = (m: Map<string, { sold: number; returned: number }>) => {
 export interface StatementLine {
   contract: string; book: string; book_title: string; role: string; format?: string;
   units: number; units_sold: number; units_returned: number; units_provision: number; units_released: number;
+  /** Part des unités retenues vendue hors France (taux contractuel réduit de moitié). */
+  units_export: number;
   base_amount: number; rate: number; gross: number; advance_applied: number; net: number;
 }
 
@@ -334,6 +337,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
     const periode = await ventesParFormat(bookId, formats, { from: periodStart, to: periodEnd });
     const anterieur = await ventesParFormat(bookId, formats, { before: periodStart });
     const { sold, returned } = totalUnites(periode);
+    const exportees = [...periode.values()].reduce((n, v) => n + v.exported, 0);
     const prior = totalUnites(anterieur).net;
 
     // Provision : retenue sur les ventes PHYSIQUES de l'exercice (un fichier
@@ -363,7 +367,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
         : baseUnitPrice({ price_paper: c.price_paper, price_ebook: c.price_ebook, vat_rate: vat }, c.scope, c.base, c.net_rate ?? 60);
 
     // Redevance : à paliers sur le cumul ; un solde négatif reste négatif (dette).
-    const { gross, effRate } =
+    const { gross: brutPlein, effRate } =
       units >= 0
         ? tieredRoyalty(prior, units, c.tiers ?? [], baseUnit)
         : (() => {
@@ -371,12 +375,22 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
             return { gross: -g.gross, effRate: g.effRate };
           })();
 
+    // Hors France : « le taux applicable sera diminué de cinquante pour cent ».
+    // La part exportée suit la même proportion que les unités retenues (la
+    // provision sur retours s'applique aussi bien ici qu'ailleurs).
+    const netVendu = sold - returned;
+    const partExport = netVendu > 0 ? Math.min(1, exportees / netVendu) : 0;
+    const unitesExport = r2(units * partExport);
+    const abattement = r2(0.5 * unitesExport * baseUnit * (effRate / 100));
+    const gross = r2(brutPlein - abattement);
+
     const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
     const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
     const net = r2(gross - advance_applied);
     lines.push({
       contract: contractId, book: bookId, book_title: c.book_title, role: c.role, format: c.scope,
       units, units_sold: sold, units_returned: returned, units_provision, units_released,
+      units_export: unitesExport,
       base_amount: r2(baseUnit), rate: effRate, gross, advance_applied, net
     });
     gross_total += gross; advance_total += advance_applied; net_total += net;
@@ -673,4 +687,134 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
     facture_ht: r2(utiles.reduce((n, v) => n + v.invoiced_ht, 0)),
     inconnus
   };
+}
+
+// ── Mouvements de stock du distributeur (art. 6 des contrats) ──────────────
+
+/**
+ * Relève, mois par mois, les mouvements de stock BLDD de la période et les
+ * consolide par livre : stock d'ouverture et de clôture, entrées (fabrication et
+ * réassorts), sorties, services de presse, ventes brutes et retours crédités.
+ *
+ * Douze requêtes pour une année, quel que soit le nombre de titres : la page de
+ * stock du distributeur porte toutes ces colonnes pour tout le catalogue. La
+ * fiche par titre ne dirait pas plus et coûterait une requête par livre.
+ */
+export async function importMouvementsBldd(periodStart: Date, periodEnd: Date) {
+  const { fetchBlStockMonth } = await import('./belleslettres');
+
+  // Mois couverts par la période, dans l'ordre.
+  const mois: { m: number; y: number }[] = [];
+  const curseur = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), 1));
+  while (curseur <= periodEnd) {
+    mois.push({ m: curseur.getUTCMonth() + 1, y: curseur.getUTCFullYear() });
+    curseur.setUTCMonth(curseur.getUTCMonth() + 1);
+  }
+
+  type Cumul = {
+    stock_start: number; stock_end: number; entries: number; exits: number;
+    free_copies: number; gross_sales: number; returns_credited: number;
+  };
+  const parEan = new Map<string, Cumul>();
+  for (const [i, { m, y }] of mois.entries()) {
+    const rows = await fetchBlStockMonth(m, y);
+    for (const r of rows) {
+      const c = parEan.get(r.ean) ?? { stock_start: 0, stock_end: 0, entries: 0, exits: 0, free_copies: 0, gross_sales: 0, returns_credited: 0 };
+      if (i === 0) c.stock_start = r.stock_start; // ouverture = début du premier mois
+      c.stock_end = r.stock_end;                  // clôture = fin du dernier mois vu
+      c.entries += r.entries;
+      c.exits += r.exits;
+      c.free_copies += r.free_copies;
+      c.gross_sales += r.gross_sales;
+      c.returns_credited += r.returns_credited;
+      parEan.set(r.ean, c);
+    }
+  }
+
+  const books = await query<any>(`SELECT meta::id(id) AS id, isbn_paper FROM book WHERE isbn_paper != NONE`);
+  const parIsbn = new Map<string, string>();
+  for (const b of books) parIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), b.id);
+
+  let enregistres = 0, inconnus = 0;
+  for (const [ean, c] of parEan) {
+    // Un titre sans mouvement ni stock n'apprend rien : on ne l'enregistre pas.
+    if (!c.stock_start && !c.stock_end && !c.entries && !c.exits && !c.free_copies && !c.gross_sales) continue;
+    const bookId = parIsbn.get(ean);
+    if (!bookId) { inconnus++; continue; }
+    const id = recId('book', bookId);
+    const ex = await query<any>(
+      `SELECT meta::id(id) AS id FROM book_period_stock WHERE book = $b AND period_start = $s AND period_end = $e LIMIT 1`,
+      { b: id, s: periodStart, e: periodEnd }
+    );
+    const contenu = { book: id, period_start: periodStart, period_end: periodEnd, source: 'bldd', ...c };
+    if (ex[0]) await query(`UPDATE $id CONTENT $c`, { id: recId('book_period_stock', ex[0].id), c: contenu });
+    else await query(`CREATE book_period_stock CONTENT $c`, { c: contenu });
+    enregistres++;
+  }
+  return { mois: mois.length, titres: enregistres, inconnus };
+}
+
+/** Mouvements de stock d'un livre sur une période (pour la reddition). */
+export async function mouvementsLivre(bookId: string, periodStart: Date, periodEnd: Date) {
+  const rows = await query<any>(
+    `SELECT stock_start, stock_end, entries, exits, free_copies, gross_sales, returns_credited
+       FROM book_period_stock WHERE book = $b AND period_start = $s AND period_end = $e LIMIT 1`,
+    { b: recId('book', bookId), s: periodStart, e: periodEnd }
+  );
+  return rows[0] ?? null;
+}
+
+/** Tous les relevés de mouvements d'un livre, du plus récent au plus ancien. */
+export async function mouvementsLivreTous(bookId: string) {
+  return await query<any>(
+    `SELECT period_start, period_end, stock_start, stock_end, entries, exits, free_copies, gross_sales, returns_credited
+       FROM book_period_stock WHERE book = $b ORDER BY period_start DESC`,
+    { b: recId('book', bookId) }
+  );
+}
+
+/**
+ * Renseigne, sur un relevé BLDD déjà importé, la part des ventes réalisées HORS
+ * FRANCE — les contrats y appliquent un taux diminué de moitié.
+ *
+ * Le distributeur ne donne pas ce découpage : il faut ouvrir le journal des
+ * ventes de chaque titre (une requête par livre, quelques minutes pour un
+ * exercice complet) et reconnaître les adresses étrangères. D'où une opération
+ * à part, lancée à la demande, et non à chaque import.
+ */
+export async function detaillerExportBldd(reportId: string) {
+  const { fetchBlStockMonth, fetchBlSalesDetail } = await import('./belleslettres');
+  const rapport = (await query<any>(
+    `SELECT period_start, period_end FROM $id`, { id: recId('sales_report', reportId) }
+  ))[0];
+  if (!rapport) throw new Error('Relevé introuvable.');
+  const debut = new Date(rapport.period_start), fin = new Date(rapport.period_end);
+
+  // Le code article du distributeur se lit sur la page de stock (colonne « Code BLDD »).
+  const codes = new Map<string, string>();
+  for (const r of await fetchBlStockMonth(fin.getUTCMonth() + 1, fin.getUTCFullYear())) {
+    if (r.code_bldd) codes.set(r.ean, r.code_bldd);
+  }
+
+  const lignes = await query<any>(
+    `SELECT meta::id(id) AS id, isbn, units_sold FROM sales_line WHERE report = $r AND units_sold > 0`,
+    { r: recId('sales_report', reportId) }
+  );
+  let traites = 0, avecExport = 0, unitesExport = 0, sansCode = 0;
+  for (const l of lignes) {
+    const code = codes.get(String(l.isbn ?? '').replace(/\D/g, ''));
+    if (!code) { sansCode++; continue; }
+    try {
+      const detail = await fetchBlSalesDetail(code, debut, fin);
+      const hors = detail.filter((d) => d.abroad).reduce((n, d) => n + d.sold - d.returned, 0);
+      traites++;
+      if (hors > 0) {
+        avecExport++;
+        unitesExport += hors;
+        await query(`UPDATE $id SET units_export = $n`, { id: recId('sales_line', l.id), n: hors });
+      }
+    } catch { sansCode++; }
+    await new Promise((r) => setTimeout(r, 120)); // courtoisie envers l'extranet
+  }
+  return { traites, avecExport, unitesExport, sansCode };
 }

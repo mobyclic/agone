@@ -422,9 +422,31 @@ DEFINE FIELD OVERWRITE gross_price    ON sales_line TYPE option<number>;  -- pri
 -- est l'assiette des contrats calculés « sur le net encaissé ».
 DEFINE FIELD OVERWRITE gross_ht       ON sales_line TYPE option<number>;
 DEFINE FIELD OVERWRITE net_receipt    ON sales_line TYPE option<number>;
+-- Part des ventes réalisées hors France (sous-ensemble de units_sold) : les
+-- contrats y appliquent un taux diminué de moitié.
+DEFINE FIELD OVERWRITE units_export   ON sales_line TYPE option<int>;
 DEFINE FIELD OVERWRITE created_at     ON sales_line TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_saleline_report ON sales_line FIELDS report;
 DEFINE INDEX OVERWRITE idx_saleline_book   ON sales_line FIELDS book;
+
+-- MOUVEMENTS DE STOCK D'UNE PÉRIODE (relevé du distributeur)
+-- L'article 6 des contrats impose de mentionner, par exercice : les exemplaires
+-- fabriqués, le stock d'ouverture et de clôture, et les exemplaires hors droits.
+-- Ces chiffres viennent du distributeur, pas du site.
+DEFINE TABLE OVERWRITE book_period_stock SCHEMAFULL;
+DEFINE FIELD OVERWRITE book             ON book_period_stock TYPE record<book>;
+DEFINE FIELD OVERWRITE period_start     ON book_period_stock TYPE datetime;
+DEFINE FIELD OVERWRITE period_end       ON book_period_stock TYPE datetime;
+DEFINE FIELD OVERWRITE stock_start      ON book_period_stock TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE stock_end        ON book_period_stock TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE entries          ON book_period_stock TYPE int DEFAULT 0;   -- fabrication et réassorts entrés
+DEFINE FIELD OVERWRITE exits            ON book_period_stock TYPE int DEFAULT 0;   -- pilon, sorties diverses
+DEFINE FIELD OVERWRITE free_copies      ON book_period_stock TYPE int DEFAULT 0;   -- services de presse et gratuits
+DEFINE FIELD OVERWRITE gross_sales      ON book_period_stock TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE returns_credited ON book_period_stock TYPE int DEFAULT 0;
+DEFINE FIELD OVERWRITE source           ON book_period_stock TYPE string DEFAULT 'bldd';
+DEFINE FIELD OVERWRITE created_at       ON book_period_stock TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_bps_uniq ON book_period_stock FIELDS book, period_start, period_end UNIQUE;
 
 -- REDDITION DE COMPTES : un état par auteur × période
 DEFINE TABLE OVERWRITE royalty_statement SCHEMAFULL;
@@ -444,6 +466,7 @@ DEFINE FIELD OVERWRITE lines.*.units_sold      ON royalty_statement TYPE option<
 DEFINE FIELD OVERWRITE lines.*.units_returned  ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.units_provision ON royalty_statement TYPE option<number>;  -- retenues au titre des retours à venir
 DEFINE FIELD OVERWRITE lines.*.units_released  ON royalty_statement TYPE option<number>;  -- provision de l'exercice précédent, reprise
+DEFINE FIELD OVERWRITE lines.*.units_export    ON royalty_statement TYPE option<number>;  -- vendues hors France (taux réduit de moitié)
 DEFINE FIELD OVERWRITE lines.*.format          ON royalty_statement TYPE option<string>;
 DEFINE FIELD OVERWRITE lines.*.base_amount      ON royalty_statement TYPE option<number>;
 DEFINE FIELD OVERWRITE lines.*.rate            ON royalty_statement TYPE option<number>;

@@ -345,3 +345,112 @@ export async function fetchBlSales(from: Date, to: Date, filtre: 'Papiers' | 'Nu
   if (!res.ok) throw new Error(`Extranet BLDD : HTTP ${res.status}`);
   return parseBlSalesHtml(await res.text());
 }
+
+// ══════════════════════════════════════════════════════════════
+// MOUVEMENTS MENSUELS (la page de stock porte bien plus que le stock)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Une ligne de la page de stock BLDD, lue en entier.
+ *
+ * Le PHP historique n'y prenait que l'EAN et le stock ; les 22 colonnes donnent
+ * en réalité tout le mouvement du mois, y compris les SERVICES DE PRESSE et le
+ * stock de début et de fin — exactement les mentions qu'impose l'article 6 des
+ * contrats d'auteur (exemplaires fabriqués, stock d'ouverture et de clôture,
+ * exemplaires hors droits).
+ */
+export interface BlStockRow {
+  ean: string; author: string; title: string; code_bldd: string;
+  stock_start: number; inventory: number; entries: number; exits: number;
+  gross_sales: number; returns_credited: number; net_sales: number;
+  free_copies: number; deposits: number; counter: number;
+  stock_publisher: number; stock_warehouse: number; stock_end: number;
+  returns_pending: number;
+}
+
+const entier = (s: string) => {
+  const n = parseInt(String(s).replace(/[^\d-]/g, ''), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** Parse la page de stock mensuelle → une ligne par titre, toutes colonnes. */
+export function parseBlStockRows(html: string): BlStockRow[] {
+  const out: BlStockRow[] = [];
+  for (const row of html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? []) {
+    const c = (row.match(/<td[^>]*>[\s\S]*?<\/td>/gi) ?? []).map(parseCell);
+    if (c.length < 20) continue;
+    const ean = (c[3] ?? '').replace(/\D/g, '');
+    if (ean.length < 12) continue; // en-tête
+    out.push({
+      ean, author: c[0] ?? '', title: c[1] ?? '', code_bldd: (c[2] ?? '').trim(),
+      stock_start: entier(c[7]), inventory: entier(c[8]), entries: entier(c[9]), exits: entier(c[10]),
+      gross_sales: entier(c[11]), returns_credited: entier(c[12]), net_sales: entier(c[13]),
+      free_copies: entier(c[14]), deposits: entier(c[15]), counter: entier(c[16]),
+      stock_publisher: entier(c[17]), stock_warehouse: entier(c[18]), stock_end: entier(c[19]),
+      returns_pending: entier(c[20])
+    });
+  }
+  return out;
+}
+
+/** Page de stock d'un mois donné (lecture seule côté BLDD). */
+export async function fetchBlStockMonth(month: number, year: number): Promise<BlStockRow[]> {
+  const cookie = await cookieBldd();
+  const url = `${BLDD_BASE}/stocks.asp?mts=${month}&yrs=${year}&com=excel&orderfield=18&orderdir=desc`;
+  const res = await fetch(url, { headers: { Cookie: cookie, 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`Extranet BLDD : HTTP ${res.status}`);
+  return parseBlStockRows(await res.text());
+}
+
+// ══════════════════════════════════════════════════════════════
+// VENTES DÉTAILLÉES (par librairie) — sert à isoler l'export
+// ══════════════════════════════════════════════════════════════
+
+export interface BlSaleDetail {
+  client: string; address: string; cp: string; city: string;
+  sold: number; returned: number; date: string; abroad: boolean;
+}
+
+/**
+ * Hors France : le relevé ne porte pas de pays, mais un code postal français
+ * tient toujours sur cinq chiffres. Une adresse belge (1000), suisse (1211) ou
+ * vide sort donc du lot. Sert au taux réduit de moitié que prévoient les contrats
+ * pour les ventes hors France.
+ */
+export const venteHorsFrance = (cp: string) => !/^\d{5}$/.test(String(cp).trim());
+
+/** Parse le journal des ventes d'un titre : une ligne par librairie et par date. */
+export function parseBlSalesDetailHtml(html: string): BlSaleDetail[] {
+  const out: BlSaleDetail[] = [];
+  for (const row of html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? []) {
+    const c = (row.match(/<td[^>]*>[\s\S]*?<\/td>/gi) ?? []).map(parseCell);
+    if (c.length < 7) continue;
+    const date = (c[6] ?? '').trim();
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) continue; // en-têtes et totaux
+    out.push({
+      client: c[0] ?? '', address: c[1] ?? '', cp: (c[2] ?? '').trim(), city: c[3] ?? '',
+      sold: entier(c[4]), returned: Math.abs(entier(c[5])), date, abroad: venteHorsFrance(c[2] ?? '')
+    });
+  }
+  return out;
+}
+
+/** Code article BLDD d'un titre (clé du journal des ventes), lu sur sa fiche. */
+export async function fetchBlCodeArticle(ean: string): Promise<string | null> {
+  const cookie = await cookieBldd();
+  const res = await fetch(`${BLDD_BASE}/ProductStock.asp?CodeEAN13=${encodeURIComponent(ean)}&d=${jjmmaaaa(new Date())}`, {
+    headers: { Cookie: cookie, 'User-Agent': 'Mozilla/5.0' }
+  });
+  if (!res.ok) return null;
+  return ((await res.text()).match(/codearticle=(\d+)/) ?? [])[1] ?? null;
+}
+
+/** Journal des ventes d'un titre sur une période (par librairie). */
+export async function fetchBlSalesDetail(codeArticle: string, from: Date, to: Date): Promise<BlSaleDetail[]> {
+  const cookie = await cookieBldd();
+  const url = `${BLDD_BASE}/detailventes.asp?codearticle=${encodeURIComponent(codeArticle)}`
+    + `&DateFrom=${encodeURIComponent(jjmmaaaa(from))}&DateTo=${encodeURIComponent(jjmmaaaa(to))}`;
+  const res = await fetch(url, { headers: { Cookie: cookie, 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`Extranet BLDD : HTTP ${res.status}`);
+  return parseBlSalesDetailHtml(await res.text());
+}

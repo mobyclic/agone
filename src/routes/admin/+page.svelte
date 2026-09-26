@@ -16,7 +16,8 @@
       label: 'Livres publiés', value: data.counts.books, href: '/admin/catalogue',
       sub: [
         data.counts.drafts > 0 ? plural(data.counts.drafts, 'brouillon') : null,
-        data.counts.outOfPrint > 0 ? plural(data.counts.outOfPrint, 'épuisé') : null
+        data.counts.outOfPrint > 0 ? plural(data.counts.outOfPrint, 'épuisé') : null,
+        data.counts.stockBas > 0 ? `${plural(data.counts.stockBas, 'stock bas')}` : null
       ].filter(Boolean).join(' · ')
     },
     { label: 'À paraître', value: data.counts.forthcoming, href: '/admin/catalogue?status=forthcoming', sub: '' },
