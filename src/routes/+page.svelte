@@ -20,11 +20,13 @@
 
 <!-- HERO — DERNIER ARTICLE EN MANCHETTE + 4 DERNIERS LIVRES -->
 <section class="pb-16 pt-10 lg:pt-14" style="padding-inline: var(--page-gutter)">
-  <div class="grid gap-y-14 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-y-14 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
 
-    <!-- Manchette : le dernier article de L'Antichambre -->
+    <!-- Manchette : le dernier article de L'Antichambre.
+         Sur téléphone elle passe APRÈS les nouveautés (order-2) : on ouvre sur
+         les livres, pas sur le magazine. -->
     {#if article}
-      <div class="flex flex-col">
+      <div class="order-2 flex flex-col lg:order-none">
         <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
           <span class="display-title text-2xl leading-none sm:text-3xl">Antichambre</span>
           <a href="/antichambre" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le magazine →</a>
@@ -77,15 +79,15 @@
       </div>
     {/if}
 
-    <!-- Vitrine : les 4 derniers livres parus -->
+    <!-- Vitrine : les derniers livres parus — en tête sur téléphone. -->
     {#if books.length}
-      <div class="flex flex-col {article ? '' : 'lg:col-span-2'}">
+      <div class="order-1 flex flex-col lg:order-none {article ? '' : 'lg:col-span-2'}">
         <div class="mb-7 flex items-end justify-between gap-4 border-b-[3px] border-foreground pb-2.5">
           <span class="display-title text-2xl leading-none sm:text-3xl">Nouveautés</span>
           <a href="/catalogue" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le catalogue →</a>
         </div>
 
-        <div class="grid grid-cols-3 gap-x-6 gap-y-10">
+        <div class="rail">
           {#each books as book (book.slug)}
             <a href="/livre/{book.slug}" class="group flex min-w-0 flex-col">
               <div class="relative aspect-[2/3] overflow-hidden border border-border bg-secondary/40 transition-colors group-hover:border-foreground">
@@ -116,11 +118,11 @@
 <!-- À PARAÎTRE + FOCUS -->
 {#if data.forthcoming.length || data.featured.length}
   <section class="py-14" style="padding-inline: var(--page-gutter)">
-    <div class="grid gap-y-12 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
+    <div class="grid grid-cols-[minmax(0,1fr)] gap-y-12 lg:grid-cols-2" style="column-gap: var(--page-gutter)">
       {#if data.forthcoming.length}
         <div>
           <SectionHead title="À paraître" href="/catalogue?parution=a-paraitre" more="Tous les livres" />
-          <div class="grid grid-cols-3 gap-x-5 gap-y-8">
+          <div class="rail">
             {#each data.forthcoming.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
           </div>
         </div>
@@ -128,7 +130,7 @@
       {#if data.featured.length}
         <div>
           <SectionHead title="Focus" href="/catalogue" more="Le catalogue" />
-          <div class="grid grid-cols-3 gap-x-5 gap-y-8">
+          <div class="rail">
             {#each data.featured.slice(0, 3) as book (book.slug)}<BookCard {book} />{/each}
           </div>
         </div>

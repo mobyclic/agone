@@ -630,10 +630,11 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
 
   // Résolution par ISBN (papier ou numérique).
   const books = await query<any>(`SELECT id, isbn_paper, isbn_ebook FROM book WHERE isbn_paper != NONE OR isbn_ebook != NONE`);
-  const parIsbn = new Map<string, string>();
+  // L'ISBN dit aussi le format : un EAN numérique vaut une vente d'ebook.
+  const parIsbn = new Map<string, { id: string; format: string }>();
   for (const b of books) {
-    if (b.isbn_paper) parIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), String(b.id));
-    if (b.isbn_ebook) parIsbn.set(String(b.isbn_ebook).replace(/\D/g, ''), String(b.id));
+    if (b.isbn_paper) parIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), { id: String(b.id), format: 'paper' });
+    if (b.isbn_ebook) parIsbn.set(String(b.isbn_ebook).replace(/\D/g, ''), { id: String(b.id), format: 'ebook' });
   }
 
   const anciens = await query<any>(
@@ -648,13 +649,13 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
 
   const inconnus: string[] = [];
   const rows = utiles.map((v) => {
-    const bookId = parIsbn.get(v.isbn);
-    if (!bookId) inconnus.push(`${v.isbn} — ${v.title}`);
+    const trouve = parIsbn.get(v.isbn);
+    if (!trouve) inconnus.push(`${v.isbn} — ${v.title}`);
     return {
       report: recId('sales_report', reportId),
-      book: bookId ? recId('book', bookId.replace(/^book:/, '')) : undefined,
+      book: trouve ? recId('book', trouve.id.replace(/^book:/, '')) : undefined,
       isbn: v.isbn,
-      format: 'paper',
+      format: trouve?.format ?? 'paper',
       units_sold: v.units_sold,
       units_returned: v.units_returned,
       units_free: 0,

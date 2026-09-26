@@ -332,10 +332,15 @@ async function cookieBldd(): Promise<string> {
 const jjmmaaaa = (d: Date) =>
   `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
-/** Récupère l'état des ventes BLDD sur une période (lecture seule côté BLDD). */
-export async function fetchBlSales(from: Date, to: Date): Promise<BlSalesLine[]> {
+/**
+ * Récupère l'état des ventes BLDD sur une période (lecture seule côté BLDD).
+ * `Filtre` vaut Papiers, Num ou All : on prend TOUT et le format se déduit de
+ * l'ISBN à l'import (le distributeur ne rend aujourd'hui que du papier, mais
+ * l'onglet numérique existe).
+ */
+export async function fetchBlSales(from: Date, to: Date, filtre: 'Papiers' | 'Num' | 'All' = 'All'): Promise<BlSalesLine[]> {
   const cookie = await cookieBldd();
-  const url = `${BLDD_BASE}/ventes.asp?DateFrom=${encodeURIComponent(jjmmaaaa(from))}&DateTo=${encodeURIComponent(jjmmaaaa(to))}&Filtre=`;
+  const url = `${BLDD_BASE}/ventes.asp?DateFrom=${encodeURIComponent(jjmmaaaa(from))}&DateTo=${encodeURIComponent(jjmmaaaa(to))}&Filtre=${filtre}`;
   const res = await fetch(url, { headers: { Cookie: cookie, 'User-Agent': 'Mozilla/5.0' } });
   if (!res.ok) throw new Error(`Extranet BLDD : HTTP ${res.status}`);
   return parseBlSalesHtml(await res.text());
