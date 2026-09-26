@@ -7,6 +7,21 @@
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
   const fmtP = (s: string, e: string) => `${new Date(s).toLocaleDateString('fr-FR')} → ${new Date(e).toLocaleDateString('fr-FR')}`;
+
+  // Mouvements de stock : périodes usuelles. Le relevé se fait mois par mois en
+  // cours d'année et sur l'exercice entier au moment de l'arrêté des comptes.
+  const jour = (d: Date) => d.toISOString().slice(0, 10);
+  const maintenant = new Date();
+  const moisEcoule = {
+    debut: jour(new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth() - 1, 1))),
+    fin: jour(new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), 0)))
+  };
+  const exercice = {
+    debut: `${maintenant.getUTCFullYear()}-01-01`,
+    fin: `${maintenant.getUTCFullYear()}-12-31`
+  };
+  let mvtDebut = $state(moisEcoule.debut);
+  let mvtFin = $state(moisEcoule.fin);
 </script>
 
 <svelte:head><title>Relevés de ventes · Admin</title></svelte:head>
@@ -92,13 +107,19 @@
     <h3 class="eyebrow mb-1">Mouvements de stock (BLDD)</h3>
     <p class="mb-3 text-xs text-muted-foreground">
       Stock d'ouverture et de clôture, exemplaires fabriqués, sorties et services de presse, mois par mois puis
-      consolidés. Ce sont les mentions qu'impose l'article 6 des contrats d'auteur. Douze requêtes pour une année,
-      quel que soit le nombre de titres.
+      consolidés. Ce sont les mentions qu'impose l'article 6 des contrats d'auteur. Une requête par mois demandé,
+      quel que soit le nombre de titres : un mois pour le suivi courant, l'exercice entier pour l'arrêté des comptes.
     </p>
     <form method="POST" action="?/mouvements" use:enhance class="space-y-3">
+      <div class="flex gap-2">
+        <button type="button" class="rounded border border-border px-2.5 py-1 text-xs hover:bg-muted"
+          onclick={() => { mvtDebut = moisEcoule.debut; mvtFin = moisEcoule.fin; }}>Mois écoulé</button>
+        <button type="button" class="rounded border border-border px-2.5 py-1 text-xs hover:bg-muted"
+          onclick={() => { mvtDebut = exercice.debut; mvtFin = exercice.fin; }}>Exercice {maintenant.getUTCFullYear()}</button>
+      </div>
       <div class="grid grid-cols-2 gap-3">
-        <label class={lbl}>Début <input name="period_start" type="date" required class={input} /></label>
-        <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
+        <label class={lbl}>Début <input name="period_start" type="date" required bind:value={mvtDebut} class={input} /></label>
+        <label class={lbl}>Fin <input name="period_end" type="date" required bind:value={mvtFin} class={input} /></label>
       </div>
       <Button type="submit" variant="outline" class="w-full"><ArrowsClockwise size={15} /> Relever les mouvements</Button>
     </form>
