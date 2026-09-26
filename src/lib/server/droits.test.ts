@@ -240,3 +240,40 @@ test('cession de droits : la part de l’auteur entre dans la reddition', async 
   eq('aucune ligne', hors.lines.length, 0);
   DEALS = []; PAIEMENTS = [];
 });
+
+// ── Traducteur : taux dégressif après amortissement de l'à-valoir ──────────
+test('2 % jusqu’à l’amortissement de l’à-valoir, 1 % après', async () => {
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0; DEALS = []; PAIEMENTS = [];
+  // 1 000 ex. à 2 % du PP HT : 379,15 € de brut plein.
+  SALES = [{ format: 'paper', sold: 1000, returned: 0, price: null, end: new Date('2026-06-30') }];
+  // Référence : le brut plein à 2 %, tel que le moteur l'arrondit.
+  CONTRACT = { ...base, role: 'translator', tiers: [{ rate: 2 }], advance: 0, advance_recouped: 0 };
+  const plein = (await computeStatementForAuthor('a1', P1, P2)).lines[0].gross;
+  eq('brut plein à 2 %', plein, 1000 * 0.02 * PPHT);
+
+  // À-valoir déjà soldé : tout au taux réduit.
+  CONTRACT = { ...base, role: 'translator', tiers: [{ rate: 2 }], advance: 100, advance_recouped: 100, rate_after_advance: 1 };
+  const solde = await computeStatementForAuthor('a1', P1, P2);
+  // Le moteur arrête au centime : la moitié d'un brut impair s'arrondit.
+  const cent = (n: number) => Math.round(n * 100) / 100;
+  eq('tout à 1 %', solde.lines[0].gross, cent(plein / 2));
+
+  // À-valoir de 100 € restant : les 100 premiers euros à 2 %, le reste à 1 %.
+  CONTRACT = { ...base, role: 'translator', tiers: [{ rate: 2 }], advance: 100, advance_recouped: 0, rate_after_advance: 1 };
+  const bascule = await computeStatementForAuthor('a1', P1, P2);
+  eq('bascule à l’euro près', bascule.lines[0].gross, cent(100 + (plein - 100) / 2));
+  eq('à-valoir imputé', bascule.lines[0].advance_applied, 100);
+});
+
+test('traducteur : 10 % de ce qui reste à l’éditeur sur une cession', async () => {
+  BOOK = { returns_provision_rate: 0 }; PREV_LINES = []; PREV_CARRY = 0; SALES = [];
+  DEALS = [{ id: 'd1', counterparty: 'Hoja de Lata', language: 'espagnol', kind: 'translation', author_share: 50, currency: 'EUR' }];
+  PAIEMENTS = [{ amount: 1000, settled_at: new Date('2026-03-01') }];
+
+  CONTRACT = { ...base, role: 'translator', tiers: [{ rate: 2 }], advance: 0, advance_recouped: 0, cession_share: 10 };
+  const r = await computeStatementForAuthor('t1', P1, P2);
+  // 1 000 € encaissés, 500 € aux auteurs, 10 % des 500 € restants.
+  eq('10 % du reliquat éditeur', r.lines[0].gross, 50);
+  expect(r.lines[0].kind, 'ligne de cession').toBe('cession');
+  DEALS = []; PAIEMENTS = [];
+});

@@ -385,6 +385,13 @@ DEFINE FIELD OVERWRITE net_rate    ON royalty_contract TYPE number DEFAULT 60;  
 -- deux coauteurs se saisit à 50 % chacun (les paliers restent comptés en
 -- exemplaires du livre, seule la somme est partagée).
 DEFINE FIELD OVERWRITE share       ON royalty_contract TYPE number DEFAULT 100 VALUE $value ?? 100;
+-- Traducteurs : « 2 % jusqu'à l'amortissement de l'à-valoir, 1 % après ». Le
+-- basculement se fait à l'euro près, au cours même de l'exercice.
+DEFINE FIELD OVERWRITE rate_after_advance ON royalty_contract TYPE option<number>;
+-- Part sur les CESSIONS de droits. Pour un auteur, elle se prend sur la part
+-- des auteurs fixée par la cession ; pour un traducteur, sur ce qui reste
+-- acquis à l'éditeur après rémunération des auteurs (10 % chez Agone).
+DEFINE FIELD OVERWRITE cession_share ON royalty_contract TYPE option<number>;
 -- À-valoir / avance
 DEFINE FIELD OVERWRITE advance          ON royalty_contract TYPE number DEFAULT 0;   -- montant à-valoir
 DEFINE FIELD OVERWRITE advance_recouped ON royalty_contract TYPE number DEFAULT 0;   -- déjà récupéré (cumul)

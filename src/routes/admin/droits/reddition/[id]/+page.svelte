@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ROLE_LABEL } from '$lib/labels';
-  import { ArrowLeft } from 'phosphor-svelte';
+  import { ArrowLeft , FilePdf } from 'phosphor-svelte';
 
   let { data } = $props();
   const s = $derived(data.statement);
@@ -20,6 +20,11 @@
     <h2 class="text-xl font-bold">{s.author_name}</h2>
     <p class="text-sm text-muted-foreground">Période : {fmtP(s.period_start, s.period_end)} · <span class="rounded bg-secondary px-2 py-0.5 text-xs">{STATUS[s.status] ?? s.status}</span></p>
   </div>
+  <div class="flex flex-wrap items-center gap-2">
+  <a href="/admin/droits/reddition/{String(s.id).replace('royalty_statement:', '')}/pdf" target="_blank" rel="noopener"
+    class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted">
+    <FilePdf size={16} /> PDF
+  </a>
   <form method="POST" action="?/status" use:enhance class="flex items-center gap-2">
     <select name="status" class="h-9 rounded-md border border-border bg-background px-2 text-sm">
       <option value="draft" selected={s.status === 'draft'}>Brouillon</option>
@@ -28,6 +33,7 @@
     </select>
     <Button type="submit" variant="outline" size="sm">Mettre à jour</Button>
   </form>
+  </div>
 </div>
 
 <!-- Réserves du calcul : à lever avant d'émettre la reddition. -->

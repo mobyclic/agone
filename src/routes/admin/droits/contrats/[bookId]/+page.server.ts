@@ -48,6 +48,8 @@ export const actions: Actions = {
       base: S('base') || 'ppht',
       net_rate: N('net_rate') ?? 60,
       share: N('share') ?? 100,
+      rate_after_advance: N('rate_after_advance'),
+      cession_share: N('cession_share'),
       advance: N('advance') ?? 0,
       advance_recouped: N('advance_recouped') ?? 0,
       status: S('status') || 'active',

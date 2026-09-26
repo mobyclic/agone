@@ -209,6 +209,14 @@
     <div class="grid gap-3 sm:grid-cols-3">
       <label class={lbl}>À-valoir (€) <input name="advance" type="number" step="0.01" value={ct?.advance ?? 0} class={input} /></label>
       <label class={lbl}>À-valoir déjà récupéré (€) <input name="advance_recouped" type="number" step="0.01" value={ct?.advance_recouped ?? 0} class={input} /></label>
+      <label class={lbl} title="Contrats de traduction : « 2 % jusqu’à l’amortissement de l’à-valoir, 1 % après ». Le basculement se fait à l’euro près, même en cours d’exercice.">
+        Taux après amortissement (%)
+        <input name="rate_after_advance" type="number" step="0.5" min="0" placeholder="aucun" value={ct?.rate_after_advance ?? ''} class={input} />
+      </label>
+      <label class={lbl} title="Part sur les cessions de droits. Pour un auteur, elle se prend sur la part d’auteurs de la cession ; pour un traducteur, sur ce qui reste acquis à l’éditeur (10 % chez Agone).">
+        Part sur les cessions (%)
+        <input name="cession_share" type="number" step="1" min="0" max="100" placeholder={ct?.role === 'author' ? 'part du barème' : 'aucune'} value={ct?.cession_share ?? ''} class={input} />
+      </label>
       <label class="mt-5 flex items-center gap-2 text-sm">
         <input type="checkbox" name="tiers_reset" checked={ct?.tiers_reset === true} class="size-4 accent-[var(--color-link)]" />
         Les paliers repartent de zéro

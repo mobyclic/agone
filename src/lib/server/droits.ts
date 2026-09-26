@@ -64,6 +64,10 @@ export interface ContractInput {
   tiers: Tier[]; scope: string; base: string; net_rate?: number;
   /** Part du barème revenant à ce contributeur (100 = tout ; 50 pour deux coauteurs). */
   share?: number;
+  /** Taux appliqué une fois l'à-valoir amorti (contrats de traduction). */
+  rate_after_advance?: number;
+  /** Part sur les cessions de droits (% ; pour un traducteur, de ce qui reste à l'éditeur). */
+  cession_share?: number;
   advance?: number; advance_recouped?: number; status?: string; notes?: string;
   /** Validité : un avenant en cours d'année = un second contrat qui prend la suite. */
   term_start?: string; term_end?: string; tiers_reset?: boolean;
@@ -75,7 +79,7 @@ export interface ContractInput {
 export async function contractsForBook(bookId: string) {
   return query<any>(
     `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate, share,
-        advance, advance_recouped, status, notes, term_start, term_end
+        rate_after_advance, cession_share, advance, advance_recouped, status, notes, term_start, term_end
       FROM royalty_contract WHERE book = $b ORDER BY role, term_start`,
     { b: recId('book', bookId) }
   );
@@ -89,6 +93,8 @@ export async function upsertContract(d: ContractInput) {
     book: recId('book', d.bookId), author: recId('author', d.authorId), role: d.role || 'author',
     tiers, scope: d.scope || 'all', base: d.base || 'ppht', net_rate: d.net_rate ?? 60,
     share: Math.min(100, Math.max(0, d.share ?? 100)),
+    rate_after_advance: Number.isFinite(Number(d.rate_after_advance)) ? Number(d.rate_after_advance) : undefined,
+    cession_share: Number.isFinite(Number(d.cession_share)) ? Number(d.cession_share) : undefined,
     advance: d.advance ?? 0, advance_recouped: d.advance_recouped ?? 0,
     status: d.status || 'active', notes: d.notes || undefined,
     term_start: d.term_start ? new Date(d.term_start) : undefined,
@@ -455,7 +461,8 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
   // de l'exercice, et leur provision sur retours reste à reprendre l'année d'après.
   const contracts = await query<any>(
     `SELECT id, book, book.title AS book_title, book.price_paper AS price_paper, book.price_ebook AS price_ebook,
-        book.vat_rate AS vat_rate, role, tiers, tiers_reset, scope, base, net_rate, share, advance, advance_recouped,
+        book.vat_rate AS vat_rate, role, tiers, tiers_reset, scope, base, net_rate, share,
+        rate_after_advance, cession_share, advance, advance_recouped,
         term_start, term_end
       FROM royalty_contract WHERE author = $a AND status != 'draft'`,
     { a: recId('author', authorId) }
@@ -556,9 +563,23 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
       // Part du contributeur : un barème partagé entre coauteurs se saisit en
       // pourcentage, les paliers restant comptés sur les ventes du livre.
       const part = Math.min(100, Math.max(0, Number(c.share ?? 100))) / 100;
-      const gross = r2((brutPlein - abattement) * part);
-
       const outstanding = Math.max(0, (c.advance ?? 0) - (c.advance_recouped ?? 0));
+
+      // Traducteurs : « 2 % jusqu'à l'amortissement de l'à-valoir, 1 % après ».
+      // Le basculement tombe à l'euro près, souvent au milieu de l'exercice :
+      // la part du brut qui solde l'à-valoir reste au premier taux, le reste
+      // passe au second.
+      const tauxApres = Number(c.rate_after_advance);
+      let gross = r2((brutPlein - abattement) * part);
+      let effRateAffiche = effRate;
+      if (Number.isFinite(tauxApres) && tauxApres >= 0 && effRate > 0 && gross > outstanding && outstanding >= 0) {
+        const apres = (gross - outstanding) * (tauxApres / effRate);
+        gross = r2(outstanding + apres);
+        // Taux moyen réellement appliqué sur l'exercice, pour la lisibilité.
+        const plein = r2((brutPlein - abattement) * part);
+        effRateAffiche = plein > 0 ? r2((gross / plein) * effRate) : effRate;
+      }
+
       const advance_applied = gross > 0 ? r2(Math.min(gross, outstanding)) : 0;
       const net = r2(gross - advance_applied);
       // Les paliers continuent de courir d'un avenant à l'autre.
@@ -569,7 +590,7 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
         contract: contractId, book: bookId, book_title: titre, role: c.role, format: c.scope,
         units, units_sold: sold, units_returned: returned, units_provision, units_released,
         units_export: unitesExport,
-        base_amount: r2(baseUnit), rate: effRate, share: r2(part * 100), gross, advance_applied, net,
+        base_amount: r2(baseUnit), rate: effRateAffiche, share: r2(part * 100), gross, advance_applied, net,
         segment_start: partiel && seg ? seg.from.toISOString() : undefined,
         segment_end: partiel && seg ? seg.to.toISOString() : undefined
       });
@@ -596,7 +617,9 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
   const principal = new Map<string, any>();
   const priorite = (scope: string) => (scope === 'all' ? 0 : scope === 'paper' ? 1 : 2);
   for (const c of contracts) {
-    if (c.role !== 'author') continue;
+    // Les auteurs se partagent la part d'auteurs de la cession ; un autre
+    // contributeur (traducteur) n'y a droit que si son contrat le prévoit.
+    if (c.role !== 'author' && !Number(c.cession_share)) continue;
     const bookId = String(c.book).replace(/^book:/, '');
     const actuel = principal.get(bookId);
     if (!actuel || priorite(c.scope) < priorite(actuel.scope)) principal.set(bookId, c);
@@ -605,13 +628,21 @@ export async function computeStatementForAuthor(authorId: string, periodStart: D
     const { produitsCessions } = await import('./cessions');
     for (const p of await produitsCessions(bookId, periodStart, periodEnd)) {
       const part = Math.min(100, Math.max(0, Number(c.share ?? 100))) / 100;
-      const gross = r2(p.part_auteurs * part);
+      // Auteur : sa part du barème appliquée à la part d'auteurs de la cession.
+      // Traducteur : « 10 % de la part restant acquise à l'Éditeur après
+      // rémunération de l'auteur » — donc sur le reliquat, pas sur le tout.
+      const surCession = Number(c.cession_share);
+      const gross = c.role === 'author' && !Number.isFinite(surCession)
+        ? r2(p.part_auteurs * part)
+        : r2((p.encaisse - p.part_auteurs) * (Math.min(100, Math.max(0, surCession || 0)) / 100));
       if (!gross) continue;
       lines.push({
         contract: String(c.id), book: bookId, book_title: c.book_title, role: c.role, format: c.scope,
         kind: 'cession', label: p.libelle,
         units: 0, units_sold: 0, units_returned: 0, units_provision: 0, units_released: 0, units_export: 0,
-        base_amount: p.encaisse, rate: p.author_share, share: r2(part * 100),
+        base_amount: p.encaisse,
+        rate: c.role === 'author' && !Number.isFinite(Number(c.cession_share)) ? p.author_share : Number(c.cession_share ?? 0),
+        share: r2(part * 100),
         gross, advance_applied: 0, net: gross
       });
       gross_total += gross;

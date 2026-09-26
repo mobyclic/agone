@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Coins } from 'phosphor-svelte';
+  import { ArrowLeft, Coins , FilePdf } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const eur = (n: number) => `${(n ?? 0).toFixed(2).replace('.', ',')} €`;
@@ -83,7 +83,7 @@
   <div class="overflow-x-auto rounded-lg border border-border bg-card">
     <table class="w-full text-sm">
       <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-        <tr><th class="px-3 py-2 font-medium">Auteur</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 text-right font-medium">Brut</th><th class="px-3 py-2 text-right font-medium">À-valoir</th><th class="px-3 py-2 text-right font-medium">Report</th><th class="px-3 py-2 text-right font-medium">Net dû</th><th class="px-3 py-2 text-right font-medium">À payer</th></tr>
+        <tr><th class="px-3 py-2 font-medium">Auteur</th><th class="px-3 py-2 font-medium">Statut</th><th class="px-3 py-2 text-right font-medium">Brut</th><th class="px-3 py-2 text-right font-medium">À-valoir</th><th class="px-3 py-2 text-right font-medium">Report</th><th class="px-3 py-2 text-right font-medium">Net dû</th><th class="px-3 py-2 text-right font-medium">À payer</th><th class="px-3 py-2"></th></tr>
       </thead>
       <tbody class="divide-y divide-border">
         {#each data.statements as s (s.id)}
@@ -98,10 +98,14 @@
               {s.payable ? eur(s.payable) : '—'}
               {#if !s.payable && s.carry_out}<span class="block text-[11px] font-normal">reporté</span>{/if}
             </td>
+            <td class="px-3 py-2 text-right">
+              <a href="/admin/droits/reddition/{String(s.id).replace('royalty_statement:', '')}/pdf" target="_blank" rel="noopener"
+                class="text-muted-foreground hover:text-link" aria-label="Reddition en PDF" title="Reddition en PDF"><FilePdf size={17} /></a>
+            </td>
           </tr>
         {/each}
         {#if data.statements.length === 0}
-          <tr><td colspan="7" class="px-3 py-8 text-center text-sm text-muted-foreground">
+          <tr><td colspan="8" class="px-3 py-8 text-center text-sm text-muted-foreground">
             Aucune reddition pour cette période. Une reddition suppose un titre à la fois
             <a href="/admin/droits/contrats" class="text-link hover:underline">sous contrat</a> et
             <a href="/admin/droits/ventes" class="text-link hover:underline">relevé en ventes</a>.
