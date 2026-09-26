@@ -56,7 +56,7 @@ function getClient(): S3Client {
 }
 
 /** Préfixes stockés dans le bucket privé (jamais d'URL publique). */
-const PREFIXES_PRIVES = ['livres/ebooks/'];
+const PREFIXES_PRIVES = ['livres/ebooks/', 'contrats/'];
 
 /** Le fichier est-il de ceux qui ne doivent pas être servis en direct ? */
 export function estPrive(key: string): boolean {

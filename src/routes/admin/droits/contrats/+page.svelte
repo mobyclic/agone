@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown, CaretRight } from 'phosphor-svelte';
+  import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown, CaretRight, FileArrowUp } from 'phosphor-svelte';
   import ResumeVentesLivre from '$lib/components/ResumeVentesLivre.svelte';
   let { data } = $props();
 
@@ -45,6 +45,12 @@
   Cliquez sur un livre pour voir ses ventes. Les colonnes indiquent, par rôle, le nombre de contributeurs ayant un
   contrat validé — « 1/1 » signifie couvert, « +1 » un contrat encore en brouillon.
 </p>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+  <a href="/admin/droits/contrats/analyser" class="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:bg-link">
+    <FileArrowUp size={15} /> Lire un contrat déposé
+  </a>
+</div>
 
 <form method="GET" class="mb-4 max-w-md">
   <div class="relative">

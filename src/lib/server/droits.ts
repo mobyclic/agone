@@ -67,6 +67,8 @@ export interface ContractInput {
   advance?: number; advance_recouped?: number; status?: string; notes?: string;
   /** Validité : un avenant en cours d'année = un second contrat qui prend la suite. */
   term_start?: string; term_end?: string; tiers_reset?: boolean;
+  /** Contrat déposé (PDF), rangé dans le stockage privé. */
+  documentId?: string;
 }
 
 /** Contrats d'un livre (avec nom d'auteur), indexés par authorId+role. */
@@ -91,7 +93,8 @@ export async function upsertContract(d: ContractInput) {
     status: d.status || 'active', notes: d.notes || undefined,
     term_start: d.term_start ? new Date(d.term_start) : undefined,
     term_end: d.term_end ? new Date(d.term_end) : undefined,
-    tiers_reset: d.tiers_reset === true
+    tiers_reset: d.tiers_reset === true,
+    document: d.documentId ? recId('media', d.documentId.replace(/^media:/, '')) : undefined
   };
   // Modification d'un contrat désigné, sinon upsert par (livre, auteur, rôle,
   // prise d'effet) : les avenants successifs coexistent au lieu de s'écraser.
