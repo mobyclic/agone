@@ -148,15 +148,15 @@
 
 <div class="grid gap-y-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" style="column-gap: var(--page-gutter)">
   <!-- Carte -->
-  <div class="order-2 lg:order-1">
-    <div bind:this={el} class="ag-map-gray h-[420px] w-full rounded-lg border border-border lg:h-[620px]"></div>
+  <div id="carte" class="order-2 scroll-mt-24 lg:order-1">
+    <div bind:this={el} class="ag-map-gray h-[320px] w-full rounded-lg border border-border sm:h-[420px] lg:h-[620px]"></div>
   </div>
 
   <!-- Liste défilante -->
   <div class="order-1 lg:order-2">
     <div
       bind:this={listeEl}
-      class="max-h-[420px] divide-y divide-border overflow-y-auto border-t border-border lg:max-h-[620px]"
+      class="divide-y divide-border border-t border-border lg:max-h-[620px] lg:overflow-y-auto"
     >
       {#each events as e (e.slug)}
         {@const ouverte = selection === e.slug}

@@ -35,19 +35,19 @@
       <div>
         <div class="eyebrow mb-3">Découvrir</div>
         <ul class="space-y-2 text-sm">
-          <li><a class="text-muted-foreground hover:text-foreground" href="/catalogue">Catalogue</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/auteurs">Auteurs</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/rencontres">Rencontres</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/antichambre">Antichambre</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/catalogue">Catalogue</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/auteurs">Auteurs</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/rencontres">Rencontres</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/antichambre">Antichambre</a></li>
         </ul>
       </div>
 
       <div>
         <div class="eyebrow mb-3">La maison</div>
         <ul class="space-y-2 text-sm">
-          <li><a class="text-muted-foreground hover:text-foreground" href="/a-propos">À propos</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/a-paraitre">À paraître</a></li>
-          <li><a class="text-muted-foreground hover:text-foreground" href="/contact">Contact</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/a-propos">À propos</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/a-paraitre">À paraître</a></li>
+          <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/contact">Contact</a></li>
         </ul>
       </div>
 
@@ -82,9 +82,9 @@
     <div class="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row">
       <p>© {year} Agone éditeur — Marseille. Tous droits réservés.</p>
       <div class="flex gap-4">
-        <a class="hover:text-foreground" href="/mentions-legales">Mentions légales</a>
-        <a class="hover:text-foreground" href="/cgv">CGV</a>
-        <button type="button" class="hover:text-foreground" onclick={() => window.dispatchEvent(new CustomEvent('open-consent-banner'))}>Gérer les cookies</button>
+        <a class="inline-block py-1 hover:text-foreground" href="/mentions-legales">Mentions légales</a>
+        <a class="inline-block py-1 hover:text-foreground" href="/cgv">CGV</a>
+        <button type="button" class="inline-block py-1 hover:text-foreground" onclick={() => window.dispatchEvent(new CustomEvent('open-consent-banner'))}>Gérer les cookies</button>
       </div>
     </div>
   </div>

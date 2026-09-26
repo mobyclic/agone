@@ -93,8 +93,8 @@
         <div class="space-y-6">
           {#each data.books as book (book.slug)}
             <a href="/livre/{book.slug}" class="group flex gap-4">
-              <span class="aspect-[2/3] w-32 shrink-0 overflow-hidden border border-border bg-muted">
-                {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="size-full object-cover" />{/if}
+              <span class="w-32 shrink-0 overflow-hidden border border-border bg-muted">
+                {#if book.cover_url}<img src={book.cover_url} alt="" loading="lazy" class="block h-auto w-full" />{:else}<span class="block aspect-[2/3]"></span>{/if}
               </span>
               <span class="min-w-0">
                 <span class="line-clamp-3 font-display text-base font-medium uppercase leading-tight group-hover:underline group-hover:underline-offset-4">{book.title}</span>

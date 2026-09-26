@@ -10,5 +10,7 @@
 
 <!-- Même principe que l'accueil : la liste défile, la carte suit. -->
 <section class="py-10" style="padding-inline: var(--page-gutter)">
+  <!-- Téléphone : la carte vient après la liste, un raccourci y mène. -->
+  <p class="mb-3 text-sm lg:hidden"><a href="#carte" class="link">Voir la carte des rencontres ↓</a></p>
   <EventsExplorer events={data.events} />
 </section>

@@ -90,7 +90,7 @@
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
     <div class="grid gap-8 sm:grid-cols-[minmax(0,340px)_minmax(0,1fr)] sm:items-start">
     <!-- Couverture + infos annexes — ferrée au défilement comme la colonne de droite. -->
-    <div use:colonneCollante>
+    <div use:colonneCollante class="hidden sm:block">
       {#if b.cover_url}
         <button type="button" onclick={() => openLightbox(0)} class="group block w-full cursor-zoom-in" aria-label="Agrandir la couverture">
           <div class="relative overflow-hidden border border-border bg-secondary/40">
@@ -104,13 +104,7 @@
         </div>
       {/if}
 
-      <dl class="mt-6 space-y-3 text-sm">
-        {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
-        {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
-        {#if dims}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
-        {#if b.isbn_paper}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
-        {#if b.title_original}<div><dt class="text-muted-foreground">Titre original</dt><dd class="mt-0.5 font-medium">{b.title_original}{b.language_original ? ` (${b.language_original})` : ''}</dd></div>{/if}
-      </dl>
+      {@render fiche()}
     </div>
 
     <!-- Contenu -->
@@ -118,60 +112,26 @@
       <!-- Collection seule au-dessus du titre (le retour au catalogue est dans la
            navigation), ligne compacte pour que le titre arrive à la hauteur du
            haut de la couverture. -->
-      {#if collection}
-        <a href="/collections/{collection.slug}" class="block font-display text-xs font-medium uppercase leading-none tracking-wide text-muted-foreground hover:text-foreground">{collection.name}</a>
-      {/if}
-
-      <h2 class="display-title mt-1.5 text-3xl leading-tight sm:text-4xl">{b.title}</h2>
-      {#if b.subtitle}<p class="mt-2 text-base leading-snug text-muted-foreground">{b.subtitle}</p>{/if}
-
-      <!-- Auteur principal : sous le titre, plus gros -->
-      {#if mainAuthors.length}
-        <p class="mt-2 font-display text-xl font-semibold uppercase tracking-wide sm:text-2xl">
-          {#each mainAuthors as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link">{p.name}</a>{#if i < mainAuthors.length - 1}<span>,</span>{' '}{/if}{/each}
-        </p>
-      {/if}
-
-      <!-- Autres contributeurs -->
-      {#if otherContributors.length}
-        <div class="mt-2 space-y-0.5">
-          {#each otherContributors as c (c.role)}
-            <p class="font-display text-xs">
-              <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} :</span>{' '}{#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>,</span>{' '}{/if}{/each}
-            </p>
-          {/each}
+      <!-- Téléphone : couverture réduite à côté du titre, pour que titre, auteur
+           et prix tiennent dans le premier écran ; la fiche technique passe
+           après le texte de présentation. -->
+      <div class="sm:hidden">
+        <div class="grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-4">
+          {#if b.cover_url}
+            <button type="button" onclick={() => openLightbox(0)} class="block w-full cursor-zoom-in border border-border bg-secondary/40" aria-label="Agrandir la couverture">
+              <img src={b.cover_url} alt={b.title} class="block h-auto w-full" />
+            </button>
+          {:else}
+            <div class="flex aspect-[2/3] items-end border border-border bg-ink p-3"><span class="font-display text-sm uppercase leading-tight text-white">{b.title}</span></div>
+          {/if}
+          <div class="min-w-0">{@render entete()}</div>
         </div>
-      {/if}
-
-      <!-- Boutons d'achat par format -->
-      {#if formats.length}
-        <div class="mt-6 flex flex-wrap gap-3">
-          {#each formats as f (f.key)}
-            <form method="POST" action="/panier?/add" use:enhance={addToCart}>
-              <input type="hidden" name="id" value={b.id} />
-              <input type="hidden" name="format" value={f.key} />
-              <input type="hidden" name="qty" value="1" />
-              <button type="submit" disabled={loadingFormat === f.key} class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background disabled:cursor-wait disabled:opacity-70">
-                {#if loadingFormat === f.key}<CircleNotch size={20} weight="bold" class="animate-spin" />{:else if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
-                {f.key === 'souscription' ? 'Souscrire' : `Format ${f.label}`} <span>({euros(f.price)})</span>
-              </button>
-            </form>
-          {/each}
-        </div>
-      {:else if epuise}
-        <p class="mt-6 inline-block border-2 border-border px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">Épuisé</p>
-      {:else if !forthcoming}
-        <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
-      {/if}
-
-      {#if forthcoming && pubFull}
-        <div class="mt-5 inline-block bg-link px-3 py-1.5 font-display text-sm font-semibold uppercase tracking-wide text-white">
-          En librairie le {pubFull}
-        </div>
-      {/if}
-      {#if forthcoming && formats.length && subEndLabel}
-        <p class="mt-2 text-sm text-muted-foreground">Souscription ouverte jusqu'au {subEndLabel}.</p>
-      {/if}
+        <div class="mt-5">{@render achat()}</div>
+      </div>
+      <div class="hidden sm:block">
+        {@render entete()}
+        {@render achat()}
+      </div>
 
       {#if b.description_html}
         <div use:embedsSociaux class="prose-agone texte-justifie mt-7 max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
@@ -181,6 +141,7 @@
       {#if b.extra_info_html}
         <div class="mt-4 border-l-2 border-link bg-secondary/50 p-4 text-sm text-muted-foreground [&_p]:mb-2">{@html b.extra_info_html}</div>
       {/if}
+      <div class="mt-8 border-t border-border pt-5 sm:hidden">{@render fiche()}</div>
     </div>
 
     </div>
@@ -265,3 +226,75 @@
     </div>
   </div>
 {/if}
+
+<!-- Blocs partagés entre la mise en page téléphone et la mise en page large. -->
+{#snippet entete()}
+      {#if collection}
+        <a href="/collections/{collection.slug}" class="block font-display text-xs font-medium uppercase leading-none tracking-wide text-muted-foreground hover:text-foreground">{collection.name}</a>
+      {/if}
+
+      <h2 class="display-title mt-1.5 text-2xl leading-tight sm:text-4xl">{b.title}</h2>
+      {#if b.subtitle}<p class="mt-2 text-base leading-snug text-muted-foreground">{b.subtitle}</p>{/if}
+
+      <!-- Auteur principal : sous le titre, plus gros -->
+      {#if mainAuthors.length}
+        <p class="mt-2 font-display text-lg font-semibold uppercase tracking-wide sm:text-2xl">
+          {#each mainAuthors as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link">{p.name}</a>{#if i < mainAuthors.length - 1}<span>,</span>{' '}{/if}{/each}
+        </p>
+      {/if}
+
+      <!-- Autres contributeurs -->
+      {#if otherContributors.length}
+        <div class="mt-2 space-y-0.5">
+          {#each otherContributors as c (c.role)}
+            <p class="font-display text-xs">
+              <span class="text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role} :</span>{' '}{#each c.people as p, i (p.slug)}<a href="/auteur/{p.slug}" class="link font-semibold uppercase tracking-wide">{p.name}</a>{#if i < c.people.length - 1}<span>,</span>{' '}{/if}{/each}
+            </p>
+          {/each}
+        </div>
+      {/if}
+
+{/snippet}
+
+{#snippet achat()}
+      <!-- Boutons d'achat par format -->
+      {#if formats.length}
+        <div class="mt-6 flex flex-wrap gap-3">
+          {#each formats as f (f.key)}
+            <form method="POST" action="/panier?/add" use:enhance={addToCart} class="max-sm:w-full">
+              <input type="hidden" name="id" value={b.id} />
+              <input type="hidden" name="format" value={f.key} />
+              <input type="hidden" name="qty" value="1" />
+              <button type="submit" disabled={loadingFormat === f.key} class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 max-sm:w-full max-sm:justify-center font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background disabled:cursor-wait disabled:opacity-70">
+                {#if loadingFormat === f.key}<CircleNotch size={20} weight="bold" class="animate-spin" />{:else if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
+                {f.key === 'souscription' ? 'Souscrire' : `Format ${f.label}`} <span>({euros(f.price)})</span>
+              </button>
+            </form>
+          {/each}
+        </div>
+      {:else if epuise}
+        <p class="mt-6 inline-block border-2 border-border px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">Épuisé</p>
+      {:else if !forthcoming}
+        <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
+      {/if}
+
+      {#if forthcoming && pubFull}
+        <div class="mt-5 inline-block bg-link px-3 py-1.5 font-display text-sm font-semibold uppercase tracking-wide text-white">
+          En librairie le {pubFull}
+        </div>
+      {/if}
+      {#if forthcoming && formats.length && subEndLabel}
+        <p class="mt-2 text-sm text-muted-foreground">Souscription ouverte jusqu'au {subEndLabel}.</p>
+      {/if}
+
+{/snippet}
+
+{#snippet fiche()}
+      <dl class="space-y-3 text-sm sm:mt-6">
+        {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
+        {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
+        {#if dims}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
+        {#if b.isbn_paper}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
+        {#if b.title_original}<div><dt class="text-muted-foreground">Titre original</dt><dd class="mt-0.5 font-medium">{b.title_original}{b.language_original ? ` (${b.language_original})` : ''}</dd></div>{/if}
+      </dl>
+{/snippet}

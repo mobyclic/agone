@@ -61,7 +61,7 @@
     ? 'translate-y-0 opacity-100'
     : 'pointer-events-none -translate-y-full opacity-0'}"
 >
-  <div class="flex items-center gap-2 py-2.5 {width}" style="padding-inline: var(--page-gutter)">
+  <div class="flex min-w-0 items-center gap-2 overflow-hidden py-2.5 {width}" style="padding-inline: var(--page-gutter)">
     {#if eyebrow}
       <span class="shrink-0 font-display text-xs font-semibold uppercase tracking-[0.14em] text-background/55">{eyebrow}</span>
       <span class="shrink-0 text-background/30">·</span>

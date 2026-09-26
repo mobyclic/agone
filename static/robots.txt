@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /compte/
+Disallow: /panier
+Disallow: /checkout
+Disallow: /connexion
+Disallow: /inscription
+Disallow: /api/
+Disallow: /recherche
+
+Sitemap: https://agone.org/sitemap.xml
