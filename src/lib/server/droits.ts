@@ -387,7 +387,7 @@ async function tauxProvision(bookId: string, defaut: number): Promise<number> {
 /** Provision retenue à l'exercice PRÉCÉDENT pour ce contrat — reprise cet exercice. */
 async function provisionPrecedente(contractId: string, periodStart: Date): Promise<number> {
   const rows = await query<any>(
-    `SELECT lines FROM royalty_statement
+    `SELECT lines, period_end FROM royalty_statement
        WHERE period_end < $s AND array::len(lines[WHERE contract = $c]) > 0
        ORDER BY period_end DESC LIMIT 1`,
     { s: periodStart, c: contractId }
@@ -399,7 +399,7 @@ async function provisionPrecedente(contractId: string, periodStart: Date): Promi
 /** Report à nouveau : solde non payé (trop faible ou négatif) de l'exercice précédent. */
 async function reportPrecedent(authorId: string, periodStart: Date): Promise<number> {
   const rows = await query<any>(
-    `SELECT carry_out FROM royalty_statement
+    `SELECT carry_out, period_end FROM royalty_statement
        WHERE author = $a AND period_end < $s AND status != 'draft'
        ORDER BY period_end DESC LIMIT 1`,
     { a: recId('author', authorId), s: periodStart }
