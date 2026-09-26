@@ -6,6 +6,18 @@
   import { ArrowLeft, FloppyDisk, Trash, Plus, DotsSixVertical, CaretUp, CaretDown, X, MagnifyingGlass, Eye, TextT, BookOpen, CalendarDots, Cursor, Image as ImageIcon } from 'phosphor-svelte';
 
   let { data, form } = $props();
+
+  // Suivi de l'envoi : état du serveur au chargement, puis sondage tant que ça tourne.
+  let sondage = $state<any>(null);
+  const tache = $derived(sondage ?? (data as any).tache);
+  async function relireEnvoi() {
+    try { sondage = await (await fetch('/admin/newsletter/api/envoi')).json(); } catch { /* on retentera */ }
+  }
+  $effect(() => {
+    if (!tache?.enCours) return;
+    const t = setInterval(relireEnvoi, 2000);
+    return () => clearInterval(t);
+  });
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
 
   // Identifiants aléatoires : un compteur repartant de 1 à chaque chargement
@@ -200,6 +212,48 @@
 </form>
 
 {#if !data.isNew}
+  <!-- Envoi : un test d'abord, puis tous les abonnés (tâche de fond suivie ici). -->
+  {#if !data.isNew}
+    <div class="mt-6 max-w-3xl rounded-lg border border-link/40 bg-link/5 p-5">
+      <h3 class="eyebrow mb-1">Envoi</h3>
+      {#if data.envoi?.newsletter_sent_at}
+        <p class="mb-3 text-sm">
+          <span class="font-medium text-success">Envoyé le {new Date(data.envoi.newsletter_sent_at).toLocaleString('fr-FR')}</span>
+          à {data.envoi.newsletter_sent_count ?? '?'} abonné(s).
+        </p>
+      {:else}
+        <p class="mb-3 text-sm text-muted-foreground">
+          Relisez d’abord un exemplaire dans votre boîte, puis envoyez aux <strong>{data.abonnes}</strong> abonnés actifs.
+          Enregistrez le numéro avant : l’envoi part de ce qui est en base.
+        </p>
+      {/if}
+
+      <form method="POST" action="?/test" use:enhance class="flex flex-wrap items-end gap-2">
+        <label class="text-xs font-medium text-muted-foreground">Envoyer un test à
+          <input name="email" type="email" required placeholder="vous@agone.org" class="mt-1 h-10 w-64 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+        </label>
+        <Button type="submit" variant="outline">Envoyer le test</Button>
+        {#if data.envoi?.newsletter_test_sent_at}<span class="text-xs text-muted-foreground">dernier test le {new Date(data.envoi.newsletter_test_sent_at).toLocaleString('fr-FR')}</span>{/if}
+      </form>
+
+      <form method="POST" action="?/envoyer" class="mt-4"
+        use:enhance={() => async ({ update }) => { await update({ reset: false }); await relireEnvoi(); }}
+        onsubmit={(e: Event) => { if (!confirm(`Envoyer ce numéro aux ${data.abonnes} abonnés ?${data.envoi?.newsletter_sent_at ? '\n\nIl a DÉJÀ été envoyé : ils le recevront une seconde fois.' : ''}`)) e.preventDefault(); }}>
+        <Button type="submit" disabled={tache?.enCours}>
+          {tache?.enCours ? 'Envoi en cours…' : data.envoi?.newsletter_sent_at ? 'Renvoyer à tous les abonnés' : `Envoyer aux ${data.abonnes} abonnés`}
+        </Button>
+      </form>
+
+      {#if tache && tache.issueId === data.issue?.id}
+        <div class="mt-4 text-sm">
+          <div class="h-2 w-full overflow-hidden rounded bg-muted"><div class="h-2 bg-link transition-[width]" style="width:{tache.total ? Math.round((tache.envoyes / tache.total) * 100) : 0}%"></div></div>
+          <p class="mt-1.5 text-muted-foreground">{tache.envoyes} / {tache.total} envoyés{tache.enCours ? '…' : ' — terminé'}</p>
+          {#if tache.erreurs.length}<ul class="mt-1 list-disc pl-5 text-xs text-destructive">{#each tache.erreurs as e (e)}<li>{e}</li>{/each}</ul>{/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   <form method="POST" action="?/delete" use:enhance class="mt-6 max-w-3xl border-t border-border pt-4">
     <Button type="submit" variant="ghost" size="sm" class="text-destructive hover:bg-destructive/10"
       onclick={(e: Event) => { if (!confirm('Supprimer ce numéro ?')) e.preventDefault(); }}>

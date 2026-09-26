@@ -74,6 +74,47 @@ export async function sendMail(
   }
 }
 
+/**
+ * Envoi groupé (LettrInfo) : jusqu'à 100 messages par appel Resend. En mode
+ * DRY_RUN, seuls les trois premiers partent, vers l'adresse de repli — un essai
+ * ne doit pas inonder une boîte de mille copies.
+ */
+export async function sendMailBatch(
+  lots: SendMailOptions[]
+): Promise<{ ok: number; erreurs: string[] }> {
+  if (!lots.length) return { ok: 0, erreurs: [] };
+  let envois = lots;
+  if (DRY_RUN) {
+    envois = lots.slice(0, 3).map((o) => ({
+      ...o, to: dryRunTo, subject: `[DRY-RUN → ${Array.isArray(o.to) ? o.to.join(', ') : o.to}] ${o.subject}`
+    }));
+  }
+  const client = getClient();
+  if (!client) {
+    console.log(`[mail] (console) lot de ${envois.length} message(s) — ${envois[0]?.subject}`);
+    return { ok: lots.length, erreurs: [] };
+  }
+  const erreurs: string[] = [];
+  let ok = 0;
+  for (let i = 0; i < envois.length; i += 100) {
+    const tranche = envois.slice(i, i + 100);
+    try {
+      const res = await client.batch.send(
+        tranche.map((o) => ({
+          from: o.from || FROM, to: o.to, subject: o.subject, html: o.html, text: o.text,
+          replyTo: o.replyTo || REPLY_TO, headers: o.headers
+        }))
+      );
+      if (res.error) erreurs.push(String(res.error.message ?? res.error));
+      else ok += tranche.length;
+    } catch (e: any) {
+      erreurs.push(String(e?.message ?? e));
+    }
+  }
+  // En simulation, on compte comme si tout était parti : la page reste lisible.
+  return { ok: DRY_RUN ? lots.length : ok, erreurs };
+}
+
 // ── Gabarit HTML minimal, sobre & éditorial (encre + rouge Agone) ──
 export function layout(title: string, inner: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f5f5f4;font-family:Georgia,'Times New Roman',serif;color:#171717">

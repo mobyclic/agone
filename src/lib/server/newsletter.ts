@@ -150,11 +150,14 @@ export interface NewsletterIssueRow {
   status: string;
   published_at?: string;
   book_count: number;
+  sent_at?: string;
+  sent_count?: number;
 }
 
 export async function listNewsletterIssues(limit = 60): Promise<NewsletterIssueRow[]> {
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, title, slug, status, published_at, array::len(books ?? []) AS book_count
+    `SELECT meta::id(id) AS id, title, slug, status, published_at, newsletter_sent_at, newsletter_sent_count,
+            array::len(books ?? []) AS book_count
        FROM article WHERE is_newsletter_issue = true ORDER BY published_at DESC LIMIT $limit`,
     { limit }
   );
@@ -164,6 +167,8 @@ export async function listNewsletterIssues(limit = 60): Promise<NewsletterIssueR
     slug: r.slug,
     status: r.status ?? 'draft',
     published_at: r.published_at ?? undefined,
+    sent_at: r.newsletter_sent_at ?? undefined,
+    sent_count: r.newsletter_sent_count ?? undefined,
     book_count: r.book_count ?? 0
   }));
 }

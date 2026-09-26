@@ -77,7 +77,10 @@
         {#each data.issues as it (it.id)}
           <tr class="hover:bg-muted/30">
             <td class="px-3 py-2"><a href="/admin/newsletter/numeros/{it.id}" class="font-medium hover:text-link">{it.title}</a></td>
-            <td class="px-3 py-2"><span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{CONTENT_STATUS_LABEL[it.status] ?? it.status}</span></td>
+            <td class="px-3 py-2">
+              {#if it.sent_at}<span class="rounded bg-success/15 px-2 py-0.5 text-xs text-success" title="{it.sent_count ?? '?'} abonnés">Envoyée {dateFr(it.sent_at)}</span>
+              {:else}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{CONTENT_STATUS_LABEL[it.status] ?? it.status}</span>{/if}
+            </td>
             <td class="px-3 py-2 text-right tabular-nums text-muted-foreground">{it.book_count}</td>
             <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(it.published_at)}</td>
             <td class="px-3 py-2">
