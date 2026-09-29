@@ -87,6 +87,23 @@
         <h3 class="eyebrow mb-3">Portrait</h3>
         <ImageUpload bind:mediaId={portraitId} bind:url={portraitUrl} folder="auteurs" kind="image" label="" accept="image/*" />
         <input type="hidden" name="portraitId" value={portraitId ?? ''} />
+        {#if portraitId}
+          <!-- Légende affichée sous le portrait, sur la fiche publique. -->
+          <div class="mt-4 space-y-2.5 border-t border-border pt-3">
+            <label class="block text-xs font-medium text-muted-foreground">Crédit
+              <input name="portrait_credit" value={a?.portrait_credit ?? ''} placeholder="ex. Jane Doe" class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary" />
+            </label>
+            <label class="block text-xs font-medium text-muted-foreground">Licence
+              <input name="portrait_license" value={a?.portrait_license ?? ''} placeholder="ex. CC BY-SA 4.0" class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary" />
+            </label>
+            <label class="block text-xs font-medium text-muted-foreground">Page d’origine
+              <input name="portrait_source" type="url" value={a?.portrait_source ?? ''} placeholder="https://commons.wikimedia.org/…" class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary" />
+            </label>
+            <p class="text-[11px] leading-snug text-muted-foreground">
+              Une photo sous licence libre doit garder sa mention : corrigez-la, ne la videz pas.
+            </p>
+          </div>
+        {/if}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <label class="flex items-center gap-2 text-sm">

@@ -175,6 +175,8 @@ export async function getAuthorAdmin(id: string) {
 export async function getAuthorAdminBySlug(slug: string) {
   const rows = await query<any>(
     `SELECT *, meta::id(id) AS pid, portrait.url AS portrait_url,
+        portrait.credit AS portrait_credit, portrait.license AS portrait_license,
+        portrait.source_url AS portrait_source,
         array::len(array::distinct(<-contributed_by<-book)) AS book_count
       FROM author WHERE slug = $slug LIMIT 1`,
     { slug }
@@ -365,4 +367,20 @@ export async function listAuthorsOverview(): Promise<AuthorOverviewRow[]> {
       };
     })
     .sort((x, y) => (x.last_name || x.full_name).localeCompare(y.last_name || y.full_name, 'fr', { sensitivity: 'base' }));
+}
+
+/**
+ * Légende du portrait : crédit, licence et page d'origine. Elle vit sur l'image
+ * (`media`), pas sur l'auteur — la même photo garde sa mention où qu'elle serve.
+ * Une licence libre IMPOSE cette mention : on peut la corriger, pas l'oublier.
+ */
+export async function setLegendePortrait(
+  mediaId: string,
+  d: { credit?: string; license?: string; source_url?: string }
+): Promise<void> {
+  const v = (x?: string) => (x && x.trim() ? x.trim() : undefined);
+  await query(`UPDATE $id SET credit = $c, license = $l, source_url = $s`, {
+    id: recId('media', mediaId.replace(/^media:/, '')),
+    c: v(d.credit), l: v(d.license), s: v(d.source_url)
+  });
 }

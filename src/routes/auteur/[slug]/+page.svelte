@@ -30,23 +30,25 @@
 <div class="py-8" style="padding-inline: var(--page-gutter)">
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
     <!-- Sans rencontre à venir, la colonne de droite serait vide : le contenu prend toute la largeur. -->
-    <div class="grid gap-8 sm:items-start {a.portrait_url ? 'sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)]' : ''} {data.rencontres.length ? '' : 'lg:col-span-2'}">
-      <!-- Portrait + repères — seulement s'il y a un portrait : sans photo, rien
-           à gauche, le texte prend la largeur. -->
-      {#if a.portrait_url}
-      <div use:colonneCollante>
-        <div class="aspect-[4/5] w-full max-w-[280px] overflow-hidden border border-border bg-muted">
-          <img src={a.portrait_url} alt={a.full_name} class="size-full object-cover" />
-        </div>
+    <div class="grid gap-8 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)] sm:items-start {data.rencontres.length ? '' : 'lg:col-span-2'}">
+      <!-- Portrait + repères. Sans photo, la colonne reste (le texte garde sa
+           mesure et son alignement d'une fiche à l'autre) mais aucun cadre de
+           remplacement n'y est posé. Sur téléphone, vide, elle ne prend pas de place. -->
+      <div use:colonneCollante class="min-w-0 {a.portrait_url || a.nationality || years || a.website ? '' : 'max-sm:hidden'}">
+        {#if a.portrait_url}
+          <div class="aspect-[4/5] w-full max-w-[280px] overflow-hidden border border-border bg-muted">
+            <img src={a.portrait_url} alt={a.full_name} class="size-full object-cover" />
+          </div>
+        {/if}
         {#if a.portrait_credit || a.portrait_license}
           <!-- Mention imposée par la licence libre de la photo. -->
-          <p class="mt-1.5 max-w-[280px] text-[11px] leading-snug text-muted-foreground">
+          <p class="mt-1.5 max-w-[280px] text-[11px] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
             {#if a.portrait_source}<a href={a.portrait_source} target="_blank" rel="noopener" class="hover:text-foreground">Photo</a>{:else}Photo{/if}
             {#if a.portrait_credit}: {a.portrait_credit}{/if}{#if a.portrait_license} · {a.portrait_license}{/if}
           </p>
         {/if}
 
-        <dl class="mt-6 max-w-[280px] space-y-3 text-sm">
+        <dl class="{a.portrait_url ? 'mt-6' : ''} max-w-[280px] space-y-3 text-sm">
           {#if a.nationality}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Nationalité</dt><dd class="text-right font-medium">{a.nationality}</dd></div>{/if}
           {#if years}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Dates</dt><dd class="font-medium">{years}</dd></div>{/if}
           {#if a.website}
@@ -54,7 +56,6 @@
           {/if}
         </dl>
       </div>
-      {/if}
 
       <!-- Contenu -->
       <div class="min-w-0">
@@ -62,14 +63,6 @@
           <a href="/auteurs" class="hover:text-foreground">Auteurs</a>
         </nav>
         <h1 class="display-title text-3xl leading-tight sm:text-4xl">{a.full_name}</h1>
-        {#if !a.portrait_url && (a.nationality || years || a.website)}
-          <!-- Sans portrait, les repères de la colonne de gauche viennent ici. -->
-          <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-            {#if a.nationality}<span>{a.nationality}</span>{/if}
-            {#if years}<span>{years}</span>{/if}
-            {#if a.website}<a href={a.website} target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-link hover:underline"><ArrowSquareOut size={14} /> Site web</a>{/if}
-          </p>
-        {/if}
         {#if a.bio_html}
           <div class="prose-agone texte-justifie mt-7 max-w-4xl text-[17px] leading-relaxed text-foreground/90 [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
             {@html a.bio_html}

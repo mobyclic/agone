@@ -2,7 +2,7 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import { isAdmin } from '$lib/roles';
-import { getAuthorAdminBySlug, upsertAuthor, deleteAuthor, booksForAuthorAdmin, type AuthorInput } from '$lib/server/authors';
+import { getAuthorAdminBySlug, upsertAuthor, deleteAuthor, booksForAuthorAdmin, setLegendePortrait, type AuthorInput } from '$lib/server/authors';
 import { statementsForAuthor, ventesParExerciceAuteur } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
@@ -59,6 +59,12 @@ export const actions: Actions = {
       siret: (canEditFiscal ? S('siret') : existing?.siret) || undefined
     };
     const { slug } = await upsertAuthor(editId, input);
+    // La légende appartient à l'image : on l'écrit sur le portrait retenu.
+    if (input.portraitId) {
+      await setLegendePortrait(input.portraitId, {
+        credit: S('portrait_credit'), license: S('portrait_license'), source_url: S('portrait_source')
+      });
+    }
     throw redirect(303, withFlash(`/admin/auteurs/${slug}`, 'Auteur enregistré.', 'success'));
   },
 
