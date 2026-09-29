@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { MagnifyingGlass } from 'phosphor-svelte';
-  import { lienCible } from '$lib/server/journal';
+  import { lienCible } from '$lib/journal';
   let { data } = $props();
 
   const TYPES: Record<string, string> = {
