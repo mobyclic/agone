@@ -5,6 +5,7 @@
 import { query } from './surreal';
 import { deburr, accentRegex } from '$lib/text';
 import { ARTICLE_EN_LIGNE } from './articles';
+import { auteursAvecContenu } from './authors';
 
 export interface SearchResults {
   books: { title: string; slug: string; cover_url?: string; author?: string }[];
@@ -23,9 +24,11 @@ export async function siteSearch(qRaw: string, perType = 6): Promise<SearchResul
          FROM book WHERE status = 'published' AND string::matches(title, $re)
          ORDER BY published_at DESC LIMIT $lim`, vars),
     query<any>(
-      `SELECT full_name, slug FROM author
+      // Large d'abord (40), filtré ensuite : les fiches sans livre, article ni
+      // rencontre sont écartées, puis on garde les `perType` premières.
+      `SELECT id, full_name, slug FROM author
          WHERE hidden != true AND string::matches(full_name, $re)
-         ORDER BY full_name ASC LIMIT $lim`, vars),
+         ORDER BY full_name ASC LIMIT 40`, vars),
     query<any>(
       `SELECT title, slug, published_at, rubrique.name AS rubrique FROM article
          WHERE ${ARTICLE_EN_LIGNE} AND string::matches(title, $re)
@@ -35,10 +38,12 @@ export async function siteSearch(qRaw: string, perType = 6): Promise<SearchResul
          WHERE string::matches(title, $re)
          ORDER BY start_at DESC LIMIT $lim`, vars)
   ]);
+  const actifs = await auteursAvecContenu(authors.map((a) => String(a.id)));
+  const auteursUtiles = authors.filter((a) => actifs.has(String(a.id))).slice(0, perType);
   const now = Date.now();
   return {
     books: books.map((b) => ({ title: b.title, slug: b.slug, cover_url: b.cover_url ?? undefined, author: (b.a_names ?? [])[0] ?? undefined })),
-    authors: authors.map((a) => ({ full_name: a.full_name, slug: a.slug })),
+    authors: auteursUtiles.map((a) => ({ full_name: a.full_name, slug: a.slug })),
     articles: articles.map((a) => ({ title: a.title, slug: a.slug, rubrique: a.rubrique ?? undefined, published_at: a.published_at ?? undefined })),
     events: events.map((e) => ({
       title: e.title, slug: e.slug, start_at: e.start_at ?? undefined, venue_city: e.venue_city ?? undefined,

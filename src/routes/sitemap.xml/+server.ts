@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { query } from '$lib/server/surreal';
 import { ARTICLE_EN_LIGNE } from '$lib/server/articles';
+import { auteursAvecContenu } from '$lib/server/authors';
 
 /**
  * Plan du site pour les moteurs : tout ce qui est public et en ligne. Les
@@ -13,7 +14,7 @@ export const GET: RequestHandler = async ({ url }) => {
   const base = url.origin.includes('localhost') ? 'https://agone.org' : url.origin;
   const [books, authors, articles, events, collections, pages] = await Promise.all([
     query<any>(`SELECT slug, updated_at FROM book WHERE status = 'published' AND slug != NONE`),
-    query<any>(`SELECT slug, updated_at FROM author WHERE slug != NONE`),
+    query<any>(`SELECT id, slug, updated_at FROM author WHERE slug != NONE AND hidden != true`),
     query<any>(`SELECT slug, updated_at FROM article WHERE ${ARTICLE_EN_LIGNE} AND slug != NONE`),
     query<any>(`SELECT slug, updated_at FROM event WHERE slug != NONE`),
     query<any>(`SELECT slug FROM collection WHERE slug != NONE`),
@@ -32,7 +33,9 @@ export const GET: RequestHandler = async ({ url }) => {
   const jour = (d?: string) => (d ? new Date(d).toISOString().slice(0, 10) : undefined);
   for (const c of collections) entrees.push({ loc: `/collections/${c.slug}`, priority: '0.7' });
   for (const b of books) entrees.push({ loc: `/livre/${b.slug}`, lastmod: jour(b.updated_at), priority: '0.8' });
-  for (const a of authors) entrees.push({ loc: `/auteur/${a.slug}`, lastmod: jour(a.updated_at), priority: '0.5' });
+  // Les fiches d'auteur vides (ni livre, ni article, ni rencontre) ne sont pas proposées aux moteurs.
+  const actifs = await auteursAvecContenu();
+  for (const a of authors.filter((x: any) => actifs.has(String(x.id)))) entrees.push({ loc: `/auteur/${a.slug}`, lastmod: jour(a.updated_at), priority: '0.5' });
   for (const a of articles) entrees.push({ loc: `/article/${a.slug}`, lastmod: jour(a.updated_at), priority: '0.6' });
   for (const e of events) entrees.push({ loc: `/rencontres/${e.slug}`, lastmod: jour(e.updated_at), priority: '0.4' });
   for (const p of pages) entrees.push({ loc: `/${p.slug}`, lastmod: jour(p.updated_at), priority: '0.3' });

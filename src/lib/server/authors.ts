@@ -4,6 +4,7 @@
  * l'arête inverse `<-contributed_by<-book`.
  */
 import { query, recId } from './surreal';
+import { ARTICLE_EN_LIGNE } from './articles';
 import { uniqueSlug } from './slug';
 import { accentRegex, deburr } from '$lib/text';
 import { ROLE_LABEL, ROLE_ORDER } from '$lib/labels';
@@ -383,4 +384,24 @@ export async function setLegendePortrait(
     id: recId('media', mediaId.replace(/^media:/, '')),
     c: v(d.credit), l: v(d.license), s: v(d.source_url)
   });
+}
+
+/**
+ * Parmi ces auteurs, ceux qui ont quelque chose à montrer : un livre (à quelque
+ * titre que ce soit), un article en ligne ou une rencontre. Les deux tiers des
+ * fiches héritées de WordPress n'ont rien de tout cela — des noms sans page
+ * utile, qu'on ne propose ni dans la recherche ni aux moteurs.
+ * Sans argument, la question est posée pour tous les auteurs.
+ */
+export async function auteursAvecContenu(ids?: string[]): Promise<Set<string>> {
+  const cibles = ids?.map((i) => recId('author', String(i).replace(/^author:/, '')));
+  if (cibles && !cibles.length) return new Set();
+  const filtre = (champ: string) => (cibles ? ` AND ${champ} CONTAINSANY $ids` : '');
+  const vars = cibles ? { ids: cibles } : {};
+  const [livres, articles, rencontres] = await Promise.all([
+    query<any>(`SELECT VALUE out FROM contributed_by${cibles ? ' WHERE out IN $ids' : ''}`, vars),
+    query<any>(`SELECT VALUE authors FROM article WHERE ${ARTICLE_EN_LIGNE} AND authors != NONE${filtre('authors')}`, vars),
+    query<any>(`SELECT VALUE authors FROM event WHERE authors != NONE${filtre('authors')}`, vars)
+  ]);
+  return new Set([...livres, ...articles.flat(), ...rencontres.flat()].filter(Boolean).map((x) => String(x)));
 }
