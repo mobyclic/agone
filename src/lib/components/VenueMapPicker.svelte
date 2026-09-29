@@ -43,7 +43,9 @@
       const la = Number(lat), ln = Number(lng);
       const has = String(lat) && String(lng) && !Number.isNaN(la) && !Number.isNaN(ln);
       map = L.map(el, { scrollWheelZoom: false }).setView(has ? [la, ln] : [46.6, 2.4], has ? 15 : 5);
-      ajouterFondDeCarte(L, map, { maxZoom: 19 });
+      // Outil de placement : il faut voir la rue, y compris à l'étranger où le Plan IGN
+      // s'arrête tôt — le socle OSM comble ce que le vectoriel ne peint pas.
+      ajouterFondDeCarte(L, map, { maxZoom: 19, socleMondial: true });
       if (has) place(la, ln);
       map.on('click', (e: any) => {
         place(e.latlng.lat, e.latlng.lng);

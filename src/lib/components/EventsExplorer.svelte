@@ -12,7 +12,7 @@
    */
   import { onMount, onDestroy } from 'svelte';
   import { MapPin, Phone, Globe, X, CalendarBlank } from 'phosphor-svelte';
-  import { ajouterFondDeCarteAuDefilement } from '$lib/client/map-tiles';
+  import { ajouterFondDeCarteAuDefilement, zoomLisible } from '$lib/client/map-tiles';
 
   interface Venue {
     name?: string; address?: string; city?: string; post_code?: string; country?: string;
@@ -72,7 +72,8 @@
   let L: any = null;
   let map: any = null;
   /** Regroupement des points : plusieurs rencontres dans une même ville se
-   *  recouvraient. Défait au zoom d'une fiche, où l'on veut le point lui-même. */
+   *  recouvraient. Défait dès le zoom 7 — le plus bas auquel s'ouvre une fiche
+   *  (lieu lointain) — pour que le repère ouvert soit toujours le point lui-même. */
   let groupe: any = null;
   const reperes = new Map<string, any>();
 
@@ -98,7 +99,9 @@
     selection = slug;
     const e = events.find((x) => x.slug === slug);
     if (e?.venue?.lat != null && e.venue?.lng != null && map) {
-      map.flyTo([e.venue.lat, e.venue.lng], ZOOM_FICHE, { duration: 0.8 });
+      // Hors de France le fond s'arrête plus tôt : on zoome moins, pour ne pas
+      // poser le repère sur un cadre gris.
+      map.flyTo([e.venue.lat, e.venue.lng], zoomLisible(e.venue.country, ZOOM_FICHE), { duration: 0.8 });
     }
     // Depuis la carte : la fiche peut être hors du champ défilé, on l'y amène.
     if (depuisCarte) {
@@ -136,7 +139,7 @@
       map.attributionControl.setPrefix(false);
       await ajouterFondDeCarteAuDefilement(L, map, el, { maxZoom: 19 });
       if (annule) return;
-      groupe = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, spiderfyOnMaxZoom: true, disableClusteringAtZoom: ZOOM_FICHE });
+      groupe = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, spiderfyOnMaxZoom: true, disableClusteringAtZoom: 7 });
       map.addLayer(groupe);
       map.on('moveend zoomend', marquerActif);
 

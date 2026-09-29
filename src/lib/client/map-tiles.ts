@@ -570,3 +570,20 @@ export function ajouterFondDeCarteAuDefilement(L: LeafletLib, map: Leaflet.Map, 
     observateur.observe(element);
   });
 }
+
+// ── JUSQU'OÙ ZOOMER SELON LE PAYS ─────────────────────────────────────────
+// Le Plan IGN est une carte de la France : au-delà des frontières, il ne porte
+// qu'un fond généralisé, qui s'arrête tôt. Mesuré sur les tuiles le 29
+// septembre 2026 : chez les voisins, de la donnée jusqu'au zoom 10 ou 11
+// (Liège est vide dès 12, Bruxelles s'amenuise à 13) ; plus loin — Lisbonne,
+// Berlin, Montréal — plus rien après le zoom 7. Zoomer au-delà montre un cadre
+// gris. La règle tient en trois paliers, du plus sûr au plus fin.
+const PAYS_VOISINS = ['belgique', 'belgium', 'be', 'suisse', 'switzerland', 'ch', 'luxembourg', 'lu',
+  'monaco', 'mc', 'andorre', 'andorra', 'ad'];
+
+/** Zoom le plus serré auquel le fond montre encore quelque chose, pour ce pays. */
+export function zoomLisible(pays: string | undefined | null, zoomFrance: number): number {
+  const p = String(pays ?? '').trim().toLowerCase();
+  if (!p || p === 'france' || p === 'fr') return zoomFrance;
+  return PAYS_VOISINS.includes(p) ? Math.min(zoomFrance, 10) : Math.min(zoomFrance, 7);
+}

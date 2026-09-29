@@ -77,8 +77,7 @@
       {#if e.venue.lat != null && e.venue.lng != null}
         <div class="mt-3">
           {#key e.slug}
-            <VenueMap lat={e.venue.lat} lng={e.venue.lng} name={e.venue.name}
-              horsFrance={!!e.venue.country && !/^(fr|france)$/i.test(String(e.venue.country).trim())} />
+            <VenueMap lat={e.venue.lat} lng={e.venue.lng} name={e.venue.name} pays={e.venue.country} />
           {/key}
         </div>
       {/if}
