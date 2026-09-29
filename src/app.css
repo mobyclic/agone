@@ -325,11 +325,19 @@
 
 /* — Leaflet — */
 .leaflet-container { font: inherit; z-index: 0; }
-/* Le fond Plan IGN est déjà gris et délavé (cf. $lib/client/map-tiles) : aucun
-   filtre à empiler dessus, il ne ferait que l'assombrir. Le filtre ne vise donc
-   que le SOCLE OSM, visible dans les seuls trous de couverture hors de France,
-   pour qu'il se fonde avec le vectoriel au lieu de trancher en couleurs. */
+/* Même carte que sur nos autres produits : le Plan IGN gris, seul, posé sur un
+   gris neutre — le style n'a pas de calque de fond, c'est donc le conteneur qui
+   donne sa teinte à ce que la carte ne peint pas. Le filtre ne vise que le socle
+   OSM, allumé sur la seule carte d'un lieu situé hors de France. */
+.ag-map-gray { background: oklch(0.94 0 0); }
 .ag-map-gray .leaflet-tile { filter: grayscale(1) brightness(1.12) contrast(0.88); }
+.ag-map-gray .leaflet-control-attribution { font-size: 9px; }
+/* Regroupements de points : à l'encre, pas au vert-jaune-orange de la
+   bibliothèque. Sélecteur porté par .leaflet-container pour primer sur sa
+   feuille, chargée dynamiquement donc après la nôtre. */
+.leaflet-container .marker-cluster { background: rgb(20 20 20 / 0.2); }
+.leaflet-container .marker-cluster div { background: #141414; color: #fff; font-weight: 600; }
+.leaflet-container .marker-cluster span { line-height: 30px; }
 
 /* — Accroche de la manchette d'accueil : s'adapte à l'espace laissé par le titre —
    Mobile : clamp à 7 lignes. Desktop (lg) : remplit la hauteur de la colonne

@@ -217,7 +217,14 @@ const COULEUR_LAISSE = '#A0A0A0';
 const LARGEUR_LAISSE = 1;
 
 export interface OptionsFond {
-  /** Socle OSM sous le vectoriel, visible seulement hors couverture IGN (défaut : true). */
+  /**
+   * Socle OSM sous le vectoriel — DÉSACTIVÉ PAR DÉFAUT. Le style PLAN.IGN n'a
+   * pas de calque de fond : tout ce qu'il ne peint pas est transparent, et le
+   * socle transparaissait donc PARTOUT, pas seulement hors de France — routes
+   * et noms d'OpenStreetMap sous le Plan IGN, un fond plus chargé et différent
+   * de celui des autres produits. On ne l'allume que sur la carte d'un lieu
+   * situé hors de France, où le vectoriel s'arrête au zoom 13.
+   */
   socleMondial?: boolean;
   fournisseur?: FournisseurFond;
   /** Opacité du fond (les pages d'origine posaient 0.85 / 0.92 sur certaines cartes). */
@@ -478,7 +485,7 @@ async function poserFond(L: LeafletLib, map: Leaflet.Map, opts: OptionsFond = {}
   map.setMaxZoom(Math.min(opts.maxZoom ?? PLAFOND_ZOOM, PLAFOND_ZOOM));
   // Socle posé AVANT le vectoriel : il occupe le volet du dessous et ne se voit
   // que dans les trous de couverture du Plan IGN.
-  if (opts.socleMondial !== false) {
+  if (opts.socleMondial === true) {
     L.tileLayer(SOCLE_MONDIAL, {
       maxZoom: Math.min(opts.maxZoom ?? PLAFOND_ZOOM, PLAFOND_ZOOM),
       subdomains: 'abc',

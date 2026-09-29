@@ -2,15 +2,17 @@
   import { ajouterFondDeCarte } from '$lib/client/map-tiles';
   import { onMount } from 'svelte';
 
-  let { lat, lng, name = '' }: { lat: number; lng: number; name?: string } = $props();
+  /** `horsFrance` : le Plan IGN s'arrête au zoom 13 hors du territoire, on lui glisse un socle. */
+  let { lat, lng, name = '', horsFrance = false }: { lat: number; lng: number; name?: string; horsFrance?: boolean } = $props();
   let el: HTMLDivElement;
 
   onMount(() => {
     let map: any;
     (async () => {
       const L = (await import('leaflet')).default;
-      map = L.map(el, { scrollWheelZoom: false, attributionControl: true }).setView([lat, lng], 14);
-      ajouterFondDeCarte(L, map, { maxZoom: 19 });
+      map = L.map(el, { scrollWheelZoom: false, attributionControl: true }).setView([lat, lng], horsFrance ? 13 : 14);
+      map.attributionControl.setPrefix(false);
+      ajouterFondDeCarte(L, map, { maxZoom: 19, socleMondial: horsFrance });
       const icon = L.divIcon({
         className: '',
         html: '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:#d4211c;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)"></div>',

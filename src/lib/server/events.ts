@@ -73,6 +73,8 @@ export interface EventDetail {
     lat?: number;
     lng?: number;
     place_id?: string;
+    /** Sert à savoir si le lieu est hors de la couverture du Plan IGN. */
+    country?: string;
     event_count?: number;
     slug?: string;
   };

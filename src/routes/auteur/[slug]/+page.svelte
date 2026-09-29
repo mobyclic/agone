@@ -14,7 +14,6 @@
   const a = $derived(data.author);
   const isStaff = $derived(['admin', 'editor'].includes(page.data.user?.role ?? ''));
   const years = $derived(a.birth_year || a.death_year ? `${a.birth_year ?? ''}–${a.death_year ?? ''}` : null);
-  const initiales = $derived(a.full_name.split(' ').map((p) => p[0]).slice(0, 2).join(''));
   const livres = $derived(a.works.find((g) => g.role === 'author')?.books ?? []);
   const contributions = $derived(a.works.filter((g) => g.role !== 'author' && g.books.length));
 </script>
@@ -31,15 +30,13 @@
 <div class="py-8" style="padding-inline: var(--page-gutter)">
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
     <!-- Sans rencontre à venir, la colonne de droite serait vide : le contenu prend toute la largeur. -->
-    <div class="grid gap-8 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)] sm:items-start {data.rencontres.length ? '' : 'lg:col-span-2'}">
-      <!-- Portrait + repères -->
+    <div class="grid gap-8 sm:items-start {a.portrait_url ? 'sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)]' : ''} {data.rencontres.length ? '' : 'lg:col-span-2'}">
+      <!-- Portrait + repères — seulement s'il y a un portrait : sans photo, rien
+           à gauche, le texte prend la largeur. -->
+      {#if a.portrait_url}
       <div use:colonneCollante>
         <div class="aspect-[4/5] w-full max-w-[280px] overflow-hidden border border-border bg-muted">
-          {#if a.portrait_url}
-            <img src={a.portrait_url} alt={a.full_name} class="size-full object-cover" />
-          {:else}
-            <div class="grid size-full place-items-center bg-gradient-to-br from-sidebar to-brand-blue font-display text-6xl font-bold text-white">{initiales}</div>
-          {/if}
+          <img src={a.portrait_url} alt={a.full_name} class="size-full object-cover" />
         </div>
         {#if a.portrait_credit || a.portrait_license}
           <!-- Mention imposée par la licence libre de la photo. -->
@@ -57,6 +54,7 @@
           {/if}
         </dl>
       </div>
+      {/if}
 
       <!-- Contenu -->
       <div class="min-w-0">
@@ -64,6 +62,14 @@
           <a href="/auteurs" class="hover:text-foreground">Auteurs</a>
         </nav>
         <h1 class="display-title text-3xl leading-tight sm:text-4xl">{a.full_name}</h1>
+        {#if !a.portrait_url && (a.nationality || years || a.website)}
+          <!-- Sans portrait, les repères de la colonne de gauche viennent ici. -->
+          <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {#if a.nationality}<span>{a.nationality}</span>{/if}
+            {#if years}<span>{years}</span>{/if}
+            {#if a.website}<a href={a.website} target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-link hover:underline"><ArrowSquareOut size={14} /> Site web</a>{/if}
+          </p>
+        {/if}
         {#if a.bio_html}
           <div class="prose-agone texte-justifie mt-7 max-w-4xl text-[17px] leading-relaxed text-foreground/90 [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3.5">
             {@html a.bio_html}

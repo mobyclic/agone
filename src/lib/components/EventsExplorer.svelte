@@ -71,7 +71,19 @@
   const ZOOM_FICHE = 13;
   let L: any = null;
   let map: any = null;
+  /** Regroupement des points : plusieurs rencontres dans une même ville se
+   *  recouvraient. Défait au zoom d'une fiche, où l'on veut le point lui-même. */
+  let groupe: any = null;
   const reperes = new Map<string, any>();
+
+  /** Un repère regroupé n'a pas d'élément : la mise en valeur se rejoue après chaque mouvement. */
+  function marquerActif() {
+    for (const [slug, m] of reperes) {
+      const noeud = m.getElement?.() as HTMLElement | undefined;
+      if (noeud) noeud.classList.toggle('is-actif', selection === slug);
+      m.setZIndexOffset?.(selection === slug ? 1000 : 0);
+    }
+  }
 
   /** Vue d'ensemble : tous les points, ou la France à défaut. */
   function vueEnsemble(animer = true) {
@@ -104,24 +116,29 @@
 
   // Les repères suivent la sélection (couleur pleine / atténuée).
   $effect(() => {
-    const actif = selection;
-    for (const [slug, m] of reperes) {
-      const noeud = m.getElement?.() as HTMLElement | undefined;
-      if (noeud) noeud.classList.toggle('is-actif', actif === slug);
-      if (actif === slug) m.setZIndexOffset?.(1000);
-      else m.setZIndexOffset?.(0);
-    }
+    void selection;
+    marquerActif();
   });
 
   onMount(() => {
     let annule = false;
     (async () => {
-      L = (await import('leaflet')).default;
+      const [leaflet] = await Promise.all([
+        import('leaflet'),
+        import('leaflet.markercluster/dist/MarkerCluster.css'),
+        import('leaflet.markercluster/dist/MarkerCluster.Default.css')
+      ]);
+      L = (leaflet as any).default ?? leaflet;
+      await import('leaflet.markercluster');
       if (annule) return;
       map = L.map(el, { scrollWheelZoom: false, attributionControl: true, zoomControl: true })
         .setView([46.6, 2.4], 5); // France par défaut
+      map.attributionControl.setPrefix(false);
       await ajouterFondDeCarteAuDefilement(L, map, el, { maxZoom: 19 });
       if (annule) return;
+      groupe = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45, spiderfyOnMaxZoom: true, disableClusteringAtZoom: ZOOM_FICHE });
+      map.addLayer(groupe);
+      map.on('moveend zoomend', marquerActif);
 
       const icone = L.divIcon({
         className: 'ag-pin',
@@ -131,8 +148,8 @@
       });
       for (const e of situees) {
         const m = L.marker([e.venue!.lat!, e.venue!.lng!], { icon: icone, title: e.title })
-          .addTo(map)
           .on('click', () => ouvrir(e.slug, true));
+        groupe.addLayer(m);
         reperes.set(e.slug, m);
       }
       // Le cadrage initial ne doit PAS écraser une fiche déjà ouverte : le fond se
@@ -160,7 +177,7 @@
     >
       {#each events as e (e.slug)}
         {@const ouverte = selection === e.slug}
-        <div data-slug={e.slug} class="relative scroll-mt-2 {ouverte ? 'bg-muted/40' : ''}">
+        <div data-slug={e.slug} class="relative scroll-mt-2 border-l-[3px] transition-colors {ouverte ? 'border-foreground bg-muted/60' : 'border-transparent'}">
           {#if ouverte}
             <button
               type="button"
