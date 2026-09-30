@@ -19,7 +19,8 @@ export async function ensureChannels() {
   await ensureCanaux();
 }
 export async function listChannels() {
-  return query<any>(`SELECT id, code, name, sort, physical_via_bldd FROM sales_channel ORDER BY sort ASC`);
+  const rows = await query<any>(`SELECT id, code, name, family, connector FROM sales_channel`);
+  return rows.sort((a, b) => String(a.family).localeCompare(String(b.family)) || String(a.name).localeCompare(String(b.name), 'fr'));
 }
 
 // ── Réglages ──────────────────────────────────────────────────
@@ -874,17 +875,14 @@ export async function genererRelevesDepuisCommandes(periodStart: Date, periodEnd
   const parCode = new Map<string, string>();
   for (const c of canaux) parCode.set(c.code, String(c.id).replace(/^sales_channel:/, ''));
 
-  const viaBldd = new Map<string, boolean>();
-  for (const c of canaux) viaBldd.set(c.code, c.physical_via_bldd === true);
-
   const resultats: { canal: string; lignes: number; unites: number; note?: string }[] = [];
   for (const code of ['web', 'comptoir', 'vpc', 'sortie_editeur']) {
     const channelId = parCode.get(code);
     if (!channelId) continue;
-    // Papier du site et de la VPC : expédié et facturé par Les Belles Lettres, donc
-    // déjà compté dans le relevé BLDD. On ne retient ici que le numérique, que le
-    // distributeur ne voit jamais.
-    const formatsRetenus = viaBldd.get(code) ? ['epub'] : ['papier', 'epub', 'souscription'];
+    // Tout ce que la commande contient compte : papier compris. Les Belles Lettres
+    // expédient bien le papier du site, mais ces ventes n'apparaissent pas sur leur
+    // extranet — elles ne sont donc comptées qu'ici.
+    const formatsRetenus = ['papier', 'epub', 'souscription'];
 
     // Ventes et retours de la période, par livre et par format.
     const agrege = async (statuts: string[]) =>
@@ -939,8 +937,7 @@ export async function genererRelevesDepuisCommandes(periodStart: Date, periodEnd
     resultats.push({
       canal: code,
       lignes: rows.length,
-      unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0),
-      note: viaBldd.get(code) ? 'numérique seul — le papier est facturé par BLDD' : undefined
+      unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0)
     });
   }
   return resultats;

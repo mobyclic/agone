@@ -6,7 +6,7 @@
    */
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { Plus, PencilSimple, Trash, FileArrowUp, Plugs, PlugsConnected, HandPointing } from 'phosphor-svelte';
+  import { Plus, PencilSimple, Trash, FileArrowUp, Plugs, PlugsConnected, HandPointing, ArrowsLeftRight } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -16,7 +16,7 @@
     { id: 'direct', nom: 'Vente directe', desc: 'Ce qu’Agone vend lui-même : le site, le comptoir, la correspondance.' },
     { id: 'indirect', nom: 'Vente indirecte', desc: 'Ce que d’autres vendent pour Agone : distributeur, diffuseur, places de marché.' }
   ];
-  const CONNECTEURS: Record<string, string> = { orders: 'Commandes du site', bldd: 'Extranet Belles Lettres' };
+  const CONNECTEURS: Record<string, string> = { orders: 'Commandes du site', bldd: 'Extranet Belles Lettres', sumup: 'Terminal SumUp' };
   const parFamille = (f: string) => data.canaux.filter((c) => c.family === f);
 
   /** Bascules en cours : la ligne change tout de suite, la base suit. */
@@ -83,7 +83,7 @@
                 {:else}<Plugs size={14} /> API à développer{/if}
               </span>
             </td>
-            <td class="px-2 py-2.5"><span class="rounded px-2 py-0.5 text-xs {e.cls}">{e.texte}</span></td>
+            <td class="px-2 py-2.5"><span class="whitespace-nowrap rounded px-2 py-0.5 text-xs {e.cls}">{e.texte}</span></td>
             <td class="px-2 py-2.5 text-xs text-muted-foreground">
               {#if r}{r.n} relevé{r.n > 1 ? 's' : ''}{r.dernier ? ` · jusqu’au ${dateFr(r.dernier)}` : ''}{:else}aucun relevé{/if}
             </td>
@@ -104,6 +104,8 @@
             <td class="whitespace-nowrap px-4 py-2.5 text-right">
               {#if c.mode === 'manuel' && actif}
                 <a href="/admin/canaux/{c.code}/import" class="mr-3 inline-flex items-center gap-1 text-xs text-link hover:underline"><FileArrowUp size={14} /> Importer un relevé</a>
+              {:else if c.connector === 'sumup' && actif}
+                <a href="/admin/canaux/sumup" class="mr-3 inline-flex items-center gap-1 text-xs text-link hover:underline"><ArrowsLeftRight size={14} /> Rapprocher les encaissements</a>
               {/if}
               <button type="button" class="mr-2 text-muted-foreground hover:text-foreground" aria-label="Modifier" onclick={() => ouvrir(c.code)}><PencilSimple size={15} /></button>
               <form method="POST" action="?/delete" use:enhance class="inline" onsubmit={(ev: Event) => { if (!confirm(`Supprimer le canal « ${c.name} » ?`)) ev.preventDefault(); }}>
@@ -166,13 +168,7 @@
             </label>
           {/if}
         {/if}
-        <label class={lbl}>Ordre <input name="sort" type="number" value={enEdition?.sort ?? 0} class={input} /></label>
-        <label class="{lbl} sm:col-span-2 lg:col-span-4">Notes <input name="notes" value={enEdition?.notes ?? ''} class={input} /></label>
-      </div>
-      <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <label class="flex items-center gap-2" title="Le papier de ce canal est expédié et facturé par Les Belles Lettres : il ne doit pas être compté deux fois dans les droits.">
-          <input type="checkbox" name="physical_via_bldd" checked={enEdition?.physical_via_bldd ?? false} class="size-4 accent-[var(--color-link)]" /> Papier facturé par Les Belles Lettres
-        </label>
+          <label class="{lbl} sm:col-span-2 lg:col-span-4">Notes <input name="notes" value={enEdition?.notes ?? ''} class={input} /></label>
       </div>
       <div class="mt-4 flex items-center gap-3">
         <Button type="submit" size="sm">Enregistrer</Button>

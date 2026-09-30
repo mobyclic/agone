@@ -221,7 +221,8 @@
         {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow mb-3">Livres associés</h3>
+        <h3 class="eyebrow mb-1">Livres associés</h3>
+        <p class="mb-3 text-xs text-muted-foreground">Affichés sur la rencontre, et candidats d’office pour les encaissements SumUp du jour (salons : déclarez ici ce qui est sur la table).</p>
         {#key ev?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" visuel="couverture" lienBase="/admin/catalogue/" initial={ev?.books ?? []} placeholder="Associer un livre…" onchange={() => (dirty = true)} />{/key}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">

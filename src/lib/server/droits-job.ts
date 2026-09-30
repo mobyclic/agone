@@ -14,6 +14,7 @@
 import {
   importVentesBldd, genererRelevesDepuisCommandes, importMouvementsBldd, detaillerExportBldd
 } from './droits';
+import { sumupConfigure, genererRelevesSumup } from './sumup';
 
 export interface EtapeCollecte {
   key: string;
@@ -49,6 +50,7 @@ export function lancerCollecte(opts: { start: Date; end: Date; avecExport: boole
     etapes: [
       { key: 'bldd', label: 'Ventes en librairie (Belles Lettres)', statut: 'attente' },
       { key: 'directs', label: 'Ventes directes (site, comptoir, VPC)', statut: 'attente' },
+      { key: 'sumup', label: 'Encaissements SumUp rapprochés', statut: sumupConfigure() ? 'attente' : 'ignore' },
       { key: 'mouvements', label: 'Mouvements de stock', statut: 'attente' },
       { key: 'export', label: 'Part des ventes hors France', statut: opts.avecExport ? 'attente' : 'ignore' }
     ]
@@ -95,9 +97,19 @@ async function executer(j: JobCollecte, opts: { start: Date; end: Date; avecExpo
       const utiles = res.filter((r) => r.lignes > 0);
       return {
         detail: utiles.length ? utiles.map((r) => `${r.canal} : ${nb(r.unites)} ex.`).join(' · ') : 'aucune vente directe sur la période',
-        remarque: 'le papier du site et de la VPC est facturé par Les Belles Lettres : il n’est compté qu’une fois, dans leur relevé'
+        remarque: 'papier et numérique du site compris : ces ventes ne figurent pas sur l’extranet des Belles Lettres'
       };
     });
+
+    if (sumupConfigure()) {
+      await lancer('sumup', async () => {
+        const r = await genererRelevesSumup(opts.start, opts.end);
+        return {
+          detail: r.lignes ? `${nb(r.encaissements)} encaissements · ${nb(r.unites)} ex. sur ${nb(r.lignes)} titres` : 'aucun encaissement rapproché sur la période',
+          remarque: r.aTraiter ? `${nb(r.aTraiter)} encaissement(s) encore à rapprocher, non comptés` : undefined
+        };
+      });
+    }
 
     await lancer('mouvements', async () => {
       const r = await importMouvementsBldd(opts.start, opts.end);

@@ -4,7 +4,8 @@
  * Deux familles — vente directe, vente indirecte — et sous chacune autant de
  * canaux qu'on veut. Chaque canal dit d'où viennent ses chiffres :
  *   - mode « api » avec un connecteur : `orders` (les commandes du site, par
- *     order.channel) ou `bldd` (l'extranet des Belles Lettres) ;
+ *     order.channel), `bldd` (l'extranet des Belles Lettres) ou `sumup` (les
+ *     encaissements du terminal, rapprochés du catalogue) ;
  *   - mode « api » sans connecteur : déclaré, pas encore branché — en veille ;
  *   - mode « manuel » : un tableur importé, colonnes à faire correspondre.
  * Un canal se désactive d'un commutateur : ses relevés passés restent, il ne se
@@ -18,12 +19,10 @@ export interface Canal {
   name: string;
   family: 'direct' | 'indirect';
   mode: 'api' | 'manuel';
-  connector?: 'orders' | 'bldd';
+  connector?: 'orders' | 'bldd' | 'sumup';
   order_channel?: string;
   enabled: boolean;
   color: string;
-  sort: number;
-  physical_via_bldd: boolean;
   notes?: string;
 }
 
@@ -31,14 +30,15 @@ export interface Canal {
 export const PALETTE = ['#26425b', '#5b8fbf', '#2e8b57', '#8fbf5b', '#b5a642', '#d4211c', '#e07a1f', '#8e44ad', '#16a085', '#7f8c8d'];
 
 const DEFAUTS: Omit<Canal, 'id'>[] = [
-  { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', sort: 0, physical_via_bldd: true, notes: 'Commandes du site. Le papier est expédié et facturé par Les Belles Lettres.' },
-  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57', sort: 2, physical_via_bldd: false },
-  { code: 'vpc', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b', sort: 3, physical_via_bldd: true },
-  { code: 'sortie_editeur', name: 'Sortie éditeur', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642', sort: 4, physical_via_bldd: false },
-  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c', sort: 10, physical_via_bldd: false }
+  { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', notes: 'Commandes du site, payées par Stripe. Le papier est expédié par Les Belles Lettres, mais ces ventes ne figurent pas sur leur extranet.' },
+  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57' },
+  { code: 'vpc', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b' },
+  { code: 'sortie_editeur', name: 'Sortie éditeur', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642' },
+  { code: 'sumup', name: 'SumUp (rencontres & salons)', family: 'direct', mode: 'api', connector: 'sumup', enabled: true, color: '#8e44ad', notes: 'Encaissements du terminal, rapprochés des rencontres du jour et du catalogue.' },
+  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c' }
 ];
 
-const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, enabled, color, sort, physical_via_bldd, notes`;
+const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, enabled, color, notes`;
 
 /**
  * Sème les canaux de base et RÉPARE les lignes anciennes : un champ ajouté après
@@ -52,7 +52,7 @@ export async function ensureCanaux(): Promise<void> {
     if (!e) { await query(`CREATE sales_channel CONTENT $d`, { d }); continue; }
     // On ne touche qu'à ce qui n'a jamais été renseigné : le reste appartient à l'utilisateur.
     const set: Record<string, unknown> = {};
-    for (const k of ['family', 'mode', 'connector', 'order_channel', 'enabled', 'color', 'physical_via_bldd'] as const) {
+    for (const k of ['family', 'mode', 'connector', 'order_channel', 'enabled', 'color'] as const) {
       if (e[k] === undefined || e[k] === null) set[k] = (d as any)[k];
     }
     if (e.color === '#7a7a7a' && d.color) set.color = d.color;
@@ -62,9 +62,10 @@ export async function ensureCanaux(): Promise<void> {
 
 export async function listCanaux(opts: { enabledOnly?: boolean } = {}): Promise<Canal[]> {
   const rows = await query<any>(
-    `SELECT ${CHAMPS} FROM sales_channel ${opts.enabledOnly ? 'WHERE enabled = true' : ''} ORDER BY family, sort ASC`
+    `SELECT ${CHAMPS} FROM sales_channel ${opts.enabledOnly ? 'WHERE enabled = true' : ''}`
   );
-  return rows.map(normaliser);
+  // Vente directe d'abord, puis par nom — en ordre alphabétique français, pas en ordre d'octets.
+  return rows.map(normaliser).sort((a, b) => a.family.localeCompare(b.family) || a.name.localeCompare(b.name, 'fr'));
 }
 
 export async function getCanal(code: string): Promise<Canal | null> {
@@ -78,13 +79,12 @@ const normaliser = (r: any): Canal => ({
   mode: r.mode === 'manuel' ? 'manuel' : 'api',
   connector: r.connector ?? undefined, order_channel: r.order_channel ?? undefined,
   enabled: r.enabled !== false,
-  color: r.color ?? '#7a7a7a', sort: Number(r.sort ?? 0),
-  physical_via_bldd: r.physical_via_bldd === true, notes: r.notes ?? undefined
+  color: r.color ?? '#7a7a7a', notes: r.notes ?? undefined
 });
 
 export interface CanalInput {
   code: string; name: string; family: string; mode: string; connector?: string; order_channel?: string;
-  enabled?: boolean; color?: string; sort?: number; physical_via_bldd?: boolean; notes?: string;
+  enabled?: boolean; color?: string; notes?: string;
 }
 
 /** Code : lettres, chiffres, tirets bas — stable, il sert de clé dans les relevés. */
@@ -102,8 +102,7 @@ export async function upsertCanal(d: CanalInput, existingCode?: string): Promise
     order_channel: connecteur === 'orders' ? (d.order_channel || code) : undefined,
     enabled: d.enabled !== false,
     color: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color : undefined,
-    sort: Number.isFinite(Number(d.sort)) ? Number(d.sort) : 0,
-    physical_via_bldd: d.physical_via_bldd === true, notes: d.notes?.trim() || undefined
+    notes: d.notes?.trim() || undefined
   };
   const existant = existingCode ? await getCanal(existingCode) : null;
   if (existant) {

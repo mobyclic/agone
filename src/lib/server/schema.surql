@@ -359,7 +359,6 @@ DEFINE INDEX OVERWRITE idx_page_slug ON page FIELDS slug UNIQUE;
 DEFINE TABLE OVERWRITE sales_channel SCHEMAFULL;
 DEFINE FIELD OVERWRITE code       ON sales_channel TYPE string;         -- 'web' | 'bldd' | …
 DEFINE FIELD OVERWRITE name       ON sales_channel TYPE string;
-DEFINE FIELD OVERWRITE sort       ON sales_channel TYPE int DEFAULT 0;
 -- Famille : vente directe (le site, le comptoir, la VPC…) ou indirecte (un
 -- distributeur, un diffuseur, une place de marché). Deux niveaux, pas plus :
 -- famille puis canal, et autant de canaux qu'on veut.
@@ -371,18 +370,13 @@ DEFINE FIELD OVERWRITE family     ON sales_channel TYPE string
 -- encore branché.
 DEFINE FIELD OVERWRITE mode       ON sales_channel TYPE string
   ASSERT $value IN ['api','manuel'] DEFAULT 'api' VALUE $value ?? 'api';
-DEFINE FIELD OVERWRITE connector  ON sales_channel TYPE option<string>;  -- 'orders' | 'bldd' | NONE (en veille)
+DEFINE FIELD OVERWRITE connector  ON sales_channel TYPE option<string>;  -- 'orders' | 'bldd' | 'sumup' | NONE (en veille)
 DEFINE FIELD OVERWRITE order_channel ON sales_channel TYPE option<string>; -- connecteur orders : quel order.channel lire
 -- Activé / désactivé : un canal désactivé reste dans les relevés passés mais
 -- ne se propose plus (statistiques, imports, collecte).
 DEFINE FIELD OVERWRITE enabled    ON sales_channel TYPE bool DEFAULT true VALUE $value ?? true;
 DEFINE FIELD OVERWRITE color      ON sales_channel TYPE string DEFAULT '#7a7a7a' VALUE $value ?? '#7a7a7a';
 DEFINE FIELD OVERWRITE notes      ON sales_channel TYPE option<string>;
--- Les commandes du site et de la VPC sont expédiées ET FACTURÉES par Les Belles
--- Lettres : leurs exemplaires papier reviennent dans le relevé BLDD. Sans ce
--- drapeau, ils seraient comptés deux fois dans les droits. Le numérique, lui,
--- ne passe jamais par le distributeur.
-DEFINE FIELD OVERWRITE physical_via_bldd ON sales_channel TYPE bool DEFAULT false VALUE $value ?? false;
 DEFINE FIELD OVERWRITE created_at ON sales_channel TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_channel_code ON sales_channel FIELDS code UNIQUE;
 
@@ -545,6 +539,39 @@ DEFINE FIELD OVERWRITE units_export   ON sales_line TYPE option<int>;
 DEFINE FIELD OVERWRITE created_at     ON sales_line TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_saleline_report ON sales_line FIELDS report;
 DEFINE INDEX OVERWRITE idx_saleline_book   ON sales_line FIELDS book;
+
+-- ENCAISSEMENTS SUMUP (terminal de paiement des rencontres et salons)
+-- SumUp ne connaît pas le catalogue : chaque encaissement est rapproché d'un ou
+-- plusieurs livres (rencontre du jour, sous-catalogue déclaré sur la rencontre,
+-- livres de l'auteur, prix) — automatiquement quand une seule lecture est
+-- possible, à la main sinon. Les encaissements rapprochés font le relevé de
+-- ventes du canal « sumup ».
+DEFINE TABLE OVERWRITE sumup_transaction SCHEMAFULL;
+DEFINE FIELD OVERWRITE sumup_id     ON sumup_transaction TYPE string;           -- identifiant SumUp
+DEFINE FIELD OVERWRITE code         ON sumup_transaction TYPE option<string>;   -- transaction_code
+DEFINE FIELD OVERWRITE amount       ON sumup_transaction TYPE number;           -- TTC, en euros
+DEFINE FIELD OVERWRITE currency     ON sumup_transaction TYPE string DEFAULT 'EUR';
+DEFINE FIELD OVERWRITE at           ON sumup_transaction TYPE datetime;
+DEFINE FIELD OVERWRITE status       ON sumup_transaction TYPE string;           -- SUCCESSFUL | REFUNDED | …
+DEFINE FIELD OVERWRITE payment_type ON sumup_transaction TYPE option<string>;
+DEFINE FIELD OVERWRITE summary      ON sumup_transaction TYPE option<string>;   -- libellé saisi sur le terminal
+DEFINE FIELD OVERWRITE card         ON sumup_transaction TYPE option<string>;
+-- Rapprochement
+DEFINE FIELD OVERWRITE etat         ON sumup_transaction TYPE string
+  ASSERT $value IN ['a_traiter','auto','valide','ignore'] DEFAULT 'a_traiter';
+DEFINE FIELD OVERWRITE event        ON sumup_transaction TYPE option<record<event>>;  -- rencontre du jour retenue
+DEFINE FIELD OVERWRITE items        ON sumup_transaction TYPE array<object> DEFAULT [];
+DEFINE FIELD OVERWRITE items.*.book ON sumup_transaction TYPE record<book>;
+DEFINE FIELD OVERWRITE items.*.qty  ON sumup_transaction TYPE int;
+DEFINE FIELD OVERWRITE items.*.price ON sumup_transaction TYPE number;          -- prix unitaire TTC retenu
+DEFINE FIELD OVERWRITE items.*.title ON sumup_transaction TYPE option<string>;   -- pour l'affichage
+DEFINE FIELD OVERWRITE suggestions  ON sumup_transaction TYPE array<object> FLEXIBLE DEFAULT []; -- lectures possibles
+DEFINE FIELD OVERWRITE note         ON sumup_transaction TYPE option<string>;
+DEFINE FIELD OVERWRITE fetched_at   ON sumup_transaction TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON sumup_transaction TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_sumup_id ON sumup_transaction FIELDS sumup_id UNIQUE;
+DEFINE INDEX OVERWRITE idx_sumup_at ON sumup_transaction FIELDS at;
+DEFINE INDEX OVERWRITE idx_sumup_etat ON sumup_transaction FIELDS etat;
 
 -- MOUVEMENTS DE STOCK D'UNE PÉRIODE (relevé du distributeur)
 -- L'article 6 des contrats impose de mentionner, par exercice : les exemplaires
