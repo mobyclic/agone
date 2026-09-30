@@ -170,3 +170,53 @@ export async function booksWithSales(): Promise<{ slug: string; title: string }[
   );
   return rows.filter((r) => r.slug).map((r) => ({ slug: r.slug, title: r.title ?? '—' }));
 }
+
+// ── Ventes par mois et par canal ──────────────────────────────────────────
+// Le site connaît ses commandes au jour près ; la librairie (Belles Lettres)
+// ne se lit mois par mois QUE dans les mouvements de stock relevés mois par
+// mois (book_period_stock sur une période d'un mois). Un relevé annuel ne peut
+// pas se répartir : il n'apparaît pas ici.
+export interface MoisParCanal { period: number; canaux: Record<string, number> }
+export const CANAUX_VENTES: { code: string; nom: string }[] = [
+  { code: 'bldd', nom: 'Librairie (Belles Lettres)' },
+  { code: 'web', nom: 'Site' },
+  { code: 'comptoir', nom: 'Comptoir & rencontres' },
+  { code: 'vpc', nom: 'Vente par correspondance' },
+  { code: 'sortie_editeur', nom: 'Sortie éditeur' }
+];
+
+export async function salesByMonthByChannel(year: number): Promise<{ mois: MoisParCanal[]; blddMensuel: boolean }> {
+  const [commandes, mouvements] = await Promise.all([
+    query<any>(
+      `SELECT time::month(in.created_at) AS period, in.channel AS canal, math::sum(qty) AS units
+         FROM contains WHERE in.status IN ${PAID} AND time::year(in.created_at) = $y GROUP BY period, canal`,
+      { y: year }
+    ),
+    query<any>(
+      `SELECT period_start, period_end, math::sum(gross_sales) AS ventes, math::sum(returns_credited) AS retours
+         FROM book_period_stock WHERE time::year(period_start) = $y GROUP BY period_start, period_end`,
+      { y: year }
+    )
+  ]);
+  const mois: MoisParCanal[] = Array.from({ length: 12 }, (_, i) => ({ period: i + 1, canaux: {} }));
+  for (const c of commandes) {
+    const m = mois[Number(c.period) - 1];
+    if (!m) continue;
+    // Le papier vendu sur le site et en VPC est facturé par Les Belles Lettres :
+    // il figure déjà dans leurs ventes. Ici on compte les COMMANDES, telles que
+    // le client les passe ; les deux lectures se complètent, elles ne s'ajoutent pas.
+    const code = String(c.canal ?? 'web');
+    m.canaux[code] = (m.canaux[code] ?? 0) + Number(c.units ?? 0);
+  }
+  let blddMensuel = false;
+  for (const r of mouvements) {
+    const debut = new Date(r.period_start), fin = new Date(r.period_end);
+    // Une période d'un mois : même mois de début et de fin.
+    if (debut.getUTCMonth() !== fin.getUTCMonth() || debut.getUTCFullYear() !== fin.getUTCFullYear()) continue;
+    blddMensuel = true;
+    const m = mois[debut.getUTCMonth()];
+    // Retours crédités en négatif chez le distributeur : le net s'obtient en additionnant.
+    m.canaux.bldd = (m.canaux.bldd ?? 0) + Number(r.ventes ?? 0) + Number(r.retours ?? 0);
+  }
+  return { mois, blddMensuel };
+}

@@ -405,3 +405,8 @@ export async function auteursAvecContenu(ids?: string[]): Promise<Set<string>> {
   ]);
   return new Set([...livres, ...articles.flat(), ...rencontres.flat()].filter(Boolean).map((x) => String(x)));
 }
+
+/** Visible ou masqué de la liste publique : le commutateur de la liste du back-office. */
+export async function setAuthorHidden(id: string, hidden: boolean): Promise<void> {
+  await query(`UPDATE $id SET hidden = $h`, { id: recId('author', id.replace(/^author:/, '')), h: hidden });
+}

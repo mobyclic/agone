@@ -37,6 +37,12 @@
   });
 
   const monthMax = $derived(Math.max(1, ...data.byMonth.map((m) => m.ca)));
+
+  // Vue mensuelle : CA du site (commandes) ou exemplaires par canal.
+  let vueMois = $state<'ca' | 'canaux'>('canaux');
+  const canalMax = $derived(Math.max(1, ...(data.parCanal?.mois ?? []).map((m) => Object.values(m.canaux).reduce((a, b) => a + b, 0))));
+  /** Une teinte par canal : encre pour la librairie, bleu de marque pour le site, gris pour le reste. */
+  const TEINTE: Record<string, string> = { bldd: '#141414', web: '#26425b', comptoir: '#7a7a7a', vpc: '#a8a8a8', sortie_editeur: '#d0d0d0' };
   // Années entières ou arrêtées au même quantième (l'année en cours n'est pas finie).
   let aDate = $state(false);
   const seriesAnnees = $derived(aDate ? data.byYearToDate : data.byYear);
@@ -112,22 +118,69 @@
 </div>
 
 <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
-  <!-- Graphe mensuel -->
+  <!-- Graphe mensuel : chiffre d'affaires du site, ou exemplaires par canal
+       (site, comptoir, VPC… et la librairie via les mouvements de stock relevés
+       mois par mois chez Les Belles Lettres). -->
   <div class="rounded-lg border border-border bg-card p-5">
-    <div class="mb-4 flex items-center justify-between">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-base font-semibold">Ventes {data.year} par mois</h3>
-      <span class="text-xs text-muted-foreground">CA</span>
-    </div>
-    <div class="flex h-52 items-end gap-1.5">
-      {#each data.byMonth as m (m.period)}
-        <div class="group relative flex flex-1 flex-col items-center justify-end">
-          <div class="w-full bg-foreground transition-colors group-hover:bg-link" style="height:{Math.max(1, (m.ca / monthMax) * 100)}%"></div>
-          <div class="pointer-events-none absolute bottom-full mb-1 hidden whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] text-background group-hover:block">
-            {eur(m.ca)} · {m.orders} cmd
-          </div>
+      {#if data.parCanal}
+        <div class="flex gap-1.5">
+          <button type="button" class={ongletAnnee(vueMois === 'ca')} onclick={() => (vueMois = 'ca')}>CA du site</button>
+          <button type="button" class={ongletAnnee(vueMois === 'canaux')} onclick={() => (vueMois = 'canaux')}>Exemplaires par canal</button>
         </div>
-      {/each}
+      {:else}
+        <span class="text-xs text-muted-foreground">CA</span>
+      {/if}
     </div>
+
+    {#if vueMois === 'ca' || !data.parCanal}
+      <div class="flex h-52 items-end gap-1.5">
+        {#each data.byMonth as m (m.period)}
+          <div class="group relative flex h-full flex-1 flex-col items-center justify-end">
+            <div class="w-full bg-foreground transition-colors group-hover:bg-link" style="height:{Math.max(1, (m.ca / monthMax) * 100)}%"></div>
+            <div class="pointer-events-none absolute bottom-full mb-1 hidden whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] text-background group-hover:block">
+              {eur(m.ca)} · {m.orders} cmd
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <!-- Barres empilées, un canal par teinte ; le survol détaille. -->
+      <div class="flex h-52 items-end gap-1.5">
+        {#each data.parCanal.mois as m (m.period)}
+          {@const total = Object.values(m.canaux).reduce((a, b) => a + b, 0)}
+          <div class="group relative flex h-full flex-1 flex-col items-center justify-end">
+            {#each data.canaux as c (c.code)}
+              {#if m.canaux[c.code]}
+                <div class="w-full transition-opacity group-hover:opacity-80" style="height:{(m.canaux[c.code] / canalMax) * 100}%;background:{TEINTE[c.code]}" title="{c.nom} : {m.canaux[c.code].toLocaleString('fr-FR')} ex."></div>
+              {/if}
+            {/each}
+            <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-left text-[10px] text-background group-hover:block">
+              <strong>{total.toLocaleString('fr-FR')} ex.</strong>
+              {#each data.canaux as c (c.code)}{#if m.canaux[c.code]}<br>{c.nom} : {m.canaux[c.code].toLocaleString('fr-FR')}{/if}{/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+      <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {#each data.canaux as c (c.code)}
+          {#if data.parCanal.mois.some((m) => m.canaux[c.code])}
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block size-2.5 rounded-sm" style="background:{TEINTE[c.code]}"></span>{c.nom}</span>
+          {/if}
+        {/each}
+      </div>
+      {#if !data.parCanal.blddMensuel}
+        <p class="mt-2 text-xs text-amber-700 dark:text-amber-500">
+          La librairie n’apparaît pas : les mouvements de stock Belles Lettres ne sont relevés qu’à l’année pour {data.year}.
+          <a href="/admin/droits/ventes" class="underline">Relever mois par mois</a> pour la voir ici.
+        </p>
+      {:else}
+        <p class="mt-2 text-xs text-muted-foreground">
+          Librairie : ventes nettes des retours, d’après les mouvements de stock mensuels du distributeur. Les autres canaux comptent les commandes telles qu’elles sont passées.
+        </p>
+      {/if}
+    {/if}
     <div class="mt-1.5 flex gap-1.5">
       {#each MONTHS as mo (mo)}<div class="flex-1 text-center text-[10px] text-muted-foreground">{mo}</div>{/each}
     </div>

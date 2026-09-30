@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import { untrack } from 'svelte';
   import { goto, replaceState } from '$app/navigation';
   import { page } from '$app/state';
@@ -9,6 +10,8 @@
   import type { AuthorOverviewRow } from '$lib/server/authors';
 
   let { data } = $props();
+  /** Bascules en cours : la ligne change tout de suite, la base suit. */
+  let enCours = $state<Record<string, boolean>>({});
 
   /**
    * « Auteurs & Co » — tout se passe côté client sur la liste complète (~1 000
@@ -196,6 +199,7 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each visibles as a (a.id)}
+        {@const masque = enCours[a.id] ?? a.hidden}
         <tr class="cursor-pointer hover:bg-muted/40" onclick={(e) => { if (!(e.target as HTMLElement).closest('a')) goto(`/admin/auteurs/${a.slug}`); }}>
           <td class="px-3 py-2">
             {#if a.portrait_url}
@@ -212,7 +216,22 @@
           <td class="px-2 py-2 text-center tabular-nums">{n(a.traductions)}</td>
           <td class="px-2 py-2 text-center tabular-nums">{n(a.contributions)}</td>
           <td class="px-2 py-2 text-center tabular-nums">{n(a.articles)}</td>
-          <td class="px-2 py-2">{#if a.hidden}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Masqué</span>{:else}<span class="text-xs text-success">Visible</span>{/if}</td>
+          <td class="px-2 py-2" onclick={(e) => e.stopPropagation()}>
+            <!-- Commutateur, comme celui de publication des articles : vert = visible. -->
+            <form method="POST" action="?/visibilite" class="inline-flex items-center gap-2" use:enhance={() => {
+              enCours[a.id] = !masque;
+              return async ({ update }) => { await update({ reset: false, invalidateAll: true }); delete enCours[a.id]; };
+            }}>
+              <input type="hidden" name="id" value={a.id} />
+              <input type="hidden" name="hidden" value={masque ? 'false' : 'true'} />
+              <button type="submit" role="switch" aria-checked={!masque} title={masque ? 'Masqué — cliquer pour rendre visible' : 'Visible — cliquer pour masquer'}
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors {masque ? 'bg-muted-foreground/30' : 'bg-success'}">
+                <span class="inline-block size-4 rounded-full bg-white shadow transition-transform {masque ? 'translate-x-0.5' : 'translate-x-[18px]'}"></span>
+                <span class="sr-only">{masque ? 'Masqué' : 'Visible'}</span>
+              </button>
+              <span class="text-xs {masque ? 'text-muted-foreground' : 'text-success'}">{masque ? 'Masqué' : 'Visible'}</span>
+            </form>
+          </td>
           <td class="whitespace-nowrap px-2 py-2" title={a.depuis ? `Première participation : ${new Date(a.depuis).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Aucune participation datée'}>
             {#if a.depuis}<span class="tabular-nums">{annee(a.depuis)}</span> <span class="text-xs text-muted-foreground">· {anciennete(a.depuis)}</span>{:else}<span class="text-muted-foreground">—</span>{/if}
           </td>
