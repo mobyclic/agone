@@ -1,28 +1,25 @@
 import type { PageServerLoad } from './$types';
-import { salesByYear, salesByMonth, salesByMonthByChannel, topBooks, formatBreakdown, overview, booksWithSales, CANAUX_VENTES } from '$lib/server/stats';
+import { requireAdmin } from '$lib/server/access';
+import { booksWithSales } from '$lib/server/stats';
+import { ventesParCanal, anneesDisponibles } from '$lib/server/statsCanaux';
 
-export const load: PageServerLoad = async ({ url }) => {
+/**
+ * Statistiques par canal : tout vient de la source unifiée (commandes du site,
+ * mouvements Belles Lettres, relevés importés). Le choix des canaux vit dans
+ * l'URL (`canaux=web:paper,bldd`) : la vue reste partageable.
+ */
+export const load: PageServerLoad = async ({ url, locals }) => {
+  requireAdmin(locals);
   const bookSlug = url.searchParams.get('livre') || undefined;
-
-  // Deux séries : années entières, et à date comparable (même quantième).
-  const aujourdhui = new Date();
-  const [byYear, byYearToDate] = await Promise.all([
-    salesByYear(bookSlug),
-    salesByYear(bookSlug, aujourdhui)
-  ]);
-  const years = byYear.map((r) => r.period);
+  const [tout, books] = await Promise.all([ventesParCanal({ bookSlug }), booksWithSales()]);
+  const years = anneesDisponibles(tout);
   const year = Number(url.searchParams.get('annee')) || years[0] || new Date().getUTCFullYear();
-
-  const [byMonth, tops, formats, ov, books, parCanal] = await Promise.all([
-    salesByMonth(year, bookSlug),
-    bookSlug ? Promise.resolve([]) : topBooks({ year, limit: 12 }),
-    formatBreakdown({ year, bookSlug }),
-    overview(bookSlug),
-    booksWithSales(),
-    bookSlug ? Promise.resolve(null) : salesByMonthByChannel(year)
-  ]);
-
+  const annee = await ventesParCanal({ annee: year, bookSlug });
+  const param = url.searchParams.get('canaux');
+  const selection = param ? param.split(',').filter((k) => tout.series.some((s) => s.key === k)) : tout.series.map((s) => s.key);
   const bookTitle = bookSlug ? books.find((b) => b.slug === bookSlug)?.title : undefined;
-
-  return { byYear, byYearToDate, jour: aujourdhui.toISOString(), byMonth, parCanal, canaux: CANAUX_VENTES, tops, formats, overview: ov, books, year, years, bookSlug, bookTitle };
+  return {
+    series: tout.series, tout: tout.points, annee, year, years, selection, books, bookSlug, bookTitle,
+    jour: new Date().toISOString()
+  };
 };
