@@ -57,17 +57,27 @@ export const ADMIN_NAV: NavSection[] = [
       { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users', adminOnly: true },
       { label: 'Codes promo', href: '/admin/promos', icon: 'Percent', adminOnly: true },
       { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
-      { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true },
-      { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar', adminOnly: true },
+      { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true }
+    ]
+  },
+  {
+    // Le parcours d'un arrêté des comptes, dans l'ordre où on le suit.
+    title: 'Droits d’auteur',
+    items: [
+      { label: 'Vue d’ensemble', href: '/admin/droits', icon: 'Coins', adminOnly: true },
+      { label: 'Contrats', href: '/admin/droits/contrats', icon: 'FileText', adminOnly: true },
+      { label: 'Cessions de droits', href: '/admin/droits/cessions', icon: 'Globe', adminOnly: true },
       { label: 'Canaux de vente', href: '/admin/canaux', icon: 'Storefront', adminOnly: true },
-      { label: 'Journal', href: '/admin/journal', icon: 'ClockCounterClockwise', adminOnly: true }
+      { label: 'Ventes par exercice', href: '/admin/droits/ventes', icon: 'Receipt', adminOnly: true },
+      { label: 'Reddition de comptes', href: '/admin/droits/reddition', icon: 'Invoice', adminOnly: true }
     ]
   },
   {
     title: 'Outils',
     items: [
+      { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar', adminOnly: true },
       { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
-      { label: 'Droits d’auteur', href: '/admin/droits', icon: 'Coins', adminOnly: true },
+      { label: 'Journal', href: '/admin/journal', icon: 'ClockCounterClockwise', adminOnly: true },
       { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix', adminOnly: true }
     ]
   }

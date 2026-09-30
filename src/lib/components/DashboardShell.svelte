@@ -24,9 +24,15 @@
   const navSections = $derived<NavSection[]>(sections ?? (items ? [{ items }] : []));
 
   let open = $state(false);
-  const isActive = (href: string) =>
+  const correspond = (href: string) =>
     page.url.pathname === href ||
     (href !== '/admin' && href !== '/compte' && page.url.pathname.startsWith(href + '/'));
+  // Une seule entrée active : la plus précise de celles qui correspondent
+  // (« Vue d'ensemble » /admin/droits ne s'allume pas avec « Contrats »).
+  const hrefActif = $derived(
+    navSections.flatMap((s) => s.items).map((i) => i.href).filter(correspond).sort((a, b) => b.length - a.length)[0] ?? ''
+  );
+  const isActive = (href: string) => href === hrefActif;
 
   const initials = $derived(
     ((user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')).toUpperCase() ||

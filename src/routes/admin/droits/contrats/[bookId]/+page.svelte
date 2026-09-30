@@ -89,7 +89,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each data.mouvements as m (m.period_start)}
+        {#each data.mouvements as m (m.period_start + '|' + m.period_end)}
           <tr class="border-t border-border">
             <td class="px-4 py-2">{new Date(m.period_start).toLocaleDateString('fr-FR')} → {new Date(m.period_end).toLocaleDateString('fr-FR')}</td>
             <td class="px-3 py-2 text-right tabular-nums">{m.stock_start}</td>
