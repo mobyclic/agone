@@ -20,7 +20,6 @@ export interface Canal {
   mode: 'api' | 'manuel';
   connector?: 'orders' | 'bldd';
   order_channel?: string;
-  split_by_format: boolean;
   enabled: boolean;
   color: string;
   sort: number;
@@ -32,14 +31,14 @@ export interface Canal {
 export const PALETTE = ['#26425b', '#5b8fbf', '#2e8b57', '#8fbf5b', '#b5a642', '#d4211c', '#e07a1f', '#8e44ad', '#16a085', '#7f8c8d'];
 
 const DEFAUTS: Omit<Canal, 'id'>[] = [
-  { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', split_by_format: true, enabled: true, color: '#26425b', sort: 0, physical_via_bldd: true, notes: 'Commandes du site. Le papier est expédié et facturé par Les Belles Lettres.' },
-  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', split_by_format: false, enabled: true, color: '#2e8b57', sort: 2, physical_via_bldd: false },
-  { code: 'vpc', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', split_by_format: false, enabled: true, color: '#8fbf5b', sort: 3, physical_via_bldd: true },
-  { code: 'sortie_editeur', name: 'Sortie éditeur', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', split_by_format: false, enabled: true, color: '#b5a642', sort: 4, physical_via_bldd: false },
-  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', split_by_format: false, enabled: true, color: '#d4211c', sort: 10, physical_via_bldd: false }
+  { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', sort: 0, physical_via_bldd: true, notes: 'Commandes du site. Le papier est expédié et facturé par Les Belles Lettres.' },
+  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57', sort: 2, physical_via_bldd: false },
+  { code: 'vpc', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b', sort: 3, physical_via_bldd: true },
+  { code: 'sortie_editeur', name: 'Sortie éditeur', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642', sort: 4, physical_via_bldd: false },
+  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c', sort: 10, physical_via_bldd: false }
 ];
 
-const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, split_by_format, enabled, color, sort, physical_via_bldd, notes`;
+const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, enabled, color, sort, physical_via_bldd, notes`;
 
 /**
  * Sème les canaux de base et RÉPARE les lignes anciennes : un champ ajouté après
@@ -53,7 +52,7 @@ export async function ensureCanaux(): Promise<void> {
     if (!e) { await query(`CREATE sales_channel CONTENT $d`, { d }); continue; }
     // On ne touche qu'à ce qui n'a jamais été renseigné : le reste appartient à l'utilisateur.
     const set: Record<string, unknown> = {};
-    for (const k of ['family', 'mode', 'connector', 'order_channel', 'split_by_format', 'enabled', 'color', 'physical_via_bldd'] as const) {
+    for (const k of ['family', 'mode', 'connector', 'order_channel', 'enabled', 'color', 'physical_via_bldd'] as const) {
       if (e[k] === undefined || e[k] === null) set[k] = (d as any)[k];
     }
     if (e.color === '#7a7a7a' && d.color) set.color = d.color;
@@ -78,14 +77,14 @@ const normaliser = (r: any): Canal => ({
   family: r.family === 'indirect' ? 'indirect' : 'direct',
   mode: r.mode === 'manuel' ? 'manuel' : 'api',
   connector: r.connector ?? undefined, order_channel: r.order_channel ?? undefined,
-  split_by_format: r.split_by_format === true, enabled: r.enabled !== false,
+  enabled: r.enabled !== false,
   color: r.color ?? '#7a7a7a', sort: Number(r.sort ?? 0),
   physical_via_bldd: r.physical_via_bldd === true, notes: r.notes ?? undefined
 });
 
 export interface CanalInput {
   code: string; name: string; family: string; mode: string; connector?: string; order_channel?: string;
-  split_by_format?: boolean; enabled?: boolean; color?: string; sort?: number; physical_via_bldd?: boolean; notes?: string;
+  enabled?: boolean; color?: string; sort?: number; physical_via_bldd?: boolean; notes?: string;
 }
 
 /** Code : lettres, chiffres, tirets bas — stable, il sert de clé dans les relevés. */
@@ -101,7 +100,7 @@ export async function upsertCanal(d: CanalInput, existingCode?: string): Promise
     mode: d.mode === 'manuel' ? 'manuel' : 'api',
     connector: connecteur,
     order_channel: connecteur === 'orders' ? (d.order_channel || code) : undefined,
-    split_by_format: d.split_by_format === true, enabled: d.enabled !== false,
+    enabled: d.enabled !== false,
     color: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color : undefined,
     sort: Number.isFinite(Number(d.sort)) ? Number(d.sort) : 0,
     physical_via_bldd: d.physical_via_bldd === true, notes: d.notes?.trim() || undefined
@@ -131,15 +130,21 @@ export async function deleteCanal(code: string): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-/** Les séries affichables : un canal éclaté par format donne deux séries. */
-export interface SerieCanal { key: string; code: string; format?: 'paper' | 'ebook'; nom: string; color: string; family: 'direct' | 'indirect' }
-export function seriesDe(canaux: Canal[]): SerieCanal[] {
+/**
+ * Les séries affichables : chaque canal se lit par format, papier et numérique,
+ * quel que soit le canal — mais seulement pour les formats qu'il a vendus ; un
+ * canal sans rien (API en veille) garde une série vide, à son nom.
+ */
+export interface SerieCanal { key: string; code: string; format: 'paper' | 'ebook'; nom: string; color: string; family: 'direct' | 'indirect' }
+export const cleSerie = (code: string, format: 'paper' | 'ebook') => `${code}:${format}`;
+export function seriesDe(canaux: Canal[], formatsVendus: Map<string, Set<'paper' | 'ebook'>>): SerieCanal[] {
   const out: SerieCanal[] = [];
   for (const c of canaux) {
-    if (c.split_by_format && c.connector === 'orders') {
-      out.push({ key: `${c.code}:paper`, code: c.code, format: 'paper', nom: `${c.name} — papier`, color: c.color, family: c.family });
-      out.push({ key: `${c.code}:ebook`, code: c.code, format: 'ebook', nom: `${c.name} — numérique`, color: eclaircir(c.color, 0.35), family: c.family });
-    } else out.push({ key: c.code, code: c.code, nom: c.name, color: c.color, family: c.family });
+    const vendus = formatsVendus.get(c.code) ?? new Set<'paper' | 'ebook'>();
+    if (vendus.size === 0) { out.push({ key: cleSerie(c.code, 'paper'), code: c.code, format: 'paper', nom: c.name, color: c.color, family: c.family }); continue; }
+    const seul = vendus.size === 1;
+    if (vendus.has('paper')) out.push({ key: cleSerie(c.code, 'paper'), code: c.code, format: 'paper', nom: seul ? c.name : `${c.name} — papier`, color: c.color, family: c.family });
+    if (vendus.has('ebook')) out.push({ key: cleSerie(c.code, 'ebook'), code: c.code, format: 'ebook', nom: seul ? c.name : `${c.name} — numérique`, color: seul ? c.color : eclaircir(c.color, 0.35), family: c.family });
   }
   return out;
 }

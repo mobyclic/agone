@@ -12,7 +12,7 @@
  * Le mois 0 compte dans les totaux de l'année, pas dans la courbe mensuelle.
  */
 import { query, recId } from './surreal';
-import { listCanaux, seriesDe, type Canal, type SerieCanal } from './canaux';
+import { listCanaux, seriesDe, cleSerie, type SerieCanal } from './canaux';
 
 const PAID = "['completed','paid','processing','sent_to_bl']";
 
@@ -38,15 +38,18 @@ const mensuel = (ps: string, pe: string) => {
  */
 export async function ventesParCanal(opts: { annee?: number; bookSlug?: string } = {}): Promise<VentesCanaux> {
   const canaux = await listCanaux({ enabledOnly: true });
-  const series = seriesDe(canaux);
   const points: Point[] = [];
   const livres: PointLivre[] = [];
+  // Papier et numérique se distinguent toujours, quel que soit le canal : une
+  // série par format vendu, et le cumul par format pour le bloc « Formats ».
   const formats = new Map<string, { key: string; format: 'paper' | 'ebook'; units: number; ca: number }>();
-  const ajouterFormat = (key: string, format: 'paper' | 'ebook', units: number, ca: number) => {
-    const k = `${key}|${format}`;
-    const f = formats.get(k) ?? { key, format, units: 0, ca: 0 };
+  const vendus = new Map<string, Set<'paper' | 'ebook'>>();
+  const ajouterFormat = (code: string, format: 'paper' | 'ebook', units: number, ca: number) => {
+    const key = cleSerie(code, format);
+    const f = formats.get(key) ?? { key, format, units: 0, ca: 0 };
     f.units += units; f.ca += ca;
-    formats.set(k, f);
+    formats.set(key, f);
+    (vendus.get(code) ?? vendus.set(code, new Set()).get(code)!).add(format);
   };
   const annee = opts.annee;
   const surAnnee = (champ: string) => (annee ? ` AND time::year(${champ}) = $annee` : '');
@@ -54,7 +57,7 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
 
   await Promise.all(canaux.map(async (c) => {
     if (c.connector === 'orders' && c.order_channel) {
-      const cle = (format: string) => (c.split_by_format ? `${c.code}:${format === 'epub' ? 'ebook' : 'paper'}` : c.code);
+      const cle = (format: string) => cleSerie(c.code, format === 'epub' ? 'ebook' : 'paper');
       const lignes = await query<any>(
         `SELECT time::year(in.created_at) AS a, time::month(in.created_at) AS m, format,
                 math::sum(qty) AS units, math::sum(line_total) AS ca
@@ -65,7 +68,7 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       for (const l of lignes) {
         const fmt: 'paper' | 'ebook' = l.format === 'epub' ? 'ebook' : 'paper';
         points.push({ key: cle(l.format), annee: l.a, mois: l.m, units: Number(l.units ?? 0), ca: Number(l.ca ?? 0), orders: 0 });
-        ajouterFormat(cle(l.format), fmt, Number(l.units ?? 0), Number(l.ca ?? 0));
+        ajouterFormat(c.code, fmt, Number(l.units ?? 0), Number(l.ca ?? 0));
       }
       // Les commandes se comptent une fois par commande, pas par ligne.
       const cmds = await query<any>(
@@ -74,7 +77,8 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
           GROUP BY a, m`,
         { ...vars, oc: c.order_channel }
       );
-      for (const o of cmds) points.push({ key: c.split_by_format ? `${c.code}:paper` : c.code, annee: o.a, mois: o.m, units: 0, ca: 0, orders: Number(o.n ?? 0) });
+      // Le nombre de commandes se porte sur la série papier du canal, quel que soit leur contenu.
+      for (const o of cmds) points.push({ key: cleSerie(c.code, 'paper'), annee: o.a, mois: o.m, units: 0, ca: 0, orders: Number(o.n ?? 0) });
       const parLivre = await query<any>(
         `SELECT out AS book, out.title AS title, out.slug AS slug, format, math::sum(qty) AS units, math::sum(line_total) AS ca
            FROM contains WHERE in.status IN ${PAID} AND in.channel = $oc${surAnnee('in.created_at')}${opts.bookSlug ? ' AND out.slug = $s' : ''}
@@ -87,7 +91,7 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       // chiffre au prix public — le vrai, pas une estimation. Une année qui n'en
       // a pas retombe sur les mouvements de stock (exemplaires × prix du livre).
       const releves = await query<any>(
-        `SELECT report.period_start AS ps, report.period_end AS pe, book, book.title AS title, book.slug AS slug, format,
+        `SELECT report.period_start AS ps, report.period_end AS pe, book, book.title AS title, book.slug AS slug, book.vat_rate AS vat, format,
                 units_sold, units_returned, gross_ht
            FROM sales_line WHERE report.channel = $ch AND report.label = 'auto'${surAnnee('report.period_start')}${opts.bookSlug ? ' AND book.slug = $s' : ''}`,
         { ...vars, ch: recId('sales_channel', c.id) }
@@ -96,21 +100,25 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       for (const l of releves) if (l.ps && mensuel(l.ps, l.pe ?? l.ps)) anneesRelevees.add(new Date(l.ps).getUTCFullYear());
       const agr = new Map<string, Point>();
       const parLivre = new Map<string, PointLivre>();
-      const TVA_LIVRE = 1.055; // le prix public HT du distributeur, ramené TTC comme les ventes du site
+      // Le prix public HT du distributeur, ramené TTC comme les ventes du site —
+      // à la TVA du livre (5,5 %, ou 20 % pour ce qui n'est pas un livre).
+      const ttc = (vat: unknown) => 1 + (Number.isFinite(Number(vat)) ? Number(vat) : 5.5) / 100;
       for (const l of releves) {
         if (!l.ps) continue;
         const a = new Date(l.ps).getUTCFullYear();
         if (!anneesRelevees.has(a) || !mensuel(l.ps, l.pe ?? l.ps)) continue;
         const mois = new Date(l.ps).getUTCMonth() + 1;
         const units = Number(l.units_sold ?? 0) - Number(l.units_returned ?? 0);
-        const ca = Number(l.gross_ht ?? 0) * TVA_LIVRE;
+        const ca = Number(l.gross_ht ?? 0) * ttc(l.vat);
         const fmt: 'paper' | 'ebook' = l.format === 'ebook' ? 'ebook' : 'paper';
-        const k = `${a}|${mois}`;
-        const p = agr.get(k) ?? { key: c.code, annee: a, mois, units: 0, ca: 0, orders: 0 };
+        const key = cleSerie(c.code, fmt);
+        const k = `${key}|${a}|${mois}`;
+        const p = agr.get(k) ?? { key, annee: a, mois, units: 0, ca: 0, orders: 0 };
         p.units += units; p.ca += ca; agr.set(k, p);
         if (l.book) {
-          const pl = parLivre.get(String(l.book)) ?? { key: c.code, book: String(l.book), title: l.title, slug: l.slug, units: 0, ca: 0 };
-          pl.units += units; pl.ca += ca; parLivre.set(String(l.book), pl);
+          const kl = `${key}|${String(l.book)}`;
+          const pl = parLivre.get(kl) ?? { key, book: String(l.book), title: l.title, slug: l.slug, units: 0, ca: 0 };
+          pl.units += units; pl.ca += ca; parLivre.set(kl, pl);
         }
         ajouterFormat(c.code, fmt, units, ca);
       }
@@ -131,11 +139,13 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
         const mois = estMois ? new Date(m.period_start).getUTCMonth() + 1 : 0;
         const units = Number(m.gross_sales ?? 0) + Number(m.returns_credited ?? 0);
         const ca = units * Number(m.prix ?? 0);
-        const k = `${a}|${mois}`;
-        const p = agr.get(k) ?? { key: c.code, annee: a, mois, units: 0, ca: 0, orders: 0 };
+        const key = cleSerie(c.code, 'paper');
+        const k = `${key}|${a}|${mois}`;
+        const p = agr.get(k) ?? { key, annee: a, mois, units: 0, ca: 0, orders: 0 };
         p.units += units; p.ca += ca; agr.set(k, p);
-        const pl = parLivre.get(String(m.book)) ?? { key: c.code, book: String(m.book), title: m.title, slug: m.slug, units: 0, ca: 0 };
-        pl.units += units; pl.ca += ca; parLivre.set(String(m.book), pl);
+        const kl = `${key}|${String(m.book)}`;
+        const pl = parLivre.get(kl) ?? { key, book: String(m.book), title: m.title, slug: m.slug, units: 0, ca: 0 };
+        pl.units += units; pl.ca += ca; parLivre.set(kl, pl);
         ajouterFormat(c.code, 'paper', units, ca);
       }
       points.push(...agr.values());
@@ -156,12 +166,14 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
         const units = Number(l.units_sold ?? 0) - Number(l.units_returned ?? 0);
         const ca = Number(l.gross_ht ?? 0) || Number(l.gross_price ?? 0) * units;
         const fmt: 'paper' | 'ebook' = l.format === 'ebook' || l.format === 'epub' ? 'ebook' : 'paper';
-        const k = `${a}|${mois}`;
-        const p = agr.get(k) ?? { key: c.code, annee: a, mois, units: 0, ca: 0, orders: 0 };
+        const key = cleSerie(c.code, fmt);
+        const k = `${key}|${a}|${mois}`;
+        const p = agr.get(k) ?? { key, annee: a, mois, units: 0, ca: 0, orders: 0 };
         p.units += units; p.ca += ca; agr.set(k, p);
         if (l.book) {
-          const pl = parLivre.get(String(l.book)) ?? { key: c.code, book: String(l.book), title: l.title, slug: l.slug, units: 0, ca: 0 };
-          pl.units += units; pl.ca += ca; parLivre.set(String(l.book), pl);
+          const kl = `${key}|${String(l.book)}`;
+          const pl = parLivre.get(kl) ?? { key, book: String(l.book), title: l.title, slug: l.slug, units: 0, ca: 0 };
+          pl.units += units; pl.ca += ca; parLivre.set(kl, pl);
         }
         ajouterFormat(c.code, fmt, units, ca);
       }
@@ -172,7 +184,7 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
   }));
 
   return {
-    series,
+    series: seriesDe(canaux, vendus),
     points: points.map((p) => ({ ...p, ca: r2(p.ca) })),
     livres: livres.map((l) => ({ ...l, ca: r2(l.ca) })),
     formats: [...formats.values()].map((f) => ({ ...f, ca: r2(f.ca) }))

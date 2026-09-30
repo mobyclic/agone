@@ -51,66 +51,11 @@
       D’où viennent les chiffres, et lesquels compter. Un canal désactivé garde ses relevés passés mais ne se propose plus.
     </p>
   </div>
-  <Button onclick={() => ouvrir('nouveau')}><Plus size={16} /> Nouveau canal</Button>
+  <Button onclick={() => { ouvrir('nouveau'); setTimeout(() => document.getElementById('nouveau-canal')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })); }}><Plus size={16} /> Nouveau canal</Button>
 </div>
 
 {#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
-{#if edition}
-  <!-- Formulaire : nouveau canal ou modification. -->
-  <form method="POST" action="?/save" use:enhance class="mb-6 rounded-lg border border-link/40 bg-link/5 p-5">
-    <h3 class="eyebrow mb-3">{edition === 'nouveau' ? 'Nouveau canal' : `Modifier « ${enEdition?.name} »`}</h3>
-    {#if enEdition}<input type="hidden" name="existing" value={enEdition.code} />{/if}
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <label class={lbl}>Nom <input name="name" required value={enEdition?.name ?? ''} placeholder="ex. Hobo Diffusion" class={input} /></label>
-      <label class={lbl} title="Clé stable des relevés : lettres, chiffres, tirets bas. Déduite du nom si vide.">Code
-        <input name="code" value={enEdition?.code ?? ''} placeholder="déduit du nom" class="{input} font-mono" disabled={!!enEdition} />
-      </label>
-      <label class={lbl}>Famille
-        <select name="family" class={input}>
-          {#each FAMILLES as f (f.id)}<option value={f.id} selected={(enEdition?.family ?? 'direct') === f.id}>{f.nom}</option>{/each}
-        </select>
-      </label>
-      <label class={lbl}>Couleur (statistiques)
-        <input name="color" type="color" value={enEdition?.color ?? '#7a7a7a'} class="h-10 w-full cursor-pointer rounded-md border border-border bg-background px-1" />
-      </label>
-      <label class={lbl}>Source des chiffres
-        <select name="mode" bind:value={mode} class={input}>
-          <option value="api">API — le site les tient ou va les chercher</option>
-          <option value="manuel">Manuel — tableur importé</option>
-        </select>
-      </label>
-      {#if mode === 'api'}
-        <label class={lbl}>Connecteur
-          <select name="connector" bind:value={connector} class={input}>
-            <option value="">Aucun pour l’instant — en veille</option>
-            <option value="orders">Commandes du site (order.channel)</option>
-            <option value="bldd">Extranet Belles Lettres</option>
-          </select>
-        </label>
-        {#if connector === 'orders'}
-          <label class={lbl} title="Valeur de order.channel à lire">Canal des commandes
-            <input name="order_channel" value={enEdition?.order_channel ?? ''} placeholder="ex. comptoir" class="{input} font-mono" />
-          </label>
-        {/if}
-      {/if}
-      <label class={lbl}>Ordre <input name="sort" type="number" value={enEdition?.sort ?? 0} class={input} /></label>
-      <label class="{lbl} sm:col-span-2 lg:col-span-4">Notes <input name="notes" value={enEdition?.notes ?? ''} class={input} /></label>
-    </div>
-    <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-      {#if mode === 'api' && connector === 'orders'}
-        <label class="flex items-center gap-2"><input type="checkbox" name="split_by_format" checked={enEdition?.split_by_format ?? false} class="size-4 accent-[var(--color-link)]" /> Deux séries dans les statistiques : papier et numérique</label>
-      {/if}
-      <label class="flex items-center gap-2" title="Le papier de ce canal est expédié et facturé par Les Belles Lettres : il ne doit pas être compté deux fois dans les droits.">
-        <input type="checkbox" name="physical_via_bldd" checked={enEdition?.physical_via_bldd ?? false} class="size-4 accent-[var(--color-link)]" /> Papier facturé par Les Belles Lettres
-      </label>
-    </div>
-    <div class="mt-4 flex items-center gap-3">
-      <Button type="submit" size="sm">Enregistrer</Button>
-      <Button type="button" variant="outline" size="sm" onclick={() => ouvrir(null)}>Annuler</Button>
-    </div>
-  </form>
-{/if}
 
 {#each FAMILLES as f (f.id)}
   <div class="mb-6 overflow-hidden rounded-lg border border-border bg-card">
@@ -129,7 +74,6 @@
             <td class="px-2 py-2.5">
               <span class="font-medium">{c.name}</span>
               <span class="ml-1.5 font-mono text-xs text-muted-foreground">{c.code}</span>
-              {#if c.split_by_format}<span class="ml-1.5 text-xs text-muted-foreground">papier + numérique</span>{/if}
               {#if c.notes}<p class="text-xs text-muted-foreground">{c.notes}</p>{/if}
             </td>
             <td class="px-2 py-2.5 text-xs text-muted-foreground">
@@ -168,6 +112,9 @@
               </form>
             </td>
           </tr>
+          {#if edition === c.code}
+            <tr><td colspan="7" class="bg-muted/20 p-3">{@render formulaire()}</td></tr>
+          {/if}
         {/each}
         {#if parFamille(f.id).length === 0}
           <tr><td colspan="7" class="px-4 py-6 text-center text-muted-foreground">Aucun canal dans cette famille.</td></tr>
@@ -176,3 +123,60 @@
     </table>
   </div>
 {/each}
+
+{#if edition === 'nouveau'}
+  <div id="nouveau-canal" class="mb-6">{@render formulaire()}</div>
+{/if}
+
+<!-- Formulaire d'un canal : sous sa ligne pour une modification, en bas de page pour un nouveau. -->
+{#snippet formulaire()}
+  <form method="POST" action="?/save" use:enhance class="rounded-lg border border-link/40 bg-link/5 p-5">
+      <h3 class="eyebrow mb-3">{edition === 'nouveau' ? 'Nouveau canal' : `Modifier « ${enEdition?.name} »`}</h3>
+      {#if enEdition}<input type="hidden" name="existing" value={enEdition.code} />{/if}
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class={lbl}>Nom <input name="name" required value={enEdition?.name ?? ''} placeholder="ex. Hobo Diffusion" class={input} /></label>
+        <label class={lbl} title="Clé stable des relevés : lettres, chiffres, tirets bas. Déduite du nom si vide.">Code
+          <input name="code" value={enEdition?.code ?? ''} placeholder="déduit du nom" class="{input} font-mono" disabled={!!enEdition} />
+        </label>
+        <label class={lbl}>Famille
+          <select name="family" class={input}>
+            {#each FAMILLES as f (f.id)}<option value={f.id} selected={(enEdition?.family ?? 'direct') === f.id}>{f.nom}</option>{/each}
+          </select>
+        </label>
+        <label class={lbl}>Couleur (statistiques)
+          <input name="color" type="color" value={enEdition?.color ?? '#7a7a7a'} class="h-10 w-full cursor-pointer rounded-md border border-border bg-background px-1" />
+        </label>
+        <label class={lbl}>Source des chiffres
+          <select name="mode" bind:value={mode} class={input}>
+            <option value="api">API — le site les tient ou va les chercher</option>
+            <option value="manuel">Manuel — tableur importé</option>
+          </select>
+        </label>
+        {#if mode === 'api'}
+          <label class={lbl}>Connecteur
+            <select name="connector" bind:value={connector} class={input}>
+              <option value="">Aucun pour l’instant — en veille</option>
+              <option value="orders">Commandes du site (order.channel)</option>
+              <option value="bldd">Extranet Belles Lettres</option>
+            </select>
+          </label>
+          {#if connector === 'orders'}
+            <label class={lbl} title="Valeur de order.channel à lire">Canal des commandes
+              <input name="order_channel" value={enEdition?.order_channel ?? ''} placeholder="ex. comptoir" class="{input} font-mono" />
+            </label>
+          {/if}
+        {/if}
+        <label class={lbl}>Ordre <input name="sort" type="number" value={enEdition?.sort ?? 0} class={input} /></label>
+        <label class="{lbl} sm:col-span-2 lg:col-span-4">Notes <input name="notes" value={enEdition?.notes ?? ''} class={input} /></label>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <label class="flex items-center gap-2" title="Le papier de ce canal est expédié et facturé par Les Belles Lettres : il ne doit pas être compté deux fois dans les droits.">
+          <input type="checkbox" name="physical_via_bldd" checked={enEdition?.physical_via_bldd ?? false} class="size-4 accent-[var(--color-link)]" /> Papier facturé par Les Belles Lettres
+        </label>
+      </div>
+      <div class="mt-4 flex items-center gap-3">
+        <Button type="submit" size="sm">Enregistrer</Button>
+        <Button type="button" variant="outline" size="sm" onclick={() => ouvrir(null)}>Annuler</Button>
+      </div>
+    </form>
+{/snippet}

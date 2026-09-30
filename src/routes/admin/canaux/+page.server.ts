@@ -29,7 +29,7 @@ const lire = (fd: FormData) => {
   return {
     code: S('code'), name: S('name'), family: S('family'), mode: S('mode'),
     connector: S('connector') || undefined, order_channel: S('order_channel') || undefined,
-    split_by_format: fd.get('split_by_format') === 'on', enabled: fd.get('enabled') !== 'off',
+    enabled: fd.get('enabled') !== 'off',
     color: S('color') || undefined, sort: Number(S('sort')) || 0,
     physical_via_bldd: fd.get('physical_via_bldd') === 'on', notes: S('notes') || undefined
   };

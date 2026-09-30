@@ -373,9 +373,6 @@ DEFINE FIELD OVERWRITE mode       ON sales_channel TYPE string
   ASSERT $value IN ['api','manuel'] DEFAULT 'api' VALUE $value ?? 'api';
 DEFINE FIELD OVERWRITE connector  ON sales_channel TYPE option<string>;  -- 'orders' | 'bldd' | NONE (en veille)
 DEFINE FIELD OVERWRITE order_channel ON sales_channel TYPE option<string>; -- connecteur orders : quel order.channel lire
--- Un canal de commandes vend du papier ET du numérique : dans les statistiques
--- on veut les deux séries (« Site — papier », « Site — numérique »).
-DEFINE FIELD OVERWRITE split_by_format ON sales_channel TYPE bool DEFAULT false VALUE $value ?? false;
 -- Activé / désactivé : un canal désactivé reste dans les relevés passés mais
 -- ne se propose plus (statistiques, imports, collecte).
 DEFINE FIELD OVERWRITE enabled    ON sales_channel TYPE bool DEFAULT true VALUE $value ?? true;
