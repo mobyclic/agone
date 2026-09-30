@@ -24,11 +24,12 @@
     { href: '/admin/droits/cessions', title: 'Cessions de droits', desc: 'Droits vendus à l’étranger et droits acquis.', n: data.stats.cessions, icon: Globe }
   ]);
 
-  /** D'où vient chaque canal : c'est ce qui explique les doubles comptages évités. */
+  /** D'où vient chaque canal. */
   const PROVENANCE: Record<string, { texte: string; auto: boolean }> = {
-    bldd: { texte: 'Importé de l’extranet Belles Lettres (ventes, retours, chiffre facturé).', auto: true },
-    web: { texte: 'Reconstruit depuis les commandes du site — numérique seul : le papier est expédié et facturé par Les Belles Lettres.', auto: true },
-    vpc: { texte: 'Reconstruit depuis les commandes — numérique seul, comme le site.', auto: true },
+    bldd: { texte: 'Importé de l’extranet Belles Lettres (ventes en librairie, retours, chiffre facturé).', auto: true },
+    web: { texte: 'Reconstruit depuis les commandes du site, papier et numérique : ces ventes ne figurent pas sur l’extranet des Belles Lettres.', auto: true },
+    vpc: { texte: 'Reconstruit depuis les commandes saisies en vente par correspondance (expédiées par Les Belles Lettres, absentes de leur extranet).', auto: true },
+    sumup: { texte: 'Encaissements du terminal SumUp rapprochés des rencontres et du catalogue.', auto: true },
     comptoir: { texte: 'Reconstruit depuis les commandes encaissées au comptoir et en rencontre.', auto: true },
     sortie_editeur: { texte: 'Reconstruit depuis les commandes de sortie éditeur.', auto: true }
   };

@@ -6,7 +6,7 @@
    */
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { Plus, PencilSimple, Trash, FileArrowUp, Plugs, PlugsConnected, HandPointing, ArrowsLeftRight } from 'phosphor-svelte';
+  import { Plus, PencilSimple, Trash, FileArrowUp, Plugs, PlugsConnected, HandPointing } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
@@ -27,9 +27,10 @@
   // Champs pilotés pour que le formulaire s'adapte (mode, connecteur).
   let mode = $state('api');
   let connector = $state('');
+  /** Accordéon : ouvre la fiche demandée, ou la referme si elle l'est déjà. */
   function ouvrir(code: string | null) {
-    edition = code;
-    const c = code && code !== 'nouveau' ? data.canaux.find((x) => x.code === code) : null;
+    edition = edition === code ? null : code;
+    const c = edition && edition !== 'nouveau' ? data.canaux.find((x) => x.code === edition) : null;
     mode = c?.mode ?? 'api';
     connector = c?.connector ?? '';
   }
@@ -69,7 +70,7 @@
           {@const actif = enCours[c.code] ?? c.enabled}
           {@const e = etat({ ...c, enabled: actif })}
           {@const r = data.releves[c.code]}
-          <tr class="{actif ? '' : 'opacity-60'}">
+          <tr class="cursor-pointer hover:bg-muted/30 {actif ? '' : 'opacity-60'} {edition === c.code ? 'bg-muted/30' : ''}" onclick={() => ouvrir(c.code)}>
             <td class="w-8 px-4 py-2.5"><span class="inline-block size-3.5 rounded-sm" style="background:{c.color}"></span></td>
             <td class="px-2 py-2.5">
               <span class="font-medium">{c.name}</span>
@@ -87,7 +88,7 @@
             <td class="px-2 py-2.5 text-xs text-muted-foreground">
               {#if r}{r.n} relevé{r.n > 1 ? 's' : ''}{r.dernier ? ` · jusqu’au ${dateFr(r.dernier)}` : ''}{:else}aucun relevé{/if}
             </td>
-            <td class="px-2 py-2.5">
+            <td class="px-2 py-2.5" onclick={(e: Event) => e.stopPropagation()}>
               <!-- Commutateur activé / désactivé -->
               <form method="POST" action="?/toggle" class="inline-flex" use:enhance={() => {
                 enCours[c.code] = !actif;
@@ -101,13 +102,11 @@
                 </button>
               </form>
             </td>
-            <td class="whitespace-nowrap px-4 py-2.5 text-right">
+            <td class="whitespace-nowrap px-4 py-2.5 text-right" onclick={(e: Event) => e.stopPropagation()}>
               {#if c.mode === 'manuel' && actif}
                 <a href="/admin/canaux/{c.code}/import" class="mr-3 inline-flex items-center gap-1 text-xs text-link hover:underline"><FileArrowUp size={14} /> Importer un relevé</a>
-              {:else if c.connector === 'sumup' && actif}
-                <a href="/admin/canaux/sumup" class="mr-3 inline-flex items-center gap-1 text-xs text-link hover:underline"><ArrowsLeftRight size={14} /> Rapprocher les encaissements</a>
               {/if}
-              <button type="button" class="mr-2 text-muted-foreground hover:text-foreground" aria-label="Modifier" onclick={() => ouvrir(c.code)}><PencilSimple size={15} /></button>
+              <button type="button" class="mr-2 {edition === c.code ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}" aria-label="Modifier" aria-expanded={edition === c.code} onclick={() => ouvrir(c.code)}><PencilSimple size={15} /></button>
               <form method="POST" action="?/delete" use:enhance class="inline" onsubmit={(ev: Event) => { if (!confirm(`Supprimer le canal « ${c.name} » ?`)) ev.preventDefault(); }}>
                 <input type="hidden" name="code" value={c.code} />
                 <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Supprimer"><Trash size={15} /></button>
@@ -115,7 +114,7 @@
             </td>
           </tr>
           {#if edition === c.code}
-            <tr><td colspan="7" class="bg-muted/20 p-3">{@render formulaire()}</td></tr>
+            <tr><td colspan="7" class="border-t border-border p-4">{@render formulaire()}</td></tr>
           {/if}
         {/each}
         {#if parFamille(f.id).length === 0}
@@ -132,8 +131,8 @@
 
 <!-- Formulaire d'un canal : sous sa ligne pour une modification, en bas de page pour un nouveau. -->
 {#snippet formulaire()}
-  <form method="POST" action="?/save" use:enhance class="rounded-lg border border-link/40 bg-link/5 p-5">
-      <h3 class="eyebrow mb-3">{edition === 'nouveau' ? 'Nouveau canal' : `Modifier « ${enEdition?.name} »`}</h3>
+  <form method="POST" action="?/save" use:enhance class={edition === 'nouveau' ? 'rounded-lg border border-border bg-card p-5' : ''}>
+      {#if edition === 'nouveau'}<h3 class="eyebrow mb-3">Nouveau canal</h3>{/if}
       {#if enEdition}<input type="hidden" name="existing" value={enEdition.code} />{/if}
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label class={lbl}>Nom <input name="name" required value={enEdition?.name ?? ''} placeholder="ex. Hobo Diffusion" class={input} /></label>
@@ -170,9 +169,8 @@
         {/if}
           <label class="{lbl} sm:col-span-2 lg:col-span-4">Notes <input name="notes" value={enEdition?.notes ?? ''} class={input} /></label>
       </div>
-      <div class="mt-4 flex items-center gap-3">
+      <div class="mt-4">
         <Button type="submit" size="sm">Enregistrer</Button>
-        <Button type="button" variant="outline" size="sm" onclick={() => ouvrir(null)}>Annuler</Button>
       </div>
     </form>
 {/snippet}
