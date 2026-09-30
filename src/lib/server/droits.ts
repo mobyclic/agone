@@ -894,57 +894,69 @@ export async function importVentesBldd(periodStart: Date, periodEnd: Date) {
   if (!canal) throw new Error('Canal « bldd » introuvable.');
   const channelId = String(canal.id).replace(/^sales_channel:/, '');
 
-  const ventes = await fetchBlSales(periodStart, periodEnd);
-  const utiles = ventes.filter((v) => v.units_sold || v.units_returned);
-
-  // Résolution par ISBN (papier ou numérique).
+  // Résolution par ISBN (papier ou numérique). L'ISBN dit aussi le format.
   const books = await query<any>(`SELECT id, isbn_paper, isbn_ebook FROM book WHERE isbn_paper != NONE OR isbn_ebook != NONE`);
-  // L'ISBN dit aussi le format : un EAN numérique vaut une vente d'ebook.
   const parIsbn = new Map<string, { id: string; format: string }>();
   for (const b of books) {
     if (b.isbn_paper) parIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), { id: String(b.id), format: 'paper' });
     if (b.isbn_ebook) parIsbn.set(String(b.isbn_ebook).replace(/\D/g, ''), { id: String(b.id), format: 'ebook' });
   }
 
+  // UN RELEVÉ PAR MOIS. L'extranet accepte n'importe quelles dates ; relever
+  // mois par mois donne le chiffre facturé mensuel (statistiques) et évite,
+  // pour les droits, de répartir un relevé annuel au prorata quand un contrat
+  // change en cours d'année. Tout relevé automatique qui chevauche la période
+  // est remplacé — jamais empilé : le moteur des droits additionne les relevés.
   const anciens = await query<any>(
-    `SELECT id FROM sales_report WHERE channel = $c AND period_start = $s AND period_end = $e AND label = 'auto'`,
+    `SELECT id FROM sales_report WHERE channel = $c AND label = 'auto' AND period_end >= $s AND period_start <= $e`,
     { c: recId('sales_channel', channelId), s: periodStart, e: periodEnd }
   );
   for (const a of anciens) await deleteReport(String(a.id).replace(/^sales_report:/, ''));
 
-  // Période sans aucune vente : on ne laisse pas un relevé vide derrière nous.
-  if (!utiles.length) return { reportId: '', lignes: 0, vendus: 0, retours: 0, prix_public_ht: 0, facture_ht: 0, inconnus: [] as string[] };
+  const mois: { debut: Date; fin: Date }[] = [];
+  const curseur = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), 1));
+  while (curseur <= periodEnd) {
+    const finMois = new Date(Date.UTC(curseur.getUTCFullYear(), curseur.getUTCMonth() + 1, 0));
+    mois.push({ debut: new Date(Math.max(+curseur, +periodStart)), fin: new Date(Math.min(+finMois, +periodEnd)) });
+    curseur.setUTCMonth(curseur.getUTCMonth() + 1);
+  }
 
-  const reportId = await createReport({
-    channelId, period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(), label: 'auto'
-  });
-
-  const inconnus: string[] = [];
-  const rows = utiles.map((v) => {
-    const trouve = parIsbn.get(v.isbn);
-    if (!trouve) inconnus.push(`${v.isbn} — ${v.title}`);
-    return {
-      report: recId('sales_report', reportId),
-      book: trouve ? recId('book', trouve.id.replace(/^book:/, '')) : undefined,
-      isbn: v.isbn,
-      format: trouve?.format ?? 'paper',
-      units_sold: v.units_sold,
-      units_returned: v.units_returned,
-      units_free: 0,
-      gross_ht: r2(v.net_ht),
-      net_receipt: r2(v.invoiced_ht)
-    };
-  });
-  for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
+  const reportIds: string[] = [];
+  const inconnus = new Set<string>();
+  let lignes = 0, vendus = 0, retours = 0, prixPublic = 0, facture = 0;
+  for (const m of mois) {
+    const ventes = await fetchBlSales(m.debut, m.fin);
+    const utiles = ventes.filter((v) => v.units_sold || v.units_returned);
+    if (!utiles.length) continue; // un mois sans vente ne laisse pas de relevé vide
+    const reportId = await createReport({
+      channelId, period_start: m.debut.toISOString(), period_end: m.fin.toISOString(), label: 'auto'
+    });
+    reportIds.push(reportId);
+    const rows = utiles.map((v) => {
+      const trouve = parIsbn.get(v.isbn);
+      if (!trouve) inconnus.add(`${v.isbn} — ${v.title}`);
+      return {
+        report: recId('sales_report', reportId),
+        book: trouve ? recId('book', trouve.id.replace(/^book:/, '')) : undefined,
+        isbn: v.isbn, format: trouve?.format ?? 'paper',
+        units_sold: v.units_sold, units_returned: v.units_returned, units_free: 0,
+        gross_ht: r2(v.net_ht), net_receipt: r2(v.invoiced_ht)
+      };
+    });
+    for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
+    lignes += rows.length;
+    for (const v of utiles) { vendus += v.units_sold; retours += v.units_returned; prixPublic += v.net_ht; facture += v.invoiced_ht; }
+  }
 
   return {
-    reportId,
-    lignes: rows.length,
-    vendus: utiles.reduce((n, v) => n + v.units_sold, 0),
-    retours: utiles.reduce((n, v) => n + v.units_returned, 0),
-    prix_public_ht: r2(utiles.reduce((n, v) => n + v.net_ht, 0)),
-    facture_ht: r2(utiles.reduce((n, v) => n + v.invoiced_ht, 0)),
-    inconnus
+    /** Premier relevé créé (compatibilité) ; `reportIds` porte tous les mois. */
+    reportId: reportIds[0] ?? '',
+    reportIds,
+    mois: reportIds.length,
+    lignes, vendus, retours,
+    prix_public_ht: r2(prixPublic),
+    facture_ht: r2(facture),
+    inconnus: [...inconnus]
   };
 }
 
@@ -1041,13 +1053,16 @@ export async function mouvementsLivreTous(bookId: string) {
  * exercice complet) et reconnaître les adresses étrangères. D'où une opération
  * à part, lancée à la demande, et non à chaque import.
  */
-export async function detaillerExportBldd(reportId: string) {
+export async function detaillerExportBldd(reports: string | string[]) {
   const { fetchBlStockMonth, fetchBlSalesDetail } = await import('./belleslettres');
-  const rapport = (await query<any>(
-    `SELECT period_start, period_end FROM $id`, { id: recId('sales_report', reportId) }
-  ))[0];
-  if (!rapport) throw new Error('Relevé introuvable.');
-  const debut = new Date(rapport.period_start), fin = new Date(rapport.period_end);
+  const ids = (Array.isArray(reports) ? reports : [reports]).map((r) => recId('sales_report', r));
+  const rapports = await query<any>(`SELECT id, period_start, period_end FROM sales_report WHERE id IN $ids`, { ids });
+  if (!rapports.length) throw new Error('Relevé introuvable.');
+  // LE JOURNAL SE LIT UNE FOIS PAR TITRE SUR TOUTE LA PÉRIODE — douze relevés
+  // mensuels ne coûtent pas douze fois plus — puis la part export se répartit
+  // entre les mois au prorata des ventes de chacun, sans perdre d'exemplaire.
+  const debut = new Date(Math.min(...rapports.map((r: any) => +new Date(r.period_start))));
+  const fin = new Date(Math.max(...rapports.map((r: any) => +new Date(r.period_end))));
 
   // Le code article du distributeur se lit sur la page de stock (colonne « Code BLDD »).
   const codes = new Map<string, string>();
@@ -1056,21 +1071,36 @@ export async function detaillerExportBldd(reportId: string) {
   }
 
   const lignes = await query<any>(
-    `SELECT meta::id(id) AS id, isbn, units_sold FROM sales_line WHERE report = $r AND units_sold > 0`,
-    { r: recId('sales_report', reportId) }
+    `SELECT meta::id(id) AS id, isbn, units_sold FROM sales_line WHERE report IN $ids AND units_sold > 0`, { ids }
   );
-  let traites = 0, avecExport = 0, unitesExport = 0, sansCode = 0;
+  const parIsbn = new Map<string, { id: string; units: number }[]>();
   for (const l of lignes) {
-    const code = codes.get(String(l.isbn ?? '').replace(/\D/g, ''));
+    const isbn = String(l.isbn ?? '').replace(/\D/g, '');
+    if (!isbn) continue;
+    parIsbn.set(isbn, [...(parIsbn.get(isbn) ?? []), { id: l.id, units: Number(l.units_sold ?? 0) }]);
+  }
+
+  let traites = 0, avecExport = 0, unitesExport = 0, sansCode = 0;
+  for (const [isbn, parts] of parIsbn) {
+    const code = codes.get(isbn);
     if (!code) { sansCode++; continue; }
     try {
       const detail = await fetchBlSalesDetail(code, debut, fin);
       const hors = detail.filter((d) => d.abroad).reduce((n, d) => n + d.sold - d.returned, 0);
       traites++;
-      if (hors > 0) {
-        avecExport++;
-        unitesExport += hors;
-        await query(`UPDATE $id SET units_export = $n`, { id: recId('sales_line', l.id), n: hors });
+      if (hors <= 0) continue;
+      avecExport++;
+      unitesExport += hors;
+      // Répartition entière au prorata des ventes du mois (plus grand reste).
+      const total = parts.reduce((n, p) => n + p.units, 0) || 1;
+      const brut = parts.map((p) => (hors * p.units) / total);
+      const bas = brut.map(Math.floor);
+      let reste = hors - bas.reduce((a, b) => a + b, 0);
+      for (const i of brut.map((v, i) => ({ i, f: v - Math.floor(v) })).sort((a, b) => b.f - a.f).map((x) => x.i)) {
+        if (reste <= 0) break; bas[i]++; reste--;
+      }
+      for (const [i, p] of parts.entries()) {
+        if (bas[i] > 0) await query(`UPDATE $id SET units_export = $n`, { id: recId('sales_line', p.id), n: bas[i] });
       }
     } catch { sansCode++; }
     await new Promise((r) => setTimeout(r, 120)); // courtoisie envers l'extranet

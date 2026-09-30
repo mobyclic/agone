@@ -3,9 +3,10 @@
  *
  * Chaque canal du référentiel a sa source :
  *   - commandes du site (connecteur `orders`) : par mois, format et livre ;
- *   - Les Belles Lettres (connecteur `bldd`) : les mouvements de stock relevés
- *     mois par mois (ventes nettes des retours), au prix public du livre pour le
- *     chiffre ; à défaut le relevé annuel, rangé au mois 0 (« non ventilé ») ;
+ *   - Les Belles Lettres (connecteur `bldd`) : l'état des ventes relevé mois
+ *     par mois (exemplaires nets, chiffre au prix public) ; à défaut les
+ *     mouvements de stock mensuels (exemplaires × prix du livre) ; à défaut
+ *     encore le relevé annuel, rangé au mois 0 (« non ventilé ») ;
  *   - tableurs importés (mode manuel) : les lignes de leurs relevés, au mois du
  *     relevé s'il couvre un mois, sinon au mois 0.
  * Le mois 0 compte dans les totaux de l'année, pas dans la courbe mensuelle.
@@ -82,6 +83,38 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       );
       for (const l of parLivre) livres.push({ key: cle(l.format), book: String(l.book), title: l.title, slug: l.slug, units: Number(l.units ?? 0), ca: Number(l.ca ?? 0) });
     } else if (c.connector === 'bldd') {
+      // D'abord l'état des ventes relevé MOIS PAR MOIS : exemplaires nets et
+      // chiffre au prix public — le vrai, pas une estimation. Une année qui n'en
+      // a pas retombe sur les mouvements de stock (exemplaires × prix du livre).
+      const releves = await query<any>(
+        `SELECT report.period_start AS ps, report.period_end AS pe, book, book.title AS title, book.slug AS slug, format,
+                units_sold, units_returned, gross_ht
+           FROM sales_line WHERE report.channel = $ch AND report.label = 'auto'${surAnnee('report.period_start')}${opts.bookSlug ? ' AND book.slug = $s' : ''}`,
+        { ...vars, ch: recId('sales_channel', c.id) }
+      );
+      const anneesRelevees = new Set<number>();
+      for (const l of releves) if (l.ps && mensuel(l.ps, l.pe ?? l.ps)) anneesRelevees.add(new Date(l.ps).getUTCFullYear());
+      const agr = new Map<string, Point>();
+      const parLivre = new Map<string, PointLivre>();
+      const TVA_LIVRE = 1.055; // le prix public HT du distributeur, ramené TTC comme les ventes du site
+      for (const l of releves) {
+        if (!l.ps) continue;
+        const a = new Date(l.ps).getUTCFullYear();
+        if (!anneesRelevees.has(a) || !mensuel(l.ps, l.pe ?? l.ps)) continue;
+        const mois = new Date(l.ps).getUTCMonth() + 1;
+        const units = Number(l.units_sold ?? 0) - Number(l.units_returned ?? 0);
+        const ca = Number(l.gross_ht ?? 0) * TVA_LIVRE;
+        const fmt: 'paper' | 'ebook' = l.format === 'ebook' ? 'ebook' : 'paper';
+        const k = `${a}|${mois}`;
+        const p = agr.get(k) ?? { key: c.code, annee: a, mois, units: 0, ca: 0, orders: 0 };
+        p.units += units; p.ca += ca; agr.set(k, p);
+        if (l.book) {
+          const pl = parLivre.get(String(l.book)) ?? { key: c.code, book: String(l.book), title: l.title, slug: l.slug, units: 0, ca: 0 };
+          pl.units += units; pl.ca += ca; parLivre.set(String(l.book), pl);
+        }
+        ajouterFormat(c.code, fmt, units, ca);
+      }
+
       const mvts = await query<any>(
         `SELECT period_start, period_end, book, book.title AS title, book.slug AS slug, book.price_paper AS prix,
                 gross_sales, returns_credited
@@ -90,10 +123,9 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       );
       // Une année relevée mois par mois se lit par mois ; sinon le relevé annuel, au mois 0.
       const anneesMensuelles = new Set(mvts.filter((m: any) => mensuel(m.period_start, m.period_end)).map((m: any) => new Date(m.period_start).getUTCFullYear()));
-      const agr = new Map<string, Point>();
-      const parLivre = new Map<string, PointLivre>();
       for (const m of mvts) {
         const a = new Date(m.period_start).getUTCFullYear();
+        if (anneesRelevees.has(a)) continue; // l'état des ventes mensuel prime
         const estMois = mensuel(m.period_start, m.period_end);
         if (anneesMensuelles.has(a) ? !estMois : estMois) continue;
         const mois = estMois ? new Date(m.period_start).getUTCMonth() + 1 : 0;

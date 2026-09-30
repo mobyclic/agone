@@ -79,13 +79,13 @@ async function executer(j: JobCollecte, opts: { start: Date; end: Date; avecExpo
     }
   };
 
-  let reportBldd: string | null = null;
+  let reportsBldd: string[] = [];
   try {
     await lancer('bldd', async () => {
       const r = await importVentesBldd(opts.start, opts.end);
-      reportBldd = r.reportId || null;
+      reportsBldd = r.reportIds;
       return {
-        detail: `${nb(r.lignes)} titres · ${nb(r.vendus)} vendus · ${nb(r.retours)} retours · ${nb(r.prix_public_ht)} € prix public HT (facturé ${nb(r.facture_ht)} €)`,
+        detail: `${r.mois} mois · ${nb(r.lignes)} lignes · ${nb(r.vendus)} vendus · ${nb(r.retours)} retours · ${nb(r.prix_public_ht)} € prix public HT (facturé ${nb(r.facture_ht)} €)`,
         remarque: r.inconnus.length ? `${r.inconnus.length} ISBN absents du catalogue, ignorés` : undefined
       };
     });
@@ -108,13 +108,13 @@ async function executer(j: JobCollecte, opts: { start: Date; end: Date; avecExpo
     });
 
     if (opts.avecExport) {
-      if (!reportBldd) {
+      if (!reportsBldd.length) {
         const e = etape('export');
         e.statut = 'erreur';
         e.error = 'Sans relevé Belles Lettres, la part export ne peut pas être établie.';
       } else {
         await lancer('export', async () => {
-          const r = await detaillerExportBldd(reportBldd!);
+          const r = await detaillerExportBldd(reportsBldd);
           return {
             detail: `${nb(r.unitesExport)} ex. hors France sur ${nb(r.avecExport)} titres (${nb(r.traites)} examinés)`,
             remarque: r.sansCode ? `${r.sansCode} titres sans code distributeur` : undefined
