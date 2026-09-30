@@ -28,10 +28,20 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
 
 /** Canal / type de commande (libellés FR). */
 export const CHANNEL_LABEL: Record<string, string> = {
-  web: 'Web',
-  comptoir: 'Comptoir',
-  vpc: 'VPC',
+  web: 'agone.org',
+  comptoir: 'Comptoir & rencontres',
+  vpc: 'Vente par correspondance',
   sortie_editeur: 'Sortie éditeur'
+};
+
+/** Mode de règlement d'une commande. */
+export const PAYMENT_LABEL: Record<string, string> = {
+  stripe: 'Carte (Stripe)',
+  sumup: 'Carte (SumUp)',
+  especes: 'Espèces',
+  cheque: 'Chèque',
+  virement: 'Virement',
+  autre: 'Autre'
 };
 
 /** Statuts d'article/livre (libellés FR). */

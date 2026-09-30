@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, Check, Truck, PaperPlaneTilt, ArrowCounterClockwise, NotePencil } from 'phosphor-svelte';
-  import { ORDER_STATUS_LABEL, CHANNEL_LABEL, euros } from '$lib/labels';
+  import { ORDER_STATUS_LABEL, CHANNEL_LABEL, PAYMENT_LABEL, euros } from '$lib/labels';
 
   let { data, form } = $props();
   const o = $derived(data.order);
@@ -41,7 +41,9 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <div>
     <h2 class="text-xl font-bold">Commande #{o.number}</h2>
-    <p class="text-sm text-muted-foreground">Passée le {dateFr(o.created_at)}{#if data.invoiceId} · <a href="/admin/factures/{data.invoiceId}" class="text-link hover:underline">Facture</a>{/if}</p>
+    <p class="text-sm text-muted-foreground">
+      Passée le {dateFr(o.created_at)}{#if o.payment_method} · {PAYMENT_LABEL[o.payment_method] ?? o.payment_method}{/if}{#if o.event_title} · <a href="/admin/rencontres/{o.event_slug}" class="text-link hover:underline">{o.event_title}</a>{/if}{#if data.invoiceId} · <a href="/admin/factures/{data.invoiceId}" class="text-link hover:underline">Facture</a>{/if}
+    </p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
     {#if data.invoiceId}

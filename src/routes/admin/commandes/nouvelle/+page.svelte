@@ -1,16 +1,17 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { untrack } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, MagnifyingGlass, Plus, Trash, X } from 'phosphor-svelte';
 
-  let { form } = $props();
+  let { data, form } = $props();
 
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const label = 'mb-1 block text-sm font-medium';
   const euro = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
 
   // — Client —
-  let mode = $state<'existing' | 'new'>('existing');
+  let mode = $state<'existing' | 'new' | 'none'>('existing');
   let cq = $state('');
   let chits = $state<{ id: string; full_name: string; email?: string }[]>([]);
   let client = $state<{ id: string; full_name: string; email?: string } | null>(null);
@@ -30,9 +31,29 @@
     client = c; cq = ''; chits = [];
   }
 
-  // — Type / statut —
-  let channel = $state('comptoir');
+  // — Type / statut / règlement / date —
+  let channel = $state(untrack(() => data.types[0]?.value ?? 'comptoir'));
   let status = $state('paid');
+  let payment = $state('sumup');
+  let placedAt = $state(new Date().toISOString().slice(0, 10));
+
+  // — Rencontre : une existante (recherche) ou une nouvelle, créée avec la commande —
+  let eventMode = $state<'none' | 'existing' | 'new'>('none');
+  let eq = $state('');
+  let ehits = $state<{ id: string; title: string; start_at?: string; venue?: string }[]>([]);
+  let evenement = $state<{ id: string; title: string; start_at?: string; venue?: string } | null>(null);
+  let etimer: ReturnType<typeof setTimeout>;
+  let neTitle = $state(''), neDate = $state(''), neTime = $state('18:30'), neVenue = $state(''), neCity = $state('');
+  const dateCourte = (d?: string) => (d ? new Date(d).toLocaleDateString('fr-FR') : '');
+  function esearch() {
+    clearTimeout(etimer);
+    const t = eq.trim();
+    if (t.length < 2) { ehits = []; return; }
+    etimer = setTimeout(async () => {
+      const r = await fetch(`/admin/api/events?q=${encodeURIComponent(t)}`);
+      ehits = r.ok ? (await r.json()).results : [];
+    }, 200);
+  }
 
   // — Lignes —
   type Line = { bookId: string; title: string; isbn?: string; format: string; qty: number; unit_price: number; base_price: number };
@@ -90,6 +111,7 @@
       <div class="flex overflow-hidden rounded-md border border-border text-xs">
         <button type="button" class="px-3 py-1 {mode === 'existing' ? 'bg-foreground text-background' : ''}" onclick={() => (mode = 'existing')}>Existant</button>
         <button type="button" class="px-3 py-1 {mode === 'new' ? 'bg-foreground text-background' : ''}" onclick={() => (mode = 'new')}>Nouveau</button>
+        <button type="button" class="px-3 py-1 {mode === 'none' ? 'bg-foreground text-background' : ''}" onclick={() => (mode = 'none')}>Sans client</button>
       </div>
     </div>
 
@@ -114,6 +136,8 @@
           </ul>
         {/if}
       {/if}
+    {:else if mode === 'none'}
+      <p class="text-sm text-muted-foreground">Vente anonyme (comptoir, rencontre) : pas de compte, pas d’email, la facture reste disponible ici.</p>
     {:else}
       <div class="grid gap-3 sm:grid-cols-3">
         <label class={label}>Prénom <input bind:value={nf} class={input} /></label>
@@ -124,14 +148,24 @@
     {/if}
   </section>
 
-  <!-- Type + statut -->
-  <section class="mb-5 grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
+  <!-- Type, règlement, date, statut -->
+  <section class="mb-5 grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
     <label class={label}>Type de commande
       <select bind:value={channel} class={input}>
-        <option value="comptoir">Comptoir (sur place)</option>
-        <option value="vpc">VPC (→ Belles Lettres)</option>
-        <option value="sortie_editeur">Sortie éditeur (bon de livraison)</option>
+        {#each data.types as t (t.value)}<option value={t.value}>{t.label}</option>{/each}
       </select>
+    </label>
+    <label class={label}>Mode de paiement
+      <select bind:value={payment} class={input}>
+        <option value="sumup">Carte (SumUp)</option>
+        <option value="especes">Espèces</option>
+        <option value="cheque">Chèque</option>
+        <option value="virement">Virement</option>
+        <option value="autre">Autre</option>
+      </select>
+    </label>
+    <label class={label} title="Une autre date qu’aujourd’hui antidate la commande (et sa date de paiement).">Date de la vente
+      <input type="date" bind:value={placedAt} class={input} />
     </label>
     <label class={label}>Statut initial
       <select bind:value={status} class={input}>
@@ -141,6 +175,50 @@
         <option value="completed">Terminée</option>
       </select>
     </label>
+  </section>
+
+  <!-- Rencontre -->
+  <section class="mb-5 rounded-lg border border-border bg-card p-4">
+    <div class="mb-3 flex items-center justify-between">
+      <h3 class="eyebrow">Rencontre <span class="font-normal normal-case text-muted-foreground">(si la vente a eu lieu sur place)</span></h3>
+      <div class="flex overflow-hidden rounded-md border border-border text-xs">
+        <button type="button" class="px-3 py-1 {eventMode === 'none' ? 'bg-foreground text-background' : ''}" onclick={() => (eventMode = 'none')}>Aucune</button>
+        <button type="button" class="px-3 py-1 {eventMode === 'existing' ? 'bg-foreground text-background' : ''}" onclick={() => (eventMode = 'existing')}>Existante</button>
+        <button type="button" class="px-3 py-1 {eventMode === 'new' ? 'bg-foreground text-background' : ''}" onclick={() => (eventMode = 'new')}>Nouvelle</button>
+      </div>
+    </div>
+    {#if eventMode === 'existing'}
+      {#if evenement}
+        <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+          <span class="text-sm"><span class="font-medium">{evenement.title}</span> <span class="text-muted-foreground">{dateCourte(evenement.start_at)}{evenement.venue ? ` · ${evenement.venue}` : ''}</span></span>
+          <button type="button" class="text-muted-foreground hover:text-foreground" onclick={() => (evenement = null)} aria-label="Retirer"><X size={16} /></button>
+        </div>
+      {:else}
+        <div class="relative">
+          <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input bind:value={eq} oninput={esearch} placeholder="Rechercher une rencontre (titre)…" autocomplete="off" class="{input} pl-9" />
+        </div>
+        {#if ehits.length}
+          <ul class="mt-1 divide-y divide-border overflow-hidden rounded-md border border-border">
+            {#each ehits as e (e.id)}
+              <li><button type="button" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted/40" onclick={() => { evenement = e; eq = ''; ehits = []; if (e.start_at) placedAt = new Date(e.start_at).toISOString().slice(0, 10); }}>
+                <span class="min-w-0 flex-1 truncate font-medium">{e.title}</span>
+                <span class="shrink-0 text-xs text-muted-foreground">{dateCourte(e.start_at)}{e.venue ? ` · ${e.venue}` : ''}</span>
+              </button></li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+    {:else if eventMode === 'new'}
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="{label} sm:col-span-2">Titre <input bind:value={neTitle} placeholder="ex. Rencontre avec … à la librairie …" class={input} /></label>
+        <label class={label}>Date <input type="date" bind:value={neDate} placeholder={placedAt} class={input} /></label>
+        <label class={label}>Heure <input type="time" bind:value={neTime} class={input} /></label>
+        <label class={label}>Lieu <input bind:value={neVenue} placeholder="nom du lieu (facultatif)" class={input} /></label>
+        <label class={label}>Ville <input bind:value={neCity} class={input} /></label>
+      </div>
+      <p class="mt-2 text-xs text-muted-foreground">La rencontre est créée avec les livres de cette commande ; vous pourrez la compléter depuis Rencontres. Date vide = date de la vente.</p>
+    {/if}
   </section>
 
   <!-- Lignes -->
@@ -208,7 +286,7 @@
 
   <!-- Livraison (optionnelle) -->
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
-    <h3 class="eyebrow mb-3">Adresse de livraison <span class="font-normal normal-case text-muted-foreground">(optionnelle — VPC / sortie éditeur)</span></h3>
+    <h3 class="eyebrow mb-3">Adresse de livraison <span class="font-normal normal-case text-muted-foreground">(optionnelle — vente par correspondance, sortie éditeur)</span></h3>
     <div class="grid gap-3 sm:grid-cols-2">
       <label class={label}>Prénom <input bind:value={sf} class={input} /></label>
       <label class={label}>Nom <input bind:value={sl} class={input} /></label>
@@ -227,6 +305,15 @@
   <input type="hidden" name="newEmail" value={ne} />
   <input type="hidden" name="channel" value={channel} />
   <input type="hidden" name="status" value={status} />
+  <input type="hidden" name="payment_method" value={payment} />
+  <input type="hidden" name="placed_at" value={placedAt} />
+  <input type="hidden" name="eventMode" value={eventMode} />
+  <input type="hidden" name="eventId" value={eventMode === 'existing' ? (evenement?.id ?? '') : ''} />
+  <input type="hidden" name="newEventTitle" value={eventMode === 'new' ? neTitle : ''} />
+  <input type="hidden" name="newEventDate" value={neDate} />
+  <input type="hidden" name="newEventTime" value={neTime} />
+  <input type="hidden" name="newEventVenue" value={neVenue} />
+  <input type="hidden" name="newEventCity" value={neCity} />
   <input type="hidden" name="ship_first" value={sf} />
   <input type="hidden" name="ship_last" value={sl} />
   <input type="hidden" name="ship_address" value={sa} />

@@ -30,7 +30,7 @@ export interface Lecture {
   entetes: string[];
   lignes: (string | number | null)[][];   // toutes les lignes de données
   apercu: (string | number | null)[][];   // les cinq premières
-  proposition: Record<number, Champ>;      // index de colonne → champ
+  proposition: Record<number, string>;     // index de colonne → champ
   expire: number;
 }
 
@@ -52,8 +52,20 @@ export function devinerChamp(entete: string): Champ {
   return 'ignore';
 }
 
-export function lireTableur(buffer: Buffer, nomFichier: string, feuilleVoulue?: string): Lecture {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+/** UTF-8 (BOM ou non) si le contenu s'y prête, sinon latin-1. */
+function decoderTexte(buffer: Buffer): string {
+  const utf8 = buffer.toString('utf8');
+  return utf8.includes('\uFFFD') ? buffer.toString('latin1') : utf8.replace(/^\uFEFF/, '');
+}
+
+export function lireTableur(buffer: Buffer, nomFichier: string, feuilleVoulue?: string, deviner: (entete: string) => string = devinerChamp): Lecture {
+  // Un CSV se lit en texte, sans interprétation des valeurs : « 12/05/2026 » reste
+  // une date française (le lecteur la prendrait pour le 5 décembre) et l'accent
+  // survit, que le fichier soit en UTF-8 (site, LibreOffice) ou en latin-1 (Excel FR).
+  const texte = /\.(csv|txt|tsv)$/i.test(nomFichier);
+  const wb = texte
+    ? XLSX.read(decoderTexte(buffer), { type: 'string', raw: true })
+    : XLSX.read(buffer, { type: 'buffer', cellDates: false });
   const feuilles = wb.SheetNames;
   const feuille = feuilleVoulue && feuilles.includes(feuilleVoulue) ? feuilleVoulue : feuilles[0];
   const ws = wb.Sheets[feuille];
@@ -63,10 +75,10 @@ export function lireTableur(buffer: Buffer, nomFichier: string, feuilleVoulue?: 
   if (iEntete < 0) iEntete = 0;
   const entetes = (brut[iEntete] ?? []).map((c, i) => (c == null || c === '' ? `Colonne ${i + 1}` : String(c).trim()));
   const lignes = brut.slice(iEntete + 1).filter((r) => r.some((c) => c != null && c !== ''));
-  const proposition: Record<number, Champ> = {};
-  const pris = new Set<Champ>();
+  const proposition: Record<number, string> = {};
+  const pris = new Set<string>();
   entetes.forEach((e, i) => {
-    const c = devinerChamp(e);
+    const c = deviner(e);
     if (c !== 'ignore' && !pris.has(c)) { proposition[i] = c; pris.add(c); }
   });
   // Nettoyage des lectures périmées, puis dépôt de celle-ci.
@@ -85,7 +97,7 @@ export const lectureEnAttente = (token: string): Lecture | null => {
   return l && l.expire > Date.now() ? l : null;
 };
 
-const nombre = (v: unknown): number => {
+export const nombre = (v: unknown): number => {
   if (typeof v === 'number') return v;
   const s = String(v ?? '').replace(/\s| /g, '').replace(',', '.').replace(/[^\d.-]/g, '');
   const n = Number(s);

@@ -29,6 +29,12 @@ export interface CreateOrderInput {
   discount?: number;
   promoCode?: string;
   shippingTotal?: number;
+  /** Mode de règlement (stripe, sumup, especes, cheque, virement, autre). */
+  paymentMethod?: string;
+  /** Rencontre où la vente a été faite. */
+  eventId?: string;
+  /** Date de la commande, pour une saisie antidatée (défaut : maintenant). */
+  placedAt?: Date;
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<{ id: string; number: number }> {
@@ -49,7 +55,10 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
       email: input.email, channel: input.channel ?? 'web',
       status: 'pending', billing: input.billing, shipping: input.shipping,
       item_count, subtotal: r2(subtotal), shipping_total, discount_total,
-      promo_code: input.promoCode || undefined, total, has_ebook, has_physical
+      promo_code: input.promoCode || undefined, total, has_ebook, has_physical,
+      payment_method: input.paymentMethod || undefined,
+      event: input.eventId ? recId('event', input.eventId.replace(/^event:/, '')) : undefined,
+      created_at: input.placedAt ?? undefined
     }
   });
   const orderId = String(rows[0].id).replace(/^order:/, '');
@@ -64,7 +73,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
 }
 
 /** Marque une commande payée + accorde les ebooks (bibliothèque) + numéro de facture. */
-export async function markOrderPaid(orderId: string): Promise<void> {
+export async function markOrderPaid(orderId: string, opts: { silencieux?: boolean } = {}): Promise<void> {
   const rows = await query<any>(`SELECT id, status, customer, has_ebook, promo_code FROM order WHERE id = $id LIMIT 1`, { id: recId('order', orderId) });
   const order = rows[0];
   if (!order || order.status === 'paid' || order.status === 'completed') return;
@@ -93,6 +102,7 @@ export async function markOrderPaid(orderId: string): Promise<void> {
 
   // Confirmation au client — après la facture, pour qu'elle existe quand il clique.
   // Jamais bloquant : un email qui échoue ne doit pas défaire un paiement.
+  if (opts.silencieux) return;
   try {
     const { sendOrderConfirmation } = await import('./orderMail');
     await sendOrderConfirmation(orderId);
@@ -105,7 +115,8 @@ const ORDER_FIELDS = `
   id, number, status, channel, total, subtotal, shipping_total, discount_total, promo_code,
   item_count, has_ebook, has_physical, invoice_number, created_at, paid_at, billing, shipping, email,
   carrier, tracking_number, tracking_url, shipped_at, notes,
-  confirmation_sent_at, shipping_notified_at, stripe_payment_intent, stripe_refund_id, refunded_at
+  confirmation_sent_at, shipping_notified_at, stripe_payment_intent, stripe_refund_id, refunded_at,
+  payment_method, event, event.title AS event_title, event.slug AS event_slug
 `;
 
 export async function getOrderByNumber(number: number) {
@@ -307,6 +318,11 @@ export interface AdminOrderInput {
   newCustomer?: { first_name?: string; last_name?: string; email: string };
   channel: string; // 'comptoir' | 'vpc' | 'sortie_editeur'
   status?: string; // statut initial (défaut 'paid')
+  paymentMethod?: string;
+  eventId?: string;
+  placedAt?: Date;
+  /** Pas d'email de confirmation (saisie après coup, import). */
+  silencieux?: boolean;
   billing?: Record<string, unknown>;
   shipping?: Record<string, unknown>;
   lines: AdminOrderLine[];
@@ -352,18 +368,21 @@ export async function createAdminOrder(input: AdminOrderInput): Promise<{ id: st
 
   const { id, number } = await createOrder({
     customerId, email, channel: input.channel,
-    billing: input.billing, shipping: input.shipping, lines
+    billing: input.billing, shipping: input.shipping, lines,
+    paymentMethod: input.paymentMethod, eventId: input.eventId, placedAt: input.placedAt
   });
 
   // 3) Statut initial (défaut : payé → facture émise).
   const status = input.status ?? 'paid';
   if (status !== 'pending') {
     if (PAID_LIKE.has(status)) {
-      await markOrderPaid(id);
+      await markOrderPaid(id, { silencieux: input.silencieux });
       if (status !== 'paid') await setOrderStatus(number, status);
     } else {
       await setOrderStatus(number, status);
     }
   }
+  // Une commande antidatée est payée à sa date, pas au moment de la saisie.
+  if (input.placedAt) await query(`UPDATE $id SET paid_at = IF paid_at != NONE THEN $d ELSE NONE END`, { id: recId('order', id), d: input.placedAt });
   return { id, number };
 }

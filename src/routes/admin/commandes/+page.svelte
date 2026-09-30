@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { MagnifyingGlass, Plus , DownloadSimple } from 'phosphor-svelte';
+  import { MagnifyingGlass, Plus , DownloadSimple, UploadSimple } from 'phosphor-svelte';
   import { Button } from '$lib/components/ui/button';
   import Pagination from '$lib/components/Pagination.svelte';
   import { ORDER_STATUS_LABEL, euros } from '$lib/labels';
@@ -47,6 +47,9 @@
     <a href="/admin/commandes/export.csv{data.status || data.type ? `?${new URLSearchParams({ ...(data.status ? { status: data.status } : {}), ...(data.type ? { type: data.type } : {}) })}` : ''}"
       class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted" title="Export CSV des commandes affichées (tous statuts si aucun filtre)">
       <DownloadSimple size={15} /> CSV
+    </a>
+    <a href="/admin/commandes/import" class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted" title="Importer des ventes depuis un tableur (rencontre, salon, comptoir)">
+      <UploadSimple size={15} /> Importer
     </a>
     <Button href="/admin/commandes/nouvelle"><Plus size={16} /> Nouvelle commande</Button>
   </div>

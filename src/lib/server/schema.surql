@@ -662,6 +662,11 @@ DEFINE FIELD OVERWRITE status       ON order TYPE string
 DEFINE FIELD OVERWRITE channel      ON order TYPE string
   ASSERT $value IN ['web','comptoir','vpc','sortie_editeur'] DEFAULT 'web';
 DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR' VALUE $value ?? 'EUR';
+-- Comment la commande a été réglée (stripe pour le site ; sumup, espèces, chèque, virement
+-- pour les ventes saisies à la main) et, le cas échéant, la rencontre où elle a été faite.
+DEFINE FIELD OVERWRITE payment_method ON order TYPE option<string>
+  ASSERT $value = NONE OR $value IN ['stripe','sumup','especes','cheque','virement','autre'];
+DEFINE FIELD OVERWRITE event        ON order TYPE option<record<event>>;
 DEFINE FIELD OVERWRITE billing      ON order TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE shipping     ON order TYPE option<object> FLEXIBLE;
 DEFINE FIELD OVERWRITE item_count   ON order TYPE int DEFAULT 0 VALUE $value ?? 0;
@@ -698,6 +703,7 @@ DEFINE INDEX OVERWRITE idx_order_number  ON order FIELDS number UNIQUE;
 DEFINE INDEX OVERWRITE idx_order_customer ON order FIELDS customer;
 DEFINE INDEX OVERWRITE idx_order_status  ON order FIELDS status;
 DEFINE INDEX OVERWRITE idx_order_legacy  ON order FIELDS legacy_wp_id;
+DEFINE INDEX OVERWRITE idx_order_event   ON order FIELDS event;
 
 -- ARÊTE — une ligne de commande (order -> book)
 DEFINE TABLE OVERWRITE contains TYPE RELATION IN order OUT book SCHEMAFULL;

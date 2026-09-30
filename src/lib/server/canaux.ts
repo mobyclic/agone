@@ -155,3 +155,10 @@ export function eclaircir(hex: string, f: number): string {
   const c = (h: string) => Math.round(parseInt(h, 16) + (255 - parseInt(h, 16)) * f).toString(16).padStart(2, '0');
   return `#${c(m[1])}${c(m[2])}${c(m[3])}`;
 }
+
+/** Les types de commande saisissables à la main : les canaux directs alimentés par les commandes, hors site. */
+export async function typesCommandeSaisie(): Promise<{ value: string; label: string }[]> {
+  return (await listCanaux({ enabledOnly: true }))
+    .filter((c) => c.connector === 'orders' && c.order_channel && c.order_channel !== 'web')
+    .map((c) => ({ value: c.order_channel!, label: c.name }));
+}
