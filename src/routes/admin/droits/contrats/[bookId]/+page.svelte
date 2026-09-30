@@ -94,6 +94,9 @@
         <div>
           <span class="font-semibold">{c.author_name}</span>
           <span class="ml-2 rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role}</span>
+          {#if c.role === 'director' && liste.length === 0}
+            <span class="ml-2 text-xs text-amber-700 dark:text-amber-500">proposé par défaut — contrat à établir</span>
+          {/if}
         </div>
         <span class="text-xs text-muted-foreground">
           {liste.length === 0
@@ -108,10 +111,7 @@
 
       <div class="space-y-5">
         {#each liste as ct (ct.id)}
-          <div class="mb-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-            <span>Porté par <strong class="text-foreground">{ct.director_name ?? '— à renseigner'}</strong></span>
-            {#if ct.document_name}<span>Contrat déposé : {ct.document_name}</span>{/if}
-          </div>
+          {#if ct.document_name}<p class="mb-1 text-xs text-muted-foreground">Contrat déposé : {ct.document_name}</p>{/if}
           {@render contrat(c, ct)}
         {/each}
 
@@ -156,14 +156,18 @@
       </p>
     </div>
 
-    <!-- Le directeur de collection porte le contrat : toujours renseigné, toujours de la maison. -->
-    <label class={lbl}>Directeur de collection *
-      <select name="director" required class="{input} mt-1 max-w-sm">
-        {#each data.staff as u (u.id)}
-          <option value={u.id} selected={(ct?.director_id ?? data.directeurDefaut) === u.id}>{u.full_name} · {u.role === 'admin' ? 'admin' : 'éditeur'}</option>
-        {/each}
-      </select>
-    </label>
+    <!-- Le directeur de collection est un coopérateur : on choisit son compte, sa fiche auteur suit. -->
+    {#if c.role === 'director'}
+      <label class={lbl}>Directeur de collection *
+        <select name="director" required class="{input} mt-1 max-w-sm">
+          {#each data.directeurs as u (u.id)}
+            <option value={u.id} selected={c.user_id ? c.user_id === u.id : !!u.author_id && String(c.author_id).replace('author:', '') === u.author_id}>
+              {u.full_name} · {u.role === 'admin' ? 'admin' : 'éditeur'}
+            </option>
+          {/each}
+        </select>
+      </label>
+    {/if}
 
     <div>
       <span class={lbl}>Barème par paliers (droits progressifs)</span>

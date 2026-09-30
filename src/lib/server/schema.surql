@@ -172,10 +172,13 @@ DEFINE FIELD OVERWRITE website     ON author TYPE option<string>;
 DEFINE FIELD OVERWRITE legal_name  ON author TYPE option<string>;
 DEFINE FIELD OVERWRITE siret       ON author TYPE option<string>;
 DEFINE FIELD OVERWRITE legacy_wp_id ON author TYPE option<int>;
+-- Compte de la maison correspondant (directeur de collection sous contrat) ; NONE pour les autres.
+DEFINE FIELD OVERWRITE user        ON author TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE created_at  ON author TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at  ON author TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_author_slug   ON author FIELDS slug UNIQUE;
 DEFINE INDEX OVERWRITE idx_author_legacy ON author FIELDS legacy_wp_id;
+DEFINE INDEX OVERWRITE idx_author_user   ON author FIELDS user;
 DEFINE INDEX OVERWRITE ft_author_name ON author FIELDS full_name FULLTEXT ANALYZER ana_text BM25;
 
 -- BOOK (le catalogue ; ex-CPT `livres`)
@@ -390,8 +393,10 @@ DEFINE INDEX OVERWRITE idx_channel_code ON sales_channel FIELDS code UNIQUE;
 DEFINE TABLE OVERWRITE royalty_contract SCHEMAFULL;
 DEFINE FIELD OVERWRITE book        ON royalty_contract TYPE record<book>;
 DEFINE FIELD OVERWRITE author      ON royalty_contract TYPE record<author>;
+-- 'director' : le directeur de collection, coopérateur de la maison, a son propre contrat
+-- sur chaque livre (il n'apparaît pas dans contributed_by, qui est le graphe public).
 DEFINE FIELD OVERWRITE role        ON royalty_contract TYPE string
-  ASSERT $value IN ['author','editor','translator','preface','postface','illustrator','other'] DEFAULT 'author';
+  ASSERT $value IN ['author','editor','translator','preface','postface','illustrator','other','director'] DEFAULT 'author';
 -- Barème par PALIERS (droits progressifs) : liste ordonnée { up_to?: cumul max du palier, rate: % }
 --   ex. [{up_to:2000, rate:8}, {up_to:5000, rate:10}, {rate:12}]  (dernier palier sans plafond)
 DEFINE FIELD OVERWRITE tiers       ON royalty_contract TYPE array<object> DEFAULT [];
@@ -430,7 +435,6 @@ DEFINE FIELD OVERWRITE term_end    ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE document    ON royalty_contract TYPE option<record<media>>;   -- contrat scanné
 -- Directeur de collection : la personne de la maison (admin ou éditeur) qui
 -- porte ce contrat. Toujours renseigné à la saisie.
-DEFINE FIELD OVERWRITE director    ON royalty_contract TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE status      ON royalty_contract TYPE string
   ASSERT $value IN ['draft','active','ended'] DEFAULT 'active';
 DEFINE FIELD OVERWRITE notes       ON royalty_contract TYPE option<string>;

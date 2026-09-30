@@ -76,7 +76,7 @@ export const actions: Actions = {
         bookId, authorId, role, tiers, scope: numerique ? 'paper' : 'all', base: 'ppht',
         share: part, advance: N('avaloir') ?? 0, status: 'draft',
         notes: `Lu dans le contrat déposé « ${S('nomFichier')} » — à vérifier avant validation.`,
-        documentId: mediaId, directorId: locals.user?.id
+        documentId: mediaId
       });
       n++;
       if (numerique) {
@@ -84,7 +84,7 @@ export const actions: Actions = {
           bookId, authorId, role, tiers: [{ rate: numerique }], scope: 'ebook', base: 'ppht',
           share: part, advance: 0, status: 'draft',
           notes: `Numérique — lu dans « ${S('nomFichier')} ».`,
-          documentId: mediaId, directorId: locals.user?.id
+          documentId: mediaId
         });
         n++;
       }

@@ -8,6 +8,7 @@
  */
 import { query, recId } from './surreal';
 import { getSetting, setSetting } from './site';
+import { uniqueSlug, slugify } from './slug';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -27,6 +28,8 @@ export interface ReglagesDroits {
   provision_rate: number;
   /** En deçà, le net n'est pas payé mais reporté sur l'exercice suivant (€). */
   threshold: number;
+  /** Compte (admin ou éditeur) proposé comme directeur de collection sur tout nouveau livre. */
+  directeur_defaut?: string;
 }
 const REGLAGES_DEFAUT: ReglagesDroits = { provision_rate: 15, threshold: 100 };
 
@@ -35,15 +38,69 @@ export async function getReglagesDroits(): Promise<ReglagesDroits> {
   const n = (x: unknown, d: number) => (Number.isFinite(Number(x)) ? Number(x) : d);
   return {
     provision_rate: n(v.provision_rate, REGLAGES_DEFAUT.provision_rate),
-    threshold: n(v.threshold, REGLAGES_DEFAUT.threshold)
+    threshold: n(v.threshold, REGLAGES_DEFAUT.threshold),
+    directeur_defaut: (typeof v.directeur_defaut === 'string' && v.directeur_defaut) || (await directeurHistorique())
   };
 }
 
 export async function setReglagesDroits(r: ReglagesDroits) {
   await setSetting('royalties', {
     provision_rate: Math.min(100, Math.max(0, Number(r.provision_rate) || 0)),
-    threshold: Math.max(0, Number(r.threshold) || 0)
+    threshold: Math.max(0, Number(r.threshold) || 0),
+    directeur_defaut: r.directeur_defaut || undefined
   });
+}
+
+/** Tant que rien n'est réglé, le directeur de collection de la maison : Thierry Discepolo. */
+async function directeurHistorique(): Promise<string | undefined> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id FROM user WHERE role IN ['admin','editor'] AND is_active = true
+       AND string::lowercase(last_name ?? '') = 'discepolo' LIMIT 1`
+  );
+  return rows[0]?.id;
+}
+
+// ── Directeur de collection ───────────────────────────────────
+// Un coopérateur (compte admin ou éditeur) sous contrat sur un livre : sa fiche
+// auteur porte le lien vers son compte, pour retrouver l'un depuis l'autre.
+
+/** Comptes pouvant diriger une collection, avec leur fiche auteur si elle existe. */
+export async function directeursPossibles() {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, full_name, email, role,
+        (SELECT meta::id(id) AS id FROM author WHERE user = $parent.id LIMIT 1)[0].id AS author_id
+       FROM user WHERE role IN ['admin','editor'] AND is_active = true ORDER BY full_name ASC`
+  );
+  return rows.map((r) => ({
+    id: String(r.id), full_name: r.full_name || r.email, role: String(r.role), author_id: r.author_id ? String(r.author_id) : undefined
+  }));
+}
+
+/**
+ * Fiche auteur d'un coopérateur : celle déjà liée à son compte, sinon l'homonyme
+ * du catalogue (qu'on relie), sinon une fiche masquée créée pour l'occasion.
+ */
+export async function auteurDuCooperateur(userId: string): Promise<string> {
+  const u = recId('user', userId.replace(/^user:/, ''));
+  const liee = await query<any>(`SELECT meta::id(id) AS id FROM author WHERE user = $u LIMIT 1`, { u });
+  if (liee[0]) return String(liee[0].id);
+  const compte = (await query<any>(`SELECT first_name, last_name, full_name, email FROM ONLY $u`, { u })) as any;
+  if (!compte?.email) throw new Error('Compte introuvable');
+  const nom = String(compte.full_name || `${compte.first_name ?? ''} ${compte.last_name ?? ''}`).trim();
+  const homonyme = await query<any>(
+    `SELECT meta::id(id) AS id FROM author WHERE user = NONE AND string::lowercase(full_name) = $n LIMIT 1`,
+    { n: nom.toLowerCase() }
+  );
+  if (homonyme[0]) {
+    await query(`UPDATE $a SET user = $u`, { a: recId('author', String(homonyme[0].id)), u });
+    return String(homonyme[0].id);
+  }
+  const slug = await uniqueSlug('author', slugify(nom || compte.email.split('@')[0]));
+  const cree = await query<any>(
+    `CREATE author SET first_name = $p, last_name = $l, full_name = $n, slug = $s, hidden = true, user = $u RETURN meta::id(id) AS id`,
+    { p: compte.first_name ?? '', l: compte.last_name ?? '', n: nom || compte.email, s: slug, u }
+  );
+  return String(cree[0].id);
 }
 
 // ── Contrats ──────────────────────────────────────────────────
@@ -64,8 +121,6 @@ export interface ContractInput {
   term_start?: string; term_end?: string; tiers_reset?: boolean;
   /** Contrat déposé (PDF), rangé dans le stockage privé. */
   documentId?: string;
-  /** Directeur de collection (compte admin ou éditeur) qui porte le contrat. */
-  directorId?: string;
 }
 
 /** Contrats d'un livre (avec nom d'auteur), indexés par authorId+role. */
@@ -73,8 +128,7 @@ export async function contractsForBook(bookId: string) {
   return query<any>(
     `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate, share,
         rate_after_advance, cession_share, advance, advance_recouped, status, notes, term_start, term_end,
-        IF director != NONE THEN meta::id(director) ELSE NONE END AS director_id,
-        director.full_name AS director_name, document.filename AS document_name
+        document.filename AS document_name
       FROM royalty_contract WHERE book = $b ORDER BY role, term_start`,
     { b: recId('book', bookId) }
   );
@@ -95,8 +149,7 @@ export async function upsertContract(d: ContractInput) {
     term_start: d.term_start ? new Date(d.term_start) : undefined,
     term_end: d.term_end ? new Date(d.term_end) : undefined,
     tiers_reset: d.tiers_reset === true,
-    document: d.documentId ? recId('media', d.documentId.replace(/^media:/, '')) : undefined,
-    director: d.directorId ? recId('user', d.directorId.replace(/^user:/, '')) : undefined
+    document: d.documentId ? recId('media', d.documentId.replace(/^media:/, '')) : undefined
   };
   // Modification d'un contrat désigné, sinon upsert par (livre, auteur, rôle,
   // prise d'effet) : les avenants successifs coexistent au lieu de s'écraser.
@@ -132,10 +185,31 @@ export async function bookContributorsWithContracts(bookId: string) {
     const k = `${String(c.author)}|${c.role}`;
     byKey.set(k, [...(byKey.get(k) ?? []), c]);
   }
-  return contributors.map((ct: any) => ({
+  const liste: { author_id: string; author_name: string; role: string; contracts: any[]; user_id?: string }[] = contributors.map((ct: any) => ({
     author_id: String(ct.author_id), author_name: ct.author_name, role: ct.role,
     contracts: byKey.get(`${String(ct.author_id)}|${ct.role}`) ?? []
   }));
+
+  // Le directeur de collection a son propre contrat sur chaque livre. Il n'est pas
+  // dans le graphe public : c'est son contrat qui le désigne, ou à défaut le
+  // directeur par défaut de la maison, proposé sans contrat.
+  const directeurs = contracts.filter((c: any) => c.role === 'director');
+  if (directeurs.length) {
+    const vus = new Set<string>();
+    for (const c of directeurs) {
+      const a = String(c.author);
+      if (vus.has(a)) continue;
+      vus.add(a);
+      liste.push({ author_id: a, author_name: c.author_name, role: 'director', contracts: byKey.get(`${a}|director`) ?? [] });
+    }
+  } else {
+    const { directeur_defaut } = await getReglagesDroits();
+    if (directeur_defaut) {
+      const u = (await query<any>(`SELECT full_name, email FROM ONLY $u`, { u: recId('user', directeur_defaut) })) as any;
+      liste.push({ author_id: '', author_name: u?.full_name || u?.email || 'Directeur de collection', role: 'director', contracts: [], user_id: directeur_defaut });
+    }
+  }
+  return liste;
 }
 
 export async function getBookLite(bookId: string) {
@@ -160,8 +234,9 @@ export async function contractCoverage(opts: { q?: string; limit?: number } = {}
   const contrats = await query<any>(
     `SELECT book, author, role, status FROM royalty_contract WHERE book != NONE`
   );
-  type Cle = 'author' | 'editor' | 'contributor';
-  const famille = (role: string): Cle => (role === 'author' ? 'author' : role === 'editor' ? 'editor' : 'contributor');
+  type Cle = 'author' | 'editor' | 'contributor' | 'director';
+  const famille = (role: string): Cle =>
+    role === 'author' ? 'author' : role === 'editor' ? 'editor' : role === 'director' ? 'director' : 'contributor';
   const valides = new Map<string, Set<string>>();   // livre|famille → contributeurs sous contrat validé
   const brouillons = new Map<string, Set<string>>();
   const total = new Map<string, number>();          // nombre de contrats du livre
@@ -190,6 +265,10 @@ export async function contractCoverage(opts: { q?: string; limit?: number } = {}
       contributor_draft: compte(brouillons, k, 'contributor'),
       editor_signed: compte(valides, k, 'editor'),
       editor_draft: compte(brouillons, k, 'editor'),
+      // Toujours attendu : un directeur de collection sous contrat par livre.
+      director_count: 1,
+      director_signed: compte(valides, k, 'director'),
+      director_draft: compte(brouillons, k, 'director'),
       contract_total: total.get(k) ?? 0,
       contract_active: actifs.get(k) ?? 0
     };
@@ -1116,7 +1195,7 @@ export async function detaillerExportBldd(reports: string | string[]) {
 /** Rôles en clair pour les réserves de calcul (le client a son propre libellé). */
 const ROLE_LABEL_SERVEUR: Record<string, string> = {
   author: 'auteur', translator: 'traducteur', preface: 'préface', postface: 'postface',
-  illustrator: 'illustration', editor: 'édition', other: 'autre'
+  illustrator: 'illustration', editor: 'édition', other: 'autre', director: 'direction de collection'
 };
 
 // ── Résultats par exercice ─────────────────────────────────────────────────

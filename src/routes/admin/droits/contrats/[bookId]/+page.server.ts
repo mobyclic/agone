@@ -1,11 +1,9 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, type Tier } from '$lib/server/droits';
+import { getBookLite, bookContributorsWithContracts, upsertContract, deleteContract, getReglagesDroits, setProvisionLivre, directeursPossibles, auteurDuCooperateur, type Tier } from '$lib/server/droits';
 import { dealsForBook } from '$lib/server/cessions';
 import { resoudreLivreAdmin } from '$lib/server/catalogue';
-import { listStaff } from '$lib/server/account';
-import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
 import { journaliser } from '$lib/server/journal';
 
@@ -22,21 +20,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   if (livre.slug && params.bookId !== livre.slug) throw redirect(301, `/admin/droits/contrats/${livre.slug}`);
   const book = await getBookLite(livre.id);
   if (!book) throw error(404, { message: 'Livre introuvable' });
-  const [contributors, reglages, cessions, staff, dernier] = await Promise.all([
+  const [contributors, reglages, cessions, directeurs] = await Promise.all([
     bookContributorsWithContracts(livre.id),
     getReglagesDroits(),
     dealsForBook(livre.id),
-    listStaff(),
-    // Directeur proposé par défaut : celui du dernier contrat de la même collection, sinon l'utilisateur.
-    query<any>(
-      `SELECT IF director != NONE THEN meta::id(director) ELSE NONE END AS id, created_at FROM royalty_contract
-        WHERE director != NONE AND book.collection = (SELECT VALUE collection FROM ONLY $b)
-        ORDER BY created_at DESC LIMIT 1`,
-      { b: recId('book', livre.id) }
-    )
+    directeursPossibles()
   ]);
-  const directeurDefaut = dernier[0]?.id ?? locals.user?.id ?? '';
-  return { book, contributors, reglages, cessions, staff, directeurDefaut, livreId: livre.id };
+  return { book, contributors, reglages, cessions, directeurs, livreId: livre.id };
 };
 
 export const actions: Actions = {
@@ -59,18 +49,26 @@ export const actions: Actions = {
     let tiers: Tier[] = [];
     try { tiers = JSON.parse(S('tiers') || '[]'); } catch { /* noop */ }
 
-    // Le directeur de collection est obligatoire, et doit être de la maison.
-    const directorId = S('director');
-    const staff = await listStaff();
-    if (!directorId || !staff.some((u) => u.id === directorId)) {
-      return fail(400, { error: 'Indiquez le directeur de collection : un compte administrateur ou éditeur.' });
+    // Le contrat du directeur de collection vise un coopérateur (compte admin ou
+    // éditeur) : c'est sa fiche auteur, liée au compte, qui porte le contrat.
+    const role = S('role') || 'author';
+    let authorId = S('authorId');
+    let directeur: string | undefined;
+    if (role === 'director') {
+      const compte = S('director');
+      const possibles = await directeursPossibles();
+      const choisi = possibles.find((u) => u.id === compte);
+      if (!choisi) return fail(400, { error: 'Le directeur de collection doit être un compte administrateur ou éditeur.' });
+      authorId = await auteurDuCooperateur(choisi.id);
+      directeur = choisi.full_name;
     }
+    if (!authorId) return fail(400, { error: 'Contributeur manquant.' });
 
     await upsertContract({
       id: S('contractId') || undefined,
       bookId: livre.id,
-      authorId: S('authorId'),
-      role: S('role') || 'author',
+      authorId,
+      role,
       tiers,
       scope: S('scope') || 'all',
       base: S('base') || 'ppht',
@@ -84,10 +82,9 @@ export const actions: Actions = {
       notes: S('notes') || undefined,
       term_start: S('term_start') || undefined,
       term_end: S('term_end') || undefined,
-      tiers_reset: fd.get('tiers_reset') === 'on',
-      directorId
+      tiers_reset: fd.get('tiers_reset') === 'on'
     });
-    await journaliser(locals, { action: 'contrat.enregistre', cible: { type: 'royalty_contract', id: S('contractId') || 'nouveau', libelle: `Contrat ${S('role') || 'author'}` }, details: { book_id: livre.slug, paliers: tiers, part: N('share') ?? 100, avaloir: N('advance') ?? 0, statut: S('status') || 'active', validite: `${S('term_start') || '…'} → ${S('term_end') || '…'}`, directeur: staff.find((u) => u.id === directorId)?.full_name } });
+    await journaliser(locals, { action: 'contrat.enregistre', cible: { type: 'royalty_contract', id: S('contractId') || 'nouveau', libelle: `Contrat ${role}` }, details: { book_id: livre.slug, paliers: tiers, part: N('share') ?? 100, avaloir: N('advance') ?? 0, statut: S('status') || 'active', validite: `${S('term_start') || '…'} → ${S('term_end') || '…'}`, directeur } });
     throw redirect(303, withFlash(`/admin/droits/contrats/${livre.slug}`, 'Contrat enregistré.', 'success'));
   },
 

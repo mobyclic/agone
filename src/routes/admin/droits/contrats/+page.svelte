@@ -7,7 +7,7 @@
   let ouvert = $state<string | null>(null);
   const bascule = (id: string) => (ouvert = ouvert === id ? null : id);
 
-  type Col = 'title' | 'date' | 'author' | 'contributor' | 'editor' | 'contract';
+  type Col = 'title' | 'date' | 'author' | 'contributor' | 'editor' | 'director' | 'contract';
   const parution = (d?: string) =>
     d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -26,6 +26,7 @@
     : col === 'author' ? manque(b.author_signed, b.author_count)
     : col === 'contributor' ? manque(b.contributor_signed, b.contributor_count)
     : col === 'editor' ? manque(b.editor_signed, b.editor_count)
+    : col === 'director' ? manque(b.director_signed, b.director_count)
     : col === 'contract' ? b.contract_total
     : 0;
   const sorted = $derived(
@@ -43,7 +44,8 @@
 <h2 class="text-xl font-bold">Contrats par livre</h2>
 <p class="mb-4 text-sm text-muted-foreground">
   Cliquez sur un livre pour voir ses contrats. Les colonnes indiquent, par rôle, le nombre de contributeurs ayant un
-  contrat validé — « 1/1 » signifie couvert, « +1 » un contrat encore en brouillon.
+  contrat validé — « 1/1 » signifie couvert, « +1 » un contrat encore en brouillon. Chaque livre attend aussi le
+  contrat de son directeur de collection.
 </p>
 
 <div class="mb-4 flex flex-wrap items-center gap-3">
@@ -94,6 +96,7 @@
         {@render sortable('Auteurs', 'author', 'right')}
         {@render sortable('Contributeurs', 'contributor', 'right')}
         {@render sortable('Éditeurs', 'editor', 'right')}
+        {@render sortable('Direction', 'director', 'right')}
         {@render sortable('Contrats', 'contract', 'right')}
       </tr>
     </thead>
@@ -122,6 +125,7 @@
           <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.author_signed, b.author_draft, b.author_count)}</td>
           <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.contributor_signed, b.contributor_draft, b.contributor_count)}</td>
           <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.editor_signed, b.editor_draft, b.editor_count)}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{@render couverture(b.director_signed, b.director_draft, b.director_count)}</td>
           <td class="px-3 py-2 text-right tabular-nums">
             {#if b.contract_total === 0}
               <span class="text-muted-foreground">0</span>
@@ -133,11 +137,11 @@
           </td>
         </tr>
         {#if ouvert === id}
-          <tr><td colspan="7" class="p-0"><ResumeContratsLivre bookId={id} slug={b.slug} /></td></tr>
+          <tr><td colspan="8" class="p-0"><ResumeContratsLivre bookId={id} slug={b.slug} /></td></tr>
         {/if}
       {/each}
       {#if sorted.length === 0}
-        <tr><td colspan="7" class="px-3 py-10 text-center text-muted-foreground">Aucun livre.</td></tr>
+        <tr><td colspan="8" class="px-3 py-10 text-center text-muted-foreground">Aucun livre.</td></tr>
       {/if}
     </tbody>
   </table>

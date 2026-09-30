@@ -15,7 +15,7 @@ import { query, recId } from './surreal';
 
 const ROLE: Record<string, string> = {
   author: 'auteur', translator: 'traducteur', preface: 'préface', postface: 'postface',
-  illustrator: 'illustration', editor: 'édition', other: 'autre'
+  illustrator: 'illustration', editor: 'édition', other: 'autre', director: 'direction de collection'
 };
 
 /** Les polices standard ne connaissent que WinAnsi : on y ramène le texte. */

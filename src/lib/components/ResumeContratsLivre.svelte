@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
    * Aperçu des contrats d'un livre, déplié SOUS sa ligne dans la liste : pour
-   * chaque personne concernée, ses contrats (périodes successives), leur
-   * validité, leur statut et le directeur de collection qui les porte. Les
-   * ventes ne sont pas ici : c'est le contrat qu'on regarde.
+   * chaque personne concernée (directeur de collection compris), ses contrats
+   * (périodes successives), leur validité et leur statut. Les ventes ne sont
+   * pas ici : c'est le contrat qu'on regarde.
    */
   import { slide } from 'svelte/transition';
   import { ArrowRight, CircleNotch } from 'phosphor-svelte';
@@ -45,7 +45,7 @@
     <p class="flex items-center gap-2 text-sm text-muted-foreground"><CircleNotch size={15} class="animate-spin" /> Chargement…</p>
   {:else}
     <div class="space-y-3">
-      {#each data.contributeurs as p (p.author_id + p.role)}
+      {#each data.contributeurs as p (p.author_id + p.role + (p.user_id ?? ''))}
         {@const n = p.contracts.length}
         {@const portees = new Set(p.contracts.map((c: any) => c.scope)).size}
         <div class="grid gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
@@ -69,7 +69,6 @@
                 <span>{SCOPE[c.scope] ?? c.scope}</span>
                 <span>{validite(c)}</span>
                 <span class={c.status === 'active' ? 'text-success' : c.status === 'draft' ? 'text-warning' : ''}>{STATUT[c.status] ?? c.status}</span>
-                {#if c.director_name}<span>porté par {c.director_name}</span>{/if}
               </li>
             {/each}
           </ul>

@@ -185,6 +185,16 @@
         <input name="threshold" type="number" step="1" min="0" value={data.reglages.threshold}
           class="mt-1 h-10 w-28 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
       </label>
+      <label class="text-xs font-medium text-muted-foreground" title="Proposé sur chaque livre : le directeur de collection a son propre contrat, comme tout contributeur.">
+        Directeur de collection par défaut
+        <select name="directeur_defaut"
+          class="mt-1 h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary">
+          <option value="">— aucun —</option>
+          {#each data.directeurs as u (u.id)}
+            <option value={u.id} selected={data.reglages.directeur_defaut === u.id}>{u.full_name} · {u.role === 'admin' ? 'admin' : 'éditeur'}</option>
+          {/each}
+        </select>
+      </label>
       <Button type="submit" variant="outline"><FloppyDisk size={15} /> Enregistrer</Button>
     </form>
 

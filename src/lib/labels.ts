@@ -9,7 +9,9 @@ export const ROLE_LABEL: Record<string, string> = {
   preface: 'Préface',
   postface: 'Postface',
   illustrator: 'Illustration',
-  other: 'Contribution'
+  other: 'Contribution',
+  // Rôle propre aux contrats de droits : jamais dans le graphe public des contributions.
+  director: 'Direction de collection'
 };
 
 /** Statuts de commande (libellés FR). */
