@@ -428,6 +428,9 @@ DEFINE FIELD OVERWRITE signed_at   ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE term_start  ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE term_end    ON royalty_contract TYPE option<datetime>;
 DEFINE FIELD OVERWRITE document    ON royalty_contract TYPE option<record<media>>;   -- contrat scanné
+-- Directeur de collection : la personne de la maison (admin ou éditeur) qui
+-- porte ce contrat. Toujours renseigné à la saisie.
+DEFINE FIELD OVERWRITE director    ON royalty_contract TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE status      ON royalty_contract TYPE string
   ASSERT $value IN ['draft','active','ended'] DEFAULT 'active';
 DEFINE FIELD OVERWRITE notes       ON royalty_contract TYPE option<string>;

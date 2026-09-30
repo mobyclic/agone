@@ -167,3 +167,11 @@ export async function anonymiserCompte(userId: string): Promise<void> {
     { id, e: `supprime-${userId}@compte-supprime.invalid` }
   );
 }
+
+/** Les comptes de la maison (admin ou éditeur) : ceux qui peuvent porter un contrat. */
+export async function listStaff(): Promise<{ id: string; full_name: string; email?: string; role: string }[]> {
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, full_name, email, role FROM user WHERE role IN ['admin','editor'] AND is_active = true ORDER BY full_name ASC`
+  );
+  return rows.map((r) => ({ id: r.id, full_name: r.full_name || r.email, email: r.email ?? undefined, role: r.role }));
+}

@@ -64,13 +64,17 @@ export interface ContractInput {
   term_start?: string; term_end?: string; tiers_reset?: boolean;
   /** Contrat déposé (PDF), rangé dans le stockage privé. */
   documentId?: string;
+  /** Directeur de collection (compte admin ou éditeur) qui porte le contrat. */
+  directorId?: string;
 }
 
 /** Contrats d'un livre (avec nom d'auteur), indexés par authorId+role. */
 export async function contractsForBook(bookId: string) {
   return query<any>(
     `SELECT id, author, author.full_name AS author_name, role, tiers, tiers_reset, scope, base, net_rate, share,
-        rate_after_advance, cession_share, advance, advance_recouped, status, notes, term_start, term_end
+        rate_after_advance, cession_share, advance, advance_recouped, status, notes, term_start, term_end,
+        IF director != NONE THEN meta::id(director) ELSE NONE END AS director_id,
+        director.full_name AS director_name, document.filename AS document_name
       FROM royalty_contract WHERE book = $b ORDER BY role, term_start`,
     { b: recId('book', bookId) }
   );
@@ -91,7 +95,8 @@ export async function upsertContract(d: ContractInput) {
     term_start: d.term_start ? new Date(d.term_start) : undefined,
     term_end: d.term_end ? new Date(d.term_end) : undefined,
     tiers_reset: d.tiers_reset === true,
-    document: d.documentId ? recId('media', d.documentId.replace(/^media:/, '')) : undefined
+    document: d.documentId ? recId('media', d.documentId.replace(/^media:/, '')) : undefined,
+    director: d.directorId ? recId('user', d.directorId.replace(/^user:/, '')) : undefined
   };
   // Modification d'un contrat désigné, sinon upsert par (livre, auteur, rôle,
   // prise d'effet) : les avenants successifs coexistent au lieu de s'écraser.

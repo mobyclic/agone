@@ -4,10 +4,10 @@
   import TiersEditor from '$lib/components/TiersEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ROLE_LABEL } from '$lib/labels';
-  import { ArrowLeft, FloppyDisk, Trash } from 'phosphor-svelte';
+  import { ArrowLeft, FloppyDisk, Trash, ChartBar, X, CircleNotch } from 'phosphor-svelte';
   import VentesExercices from '$lib/components/VentesExercices.svelte';
 
-  let { data } = $props();
+  let { data, form } = $props();
   const input = 'h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary';
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
   /** Date d'un champ <input type="date"> (vide si le contrat n'en porte pas). */
@@ -17,13 +17,30 @@
   const cle = (c: any) => `${c.author_id}|${c.role}`;
   let ouverts = $state(new SvelteSet<string>());
   const ouvrir = (k: string) => ouverts.add(k);
+
+  // Ventes et mouvements de stock : hors de la page, dans une fenêtre à la demande.
+  let fenetre = $state(false);
+  let chiffres = $state<any>(null);
+  async function voirChiffres() {
+    fenetre = true;
+    if (chiffres) return;
+    try { chiffres = await (await fetch(`/admin/droits/api/livre/${data.livreId}`)).json(); }
+    catch { chiffres = { erreur: true }; }
+  }
 </script>
 
 <svelte:head><title>Contrats · {data.book.title}</title></svelte:head>
 
 <a href="/admin/droits/contrats" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Contrats</a>
-<h2 class="text-xl font-bold">{data.book.title}</h2>
-<p class="mb-4 text-sm text-muted-foreground">Un contrat par contributeur : barème par paliers de ventes, base de calcul et à-valoir.</p>
+<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h2 class="text-xl font-bold">{data.book.title}</h2>
+    <p class="text-sm text-muted-foreground">Un contrat par contributeur : barème par paliers de ventes, base de calcul et à-valoir.</p>
+  </div>
+  <Button type="button" variant="outline" size="sm" onclick={voirChiffres}><ChartBar size={15} /> Ventes et mouvements de stock</Button>
+</div>
+
+{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <!-- Provision sur retours : défaut de la maison, surchargeable pour ce titre. -->
 <form method="POST" action="?/provision" use:enhance class="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
@@ -37,8 +54,6 @@
     Vide = défaut de la maison ({data.reglages.provision_rate} %). Retenue sur les ventes de l'exercice, reprise à l'exercice suivant.
   </p>
 </form>
-
-<div class="mb-6"><VentesExercices exercices={data.ventes} /></div>
 
 <!-- Cessions de droits attachées à ce titre -->
 {#if data.cessions.length}
@@ -67,45 +82,6 @@
   </div>
 {/if}
 
-<!-- Mouvements de stock relevés chez le distributeur : ce qui a été fabriqué,
-     vendu, rendu et donné en service de presse sur chaque exercice importé. -->
-{#if data.mouvements.length}
-  <div class="mb-6 overflow-hidden rounded-lg border border-border bg-card">
-    <div class="flex items-baseline justify-between border-b border-border px-4 py-3">
-      <h3 class="text-sm font-semibold">Mouvements de stock (Belles Lettres)</h3>
-      <span class="text-xs text-muted-foreground">Importés depuis <a href="/admin/droits/ventes" class="text-link hover:underline">Ventes &amp; rapports</a></span>
-    </div>
-    <table class="w-full text-sm">
-      <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-        <tr>
-          <th class="px-4 py-2 text-left font-medium">Exercice</th>
-          <th class="px-3 py-2 text-right font-medium">Stock début</th>
-          <th class="px-3 py-2 text-right font-medium" title="Fabrication et réassorts reçus par le distributeur">Entrées</th>
-          <th class="px-3 py-2 text-right font-medium" title="Sorties de stock autres que les ventes : pilon, destructions, transferts">Sorties</th>
-          <th class="px-3 py-2 text-right font-medium">Ventes brutes</th>
-          <th class="px-3 py-2 text-right font-medium">Retours</th>
-          <th class="px-3 py-2 text-right font-medium" title="Services de presse et exemplaires gratuits (« SceP &amp; Gratuits » chez Les Belles Lettres)">SP &amp; gratuits</th>
-          <th class="px-4 py-2 text-right font-medium">Stock fin</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each data.mouvements as m (m.period_start + '|' + m.period_end)}
-          <tr class="border-t border-border">
-            <td class="px-4 py-2">{new Date(m.period_start).toLocaleDateString('fr-FR')} → {new Date(m.period_end).toLocaleDateString('fr-FR')}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{m.stock_start}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{m.entries}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{m.exits}</td>
-            <td class="px-3 py-2 text-right tabular-nums font-medium">{m.gross_sales}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{Math.abs(m.returns_credited)}</td>
-            <td class="px-3 py-2 text-right tabular-nums">{m.free_copies}</td>
-            <td class="px-4 py-2 text-right tabular-nums">{m.stock_end}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
-{/if}
-
 {#if data.contributors.length === 0}
   <p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">Ce livre n’a pas encore de contributeur. Ajoutez-en depuis <a href="/admin/catalogue/{data.book.id ? String(data.book.id).replace('book:', '') : ''}" class="text-link hover:underline">la fiche catalogue</a>.</p>
 {/if}
@@ -120,12 +96,22 @@
           <span class="ml-2 rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role}</span>
         </div>
         <span class="text-xs text-muted-foreground">
-          {liste.length === 0 ? 'Pas de contrat' : liste.length === 1 ? '1 contrat' : `${liste.length} contrats successifs`}
+          {liste.length === 0
+            ? 'Pas de contrat'
+            : liste.length === 1
+              ? '1 contrat'
+              : new Set(liste.map((c: any) => c.scope)).size === liste.length
+                ? `${liste.length} contrats (une portée chacun)`
+                : `${liste.length} contrats successifs`}
         </span>
       </div>
 
       <div class="space-y-5">
         {#each liste as ct (ct.id)}
+          <div class="mb-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
+            <span>Porté par <strong class="text-foreground">{ct.director_name ?? '— à renseigner'}</strong></span>
+            {#if ct.document_name}<span>Contrat déposé : {ct.document_name}</span>{/if}
+          </div>
           {@render contrat(c, ct)}
         {/each}
 
@@ -169,6 +155,15 @@
         successifs selon ces dates.
       </p>
     </div>
+
+    <!-- Le directeur de collection porte le contrat : toujours renseigné, toujours de la maison. -->
+    <label class={lbl}>Directeur de collection *
+      <select name="director" required class="{input} mt-1 max-w-sm">
+        {#each data.staff as u (u.id)}
+          <option value={u.id} selected={(ct?.director_id ?? data.directeurDefaut) === u.id}>{u.full_name} · {u.role === 'admin' ? 'admin' : 'éditeur'}</option>
+        {/each}
+      </select>
+    </label>
 
     <div>
       <span class={lbl}>Barème par paliers (droits progressifs)</span>
@@ -235,3 +230,54 @@
     </div>
   </form>
 {/snippet}
+
+<!-- Ventes par exercice et mouvements de stock, à la demande. -->
+{#if fenetre}
+  <div class="fixed inset-0 z-[70] grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="Ventes et mouvements de stock">
+    <button type="button" class="absolute inset-0 cursor-default bg-black/60" aria-label="Fermer" onclick={() => (fenetre = false)}></button>
+    <div class="relative z-10 max-h-[90svh] w-full max-w-4xl overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-2xl">
+      <button type="button" onclick={() => (fenetre = false)} class="absolute right-3 top-3 grid size-9 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={20} /></button>
+      <h3 class="mb-4 pr-10 text-lg font-bold">{data.book.title}</h3>
+      {#if !chiffres}
+        <p class="flex items-center gap-2 text-sm text-muted-foreground"><CircleNotch size={16} class="animate-spin" /> Chargement…</p>
+      {:else if chiffres.erreur}
+        <p class="text-sm text-destructive">Chargement impossible.</p>
+      {:else}
+        <VentesExercices exercices={chiffres.ventes} />
+        {#if chiffres.mouvements.length}
+          <div class="mt-5 overflow-hidden rounded-lg border border-border bg-card">
+            <div class="border-b border-border px-4 py-3"><h4 class="text-sm font-semibold">Mouvements de stock (Belles Lettres)</h4></div>
+            <table class="w-full text-sm">
+              <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th class="px-4 py-2 text-left font-medium">Période</th>
+                  <th class="px-3 py-2 text-right font-medium">Stock début</th>
+                  <th class="px-3 py-2 text-right font-medium">Entrées</th>
+                  <th class="px-3 py-2 text-right font-medium">Sorties</th>
+                  <th class="px-3 py-2 text-right font-medium">Ventes brutes</th>
+                  <th class="px-3 py-2 text-right font-medium">Retours</th>
+                  <th class="px-3 py-2 text-right font-medium">SP &amp; gratuits</th>
+                  <th class="px-4 py-2 text-right font-medium">Stock fin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each chiffres.mouvements as m (m.period_start + '|' + m.period_end)}
+                  <tr class="border-t border-border">
+                    <td class="px-4 py-2">{new Date(m.period_start).toLocaleDateString('fr-FR')} → {new Date(m.period_end).toLocaleDateString('fr-FR')}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{m.stock_start}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{m.entries}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{m.exits}</td>
+                    <td class="px-3 py-2 text-right tabular-nums font-medium">{m.gross_sales}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{Math.abs(m.returns_credited)}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{m.free_copies}</td>
+                    <td class="px-4 py-2 text-right tabular-nums">{m.stock_end}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      {/if}
+    </div>
+  </div>
+{/if}

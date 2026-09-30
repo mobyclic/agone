@@ -1,9 +1,9 @@
 <script lang="ts">
   import { ArrowLeft, MagnifyingGlass, CaretUp, CaretDown, CaretRight, FileArrowUp } from 'phosphor-svelte';
-  import ResumeVentesLivre from '$lib/components/ResumeVentesLivre.svelte';
+  import ResumeContratsLivre from '$lib/components/ResumeContratsLivre.svelte';
   let { data } = $props();
 
-  /** Livre déplié sous sa ligne : le résumé de ses ventes. */
+  /** Livre déplié sous sa ligne : ses contrats, personne par personne. */
   let ouvert = $state<string | null>(null);
   const bascule = (id: string) => (ouvert = ouvert === id ? null : id);
 
@@ -42,7 +42,7 @@
 <a href="/admin/droits" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Droits d’auteur</a>
 <h2 class="text-xl font-bold">Contrats par livre</h2>
 <p class="mb-4 text-sm text-muted-foreground">
-  Cliquez sur un livre pour voir ses ventes. Les colonnes indiquent, par rôle, le nombre de contributeurs ayant un
+  Cliquez sur un livre pour voir ses contrats. Les colonnes indiquent, par rôle, le nombre de contributeurs ayant un
   contrat validé — « 1/1 » signifie couvert, « +1 » un contrat encore en brouillon.
 </p>
 
@@ -101,7 +101,7 @@
       {#each sorted as b (b.id)}
         {@const id = String(b.id).replace('book:', '')}
         <tr class="cursor-pointer hover:bg-muted/30 {ouvert === id ? 'bg-muted/40' : ''}" onclick={() => bascule(id)}
-          tabindex="0" role="button" aria-expanded={ouvert === id} aria-label="Ventes de {b.title}"
+          tabindex="0" role="button" aria-expanded={ouvert === id} aria-label="Contrats de {b.title}"
           onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bascule(id); } }}>
           <td class="py-1.5 pl-3">
             <span class="block w-9 shrink-0 overflow-hidden rounded-sm border border-border bg-muted">
@@ -133,7 +133,7 @@
           </td>
         </tr>
         {#if ouvert === id}
-          <tr><td colspan="7" class="p-0"><ResumeVentesLivre bookId={id} /></td></tr>
+          <tr><td colspan="7" class="p-0"><ResumeContratsLivre bookId={id} slug={b.slug} /></td></tr>
         {/if}
       {/each}
       {#if sorted.length === 0}

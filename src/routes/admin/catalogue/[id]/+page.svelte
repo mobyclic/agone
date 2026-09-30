@@ -281,7 +281,7 @@
   {#if data.ventes.length}
     <section class="mb-8">
       <VentesExercices exercices={data.ventes} />
-      <a href="/admin/droits/contrats/{String(b?.id ?? '').replace('book:', '')}" class="mt-2 inline-block text-sm text-link hover:underline">
+      <a href="/admin/droits/contrats/{b?.slug ?? String(b?.id ?? '').replace('book:', '')}" class="mt-2 inline-block text-sm text-link hover:underline">
         Contrats, provision et mouvements de stock de ce titre →
       </a>
     </section>
