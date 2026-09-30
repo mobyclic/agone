@@ -136,3 +136,17 @@ export function formatsEnVente(b: LivreVendable): FormatVente[] {
 export function estEpuise(b: LivreVendable): boolean {
   return !isForthcoming(b) && b.price_paper != null && b.price_paper > 0 && (b.stock_qty ?? 0) <= 0;
 }
+
+// ── Contrats de droits : résumés en une ligne (liste et page des contrats) ──
+export const CONTRAT_STATUT: Record<string, string> = { active: 'actif', draft: 'brouillon', ended: 'terminé' };
+export const CONTRAT_SCOPE: Record<string, string> = { all: 'tous supports', paper: 'papier', ebook: 'numérique' };
+/** « 6 % ≤2 000 · 8 % ≤5 000 · 10 % » */
+export const baremeCourt = (t: any[]) =>
+  (t ?? []).length ? t.map((p) => `${p.rate} %${p.up_to ? ` ≤${Number(p.up_to).toLocaleString('fr-FR')}` : ''}`).join(' · ') : 'sans barème';
+/** « du 01/01/2026 au 31/12/2026 », « depuis l’origine au … », ou « sans limite de date ». */
+export const validiteContrat = (c: { term_start?: string; term_end?: string }) => {
+  const jour = (d?: string) => (d ? new Date(d).toLocaleDateString('fr-FR') : '');
+  return c.term_start || c.term_end
+    ? `${c.term_start ? `du ${jour(c.term_start)}` : 'depuis l’origine'}${c.term_end ? ` au ${jour(c.term_end)}` : ''}`
+    : 'sans limite de date';
+};

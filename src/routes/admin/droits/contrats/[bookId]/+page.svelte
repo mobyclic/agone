@@ -3,8 +3,8 @@
   import { SvelteSet } from 'svelte/reactivity';
   import TiersEditor from '$lib/components/TiersEditor.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { ROLE_LABEL } from '$lib/labels';
-  import { ArrowLeft, FloppyDisk, Trash, ChartBar, X, CircleNotch } from 'phosphor-svelte';
+  import { ROLE_LABEL, CONTRAT_STATUT, CONTRAT_SCOPE, baremeCourt, validiteContrat } from '$lib/labels';
+  import { ArrowLeft, FloppyDisk, Trash, ChartBar, X, CircleNotch, CaretRight, ArrowsOutSimple, ArrowsInSimple } from 'phosphor-svelte';
   import VentesExercices from '$lib/components/VentesExercices.svelte';
 
   let { data, form } = $props();
@@ -13,10 +13,25 @@
   /** Date d'un champ <input type="date"> (vide si le contrat n'en porte pas). */
   const jour = (d?: string) => (d ? new Date(d).toISOString().slice(0, 10) : '');
 
-  // Formulaires d'avenant ouverts, par contributeur.
+  // Tout est replié par défaut : un contributeur, puis chacun de ses contrats,
+  // s'ouvrent à la demande. Le formulaire d'avenant est un pli de plus.
   const cle = (c: any) => `${c.author_id}|${c.role}`;
-  let ouverts = $state(new SvelteSet<string>());
-  const ouvrir = (k: string) => ouverts.add(k);
+  let contribsOuverts = $state(new SvelteSet<string>());
+  let contratsOuverts = $state(new SvelteSet<string>());
+  let avenants = $state(new SvelteSet<string>());
+  const basculer = (set: SvelteSet<string>, k: string) => (set.has(k) ? set.delete(k) : set.add(k));
+  const toutOuvert = $derived(data.contributors.every((c: any) => contribsOuverts.has(cle(c))));
+  function toutBasculer() {
+    if (toutOuvert) { contribsOuverts.clear(); contratsOuverts.clear(); return; }
+    for (const c of data.contributors) {
+      contribsOuverts.add(cle(c));
+      for (const ct of c.contracts ?? []) contratsOuverts.add(String(ct.id));
+    }
+  }
+  /** Ce qu'on lit d'un contrat sans l'ouvrir. */
+  const resume = (ct: any) =>
+    [baremeCourt(ct.tiers), CONTRAT_SCOPE[ct.scope] ?? ct.scope, validiteContrat(ct)].join(' · ');
+  const couleurStatut = (s: string) => (s === 'active' ? 'text-success' : s === 'draft' ? 'text-warning' : 'text-muted-foreground');
 
   // Ventes et mouvements de stock : hors de la page, dans une fenêtre à la demande.
   let fenetre = $state(false);
@@ -37,7 +52,14 @@
     <h2 class="text-xl font-bold">{data.book.title}</h2>
     <p class="text-sm text-muted-foreground">Un contrat par contributeur : barème par paliers de ventes, base de calcul et à-valoir.</p>
   </div>
-  <Button type="button" variant="outline" size="sm" onclick={voirChiffres}><ChartBar size={15} /> Ventes et mouvements de stock</Button>
+  <div class="flex flex-wrap gap-2">
+    {#if data.contributors.length}
+      <Button type="button" variant="ghost" size="sm" onclick={toutBasculer}>
+        {#if toutOuvert}<ArrowsInSimple size={15} /> Tout replier{:else}<ArrowsOutSimple size={15} /> Tout déplier{/if}
+      </Button>
+    {/if}
+    <Button type="button" variant="outline" size="sm" onclick={voirChiffres}><ChartBar size={15} /> Ventes et mouvements de stock</Button>
+  </div>
 </div>
 
 {#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
@@ -86,51 +108,72 @@
   <p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">Ce livre n’a pas encore de contributeur. Ajoutez-en depuis <a href="/admin/catalogue/{data.book.id ? String(data.book.id).replace('book:', '') : ''}" class="text-link hover:underline">la fiche catalogue</a>.</p>
 {/if}
 
-<div class="space-y-6">
-  {#each data.contributors as c (c.author_id + c.role)}
+<div class="space-y-3">
+  {#each data.contributors as c (c.author_id + c.role + (c.user_id ?? ''))}
     {@const liste = c.contracts ?? []}
-    <div class="rounded-lg border border-border bg-card p-5">
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <span class="font-semibold">{c.author_name}</span>
-          <span class="ml-2 rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role}</span>
-          {#if c.role === 'director' && liste.length === 0}
-            <span class="ml-2 text-xs text-amber-700 dark:text-amber-500">proposé par défaut — contrat à établir</span>
-          {/if}
-        </div>
-        <span class="text-xs text-muted-foreground">
+    {@const k = cle(c)}
+    {@const ouvert = contribsOuverts.has(k)}
+    <div class="rounded-lg border border-border bg-card">
+      <!-- En-tête du contributeur : tout ce qu'il faut savoir sans déplier. -->
+      <button type="button" onclick={() => basculer(contribsOuverts, k)} aria-expanded={ouvert}
+        class="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3.5 text-left hover:bg-muted/30 {ouvert ? 'rounded-t-lg border-b border-border' : 'rounded-lg'}">
+        <CaretRight size={13} weight="bold" class="shrink-0 text-muted-foreground transition-transform {ouvert ? 'rotate-90' : ''}" />
+        <span class="font-semibold">{c.author_name}</span>
+        <span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{ROLE_LABEL[c.role] ?? c.role}</span>
+        <span class="ml-auto text-xs {liste.length ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-500'}">
           {liste.length === 0
-            ? 'Pas de contrat'
+            ? c.role === 'director' ? 'proposé par défaut — contrat à établir' : 'aucun contrat'
             : liste.length === 1
               ? '1 contrat'
-              : new Set(liste.map((c: any) => c.scope)).size === liste.length
+              : new Set(liste.map((x: any) => x.scope)).size === liste.length
                 ? `${liste.length} contrats (une portée chacun)`
                 : `${liste.length} contrats successifs`}
         </span>
-      </div>
-
-      <div class="space-y-5">
-        {#each liste as ct (ct.id)}
-          {#if ct.document_name}<p class="mb-1 text-xs text-muted-foreground">Contrat déposé : {ct.document_name}</p>{/if}
-          {@render contrat(c, ct)}
-        {/each}
-
-        {#if liste.length === 0}
-          {@render contrat(c, null)}
-        {:else if ouverts.has(cle(c))}
-          <div class="border-t border-dashed border-border pt-5">
-            <p class="mb-3 text-xs text-muted-foreground">
-              Nouvel avenant — les conditions du dernier contrat sont reprises, changez ce qui a été renégocié.
-              Pensez à clore le contrat précédent à la veille de la prise d’effet.
-            </p>
-            {@render contrat(c, { ...liste[liste.length - 1], id: null, term_start: '', term_end: '', advance: 0, advance_recouped: 0 })}
-          </div>
-        {:else}
-          <button type="button" class="text-sm text-link hover:underline" onclick={() => ouvrir(cle(c))}>
-            + Ajouter un avenant (nouvelles conditions à partir d’une date)
-          </button>
+        {#if !ouvert && liste.length}
+          <span class="basis-full pl-6 text-xs text-muted-foreground">
+            {#each liste as ct, i (ct.id)}{#if i}<span class="mx-1.5 opacity-40">|</span>{/if}<span class="tabular-nums">{resume(ct)}</span> <span class={couleurStatut(ct.status)}>{CONTRAT_STATUT[ct.status] ?? ct.status}</span>{/each}
+          </span>
         {/if}
-      </div>
+      </button>
+
+      {#if ouvert}
+        <div class="space-y-3 p-4">
+          <!-- Chaque contrat est un pli : sa ligne de résumé, puis son formulaire. -->
+          {#each liste as ct, i (ct.id)}
+            {@const kc = String(ct.id)}
+            {@const oc = contratsOuverts.has(kc)}
+            <div class="rounded-md border border-border {oc ? '' : 'bg-muted/20'}">
+              <button type="button" onclick={() => basculer(contratsOuverts, kc)} aria-expanded={oc}
+                class="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 text-left text-sm hover:bg-muted/40">
+                <CaretRight size={12} weight="bold" class="shrink-0 text-muted-foreground transition-transform {oc ? 'rotate-90' : ''}" />
+                <span class="font-medium">{liste.length > 1 ? `Contrat ${i + 1}` : 'Contrat'}</span>
+                <span class="tabular-nums text-muted-foreground">{resume(ct)}</span>
+                <span class="ml-auto text-xs {couleurStatut(ct.status)}">{CONTRAT_STATUT[ct.status] ?? ct.status}</span>
+                {#if ct.document_name}<span class="basis-full pl-6 text-xs text-muted-foreground">Contrat déposé : {ct.document_name}</span>{/if}
+              </button>
+              {#if oc}
+                <div class="border-t border-border p-4">{@render contrat(c, ct)}</div>
+              {/if}
+            </div>
+          {/each}
+
+          {#if liste.length === 0}
+            {@render contrat(c, null)}
+          {:else if avenants.has(k)}
+            <div class="rounded-md border border-dashed border-border p-4">
+              <p class="mb-3 text-xs text-muted-foreground">
+                Nouvel avenant — les conditions du dernier contrat sont reprises, changez ce qui a été renégocié.
+                Pensez à clore le contrat précédent à la veille de la prise d’effet.
+              </p>
+              {@render contrat(c, { ...liste[liste.length - 1], id: null, term_start: '', term_end: '', advance: 0, advance_recouped: 0 })}
+            </div>
+          {:else}
+            <button type="button" class="text-sm text-link hover:underline" onclick={() => avenants.add(k)}>
+              + Ajouter un avenant (nouvelles conditions à partir d’une date)
+            </button>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/each}
 </div>

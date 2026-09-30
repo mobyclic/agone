@@ -7,7 +7,7 @@
    */
   import { slide } from 'svelte/transition';
   import { ArrowRight, CircleNotch } from 'phosphor-svelte';
-  import { ROLE_LABEL } from '$lib/labels';
+  import { ROLE_LABEL, CONTRAT_STATUT as STATUT, CONTRAT_SCOPE as SCOPE, baremeCourt as bareme, validiteContrat as validite } from '$lib/labels';
 
   let { bookId, slug }: { bookId: string; slug: string } = $props();
 
@@ -28,14 +28,6 @@
     return () => { vivant = false; };
   });
 
-  const jour = (d?: string) => (d ? new Date(d).toLocaleDateString('fr-FR') : '');
-  const validite = (c: any) =>
-    c.term_start || c.term_end
-      ? `${c.term_start ? `du ${jour(c.term_start)}` : 'depuis l’origine'}${c.term_end ? ` au ${jour(c.term_end)}` : ''}`
-      : 'sans limite de date';
-  const STATUT: Record<string, string> = { active: 'actif', draft: 'brouillon', ended: 'terminé' };
-  const SCOPE: Record<string, string> = { all: 'tous supports', paper: 'papier', ebook: 'numérique' };
-  const bareme = (t: any[]) => (t ?? []).length ? t.map((p) => `${p.rate} %${p.up_to ? ` ≤${Number(p.up_to).toLocaleString('fr-FR')}` : ''}`).join(' · ') : 'sans barème';
 </script>
 
 <div class="border-l-2 border-link bg-muted/25 px-5 py-4" transition:slide={{ duration: 160 }}>
