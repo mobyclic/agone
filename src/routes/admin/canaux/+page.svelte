@@ -55,7 +55,6 @@
   <Button onclick={() => { ouvrir('nouveau'); setTimeout(() => document.getElementById('nouveau-canal')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })); }}><Plus size={16} /> Nouveau canal</Button>
 </div>
 
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 
 {#each FAMILLES as f (f.id)}

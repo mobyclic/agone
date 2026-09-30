@@ -62,7 +62,6 @@
   </div>
 </div>
 
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <!-- Provision sur retours : défaut de la maison, surchargeable pour ce titre. -->
 <form method="POST" action="?/provision" use:enhance class="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">

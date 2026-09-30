@@ -62,7 +62,6 @@
   mouvements de stock. Les redevances s’appuient dessus.
 </p>
 
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <!-- Le geste principal : une année, un bouton. -->
 <div class="mb-6 rounded-lg border border-link/40 bg-link/5 p-5">

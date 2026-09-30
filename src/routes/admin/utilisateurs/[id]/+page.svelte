@@ -36,7 +36,6 @@
     </p>
   </div>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <div class="grid gap-6 sm:grid-cols-[1fr_240px]">
     <div class="space-y-5">

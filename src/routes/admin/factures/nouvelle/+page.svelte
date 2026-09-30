@@ -48,7 +48,6 @@
 
 <form method="POST" action="?/save" use:enhance class="max-w-3xl">
   <div class="mb-4"><h2 class="text-xl font-bold">Facture / avoir manuel</h2></div>
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <!-- Type -->
   <section class="mb-5 flex items-center gap-3 rounded-lg border border-border bg-card p-4">

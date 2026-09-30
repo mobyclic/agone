@@ -156,9 +156,15 @@ export function eclaircir(hex: string, f: number): string {
   return `#${c(m[1])}${c(m[2])}${c(m[3])}`;
 }
 
-/** Les types de commande saisissables à la main : les canaux directs alimentés par les commandes, hors site. */
+/**
+ * Les types de commande saisissables à la main : les canaux directs alimentés par
+ * les commandes, hors site — dans l'ordre du formulaire : ce qui part aux Belles
+ * Lettres, ce qu'Agone expédie, ce qui se vend sur place.
+ */
 export async function typesCommandeSaisie(): Promise<{ value: string; label: string }[]> {
+  const rang = (code: string) => ['vpc', 'sortie_editeur', 'comptoir'].indexOf(code);
   return (await listCanaux({ enabledOnly: true }))
     .filter((c) => c.connector === 'orders' && c.order_channel && c.order_channel !== 'web')
+    .sort((a, b) => (rang(a.order_channel!) + 1 || 99) - (rang(b.order_channel!) + 1 || 99))
     .map((c) => ({ value: c.order_channel!, label: c.name }));
 }

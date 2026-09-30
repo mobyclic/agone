@@ -77,7 +77,6 @@
 <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="pb-10">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouveau livre' : b?.title}</h2>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <!-- Pleine largeur : les textes à gauche, tout le reste (après « Informations
        complémentaires ») dans la colonne de droite. -->

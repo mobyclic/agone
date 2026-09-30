@@ -94,7 +94,6 @@
       </table>
     </div>
 
-    {#if form?.error}<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
     <!-- Changement de statut -->
     <form method="POST" action="?/status" use:enhance class="rounded-lg border border-border bg-card p-4">

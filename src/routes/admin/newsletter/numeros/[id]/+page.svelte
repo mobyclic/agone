@@ -116,7 +116,6 @@
     </div>
   </div>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <div class="mb-5 grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-[1fr_180px]">
     <label class="block"><span class="mb-1 block text-sm font-medium">Titre du numéro</span>

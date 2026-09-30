@@ -135,7 +135,6 @@
       <button type="button" onclick={() => (showNew = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
       <h3 class="text-lg font-bold">Nouvel utilisateur</h3>
 
-      {#if form?.error}<p class="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
       <form method="POST" action="?/create"
         use:enhance={() => { creating = true; return async ({ update }) => { await update(); creating = false; }; }}

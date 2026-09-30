@@ -28,7 +28,6 @@
 <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update({ reset: false }); dirty = false; saving = false; }; }} oninput={() => (dirty = true)} onchange={() => (dirty = true)} class="max-w-3xl pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouvelle collection' : c?.name}</h2>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <div class="space-y-5">
     <div class="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">

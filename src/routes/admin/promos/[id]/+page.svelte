@@ -25,7 +25,6 @@
 
 <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update(); saving = false; }; }} class="max-w-2xl pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouveau code promo' : p?.code}</h2>
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <div class="space-y-5">
     <!-- Identité -->

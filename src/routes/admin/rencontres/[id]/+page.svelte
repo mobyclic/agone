@@ -130,7 +130,6 @@
     {/if}
   </div>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <!-- Pleine largeur : contenu à gauche, rattachements (auteurs, livres, couverture) à droite. -->
   <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start 2xl:grid-cols-[minmax(0,1fr)_26rem]">

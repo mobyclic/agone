@@ -53,7 +53,6 @@
 {:else if data.config.dernier_releve}
   <p class="mb-4 text-xs text-muted-foreground">Dernier relevé le {jour(data.config.dernier_releve)} à {heure(data.config.dernier_releve)}{data.config.merchant_code ? ` · marchand ${data.config.merchant_code}` : ''}.</p>
 {/if}
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <div class="mb-4 flex flex-wrap items-center gap-2">
   {#each ETATS as e (e.id)}

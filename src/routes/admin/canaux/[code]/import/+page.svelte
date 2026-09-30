@@ -29,7 +29,6 @@
   vous indiquez la période, et le relevé rejoint les ventes de l’exercice — pour les statistiques comme pour les droits d’auteur.
 </p>
 
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <form method="POST" action="?/lire" enctype="multipart/form-data"
   use:enhance={() => { lecture = true; return async ({ update }) => { await update({ reset: false }); lecture = false; }; }}

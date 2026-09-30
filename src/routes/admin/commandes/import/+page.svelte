@@ -46,7 +46,6 @@
   intitulés, vous corrigez, vous fixez le type, le paiement et la date valables pour le fichier, vous relisez l’aperçu, et les commandes sont créées — antidatées, sans email au client.
 </p>
 
-{#if form?.error}<p class="mb-4 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
 <form method="POST" action="?/lire" enctype="multipart/form-data"
   use:enhance={() => { lecture = true; return async ({ update }) => { await update({ reset: false }); lecture = false; }; }}

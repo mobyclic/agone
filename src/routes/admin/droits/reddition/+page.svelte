@@ -32,7 +32,6 @@
     report à nouveau et seuil de paiement. Les redditions sont créées en brouillon — rien n’est engagé tant qu’elles ne
     sont pas émises. Relancer refait les brouillons sans toucher à ce qui est déjà émis ou payé.
   </p>
-  {#if form?.error}<p class="mb-3 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
 
   <form method="POST" action="?/generate" use:enhance class="flex flex-wrap items-end gap-3">
     {#if periodeLibre}

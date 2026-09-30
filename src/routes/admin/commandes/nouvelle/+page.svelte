@@ -32,7 +32,7 @@
   }
 
   // — Type / statut / règlement / date —
-  let channel = $state(untrack(() => data.types[0]?.value ?? 'comptoir'));
+  let channel = $state(untrack(() => data.types[0]?.value ?? 'vpc'));
   let status = $state('paid');
   let payment = $state('sumup');
   let placedAt = $state(new Date().toISOString().slice(0, 10));
@@ -102,7 +102,21 @@
     <h2 class="text-xl font-bold">Nouvelle commande</h2>
   </div>
 
-  {#if form?.error}<p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>{/if}
+
+  <!-- D'abord : quand, et quel type de commande — le reste du formulaire s'y adapte. -->
+  <section class="mb-5 grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
+    <label class={label} title="Une autre date qu’aujourd’hui antidate la commande (et sa date de paiement).">Date de la vente
+      <input type="date" bind:value={placedAt} class={input} />
+    </label>
+    <label class={label}>Type de commande
+      <select bind:value={channel} class={input}>
+        {#each data.types as t (t.value)}<option value={t.value}>{t.label}</option>{/each}
+      </select>
+      <span class="mt-1 block text-xs font-normal text-muted-foreground">
+        {#if channel === 'vpc'}Expédiée par Les Belles Lettres (export du soir).{:else if channel === 'sortie_editeur'}Expédiée par Agone : un bon de livraison sera généré.{:else}Vendue sur place, remise en main propre.{/if}
+      </span>
+    </label>
+  </section>
 
   <!-- Client -->
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
@@ -148,36 +162,8 @@
     {/if}
   </section>
 
-  <!-- Type, règlement, date, statut -->
-  <section class="mb-5 grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-    <label class={label}>Type de commande
-      <select bind:value={channel} class={input}>
-        {#each data.types as t (t.value)}<option value={t.value}>{t.label}</option>{/each}
-      </select>
-    </label>
-    <label class={label}>Mode de paiement
-      <select bind:value={payment} class={input}>
-        <option value="sumup">Carte (SumUp)</option>
-        <option value="especes">Espèces</option>
-        <option value="cheque">Chèque</option>
-        <option value="virement">Virement</option>
-        <option value="autre">Autre</option>
-      </select>
-    </label>
-    <label class={label} title="Une autre date qu’aujourd’hui antidate la commande (et sa date de paiement).">Date de la vente
-      <input type="date" bind:value={placedAt} class={input} />
-    </label>
-    <label class={label}>Statut initial
-      <select bind:value={status} class={input}>
-        <option value="paid">Payée</option>
-        <option value="pending">En attente</option>
-        <option value="processing">En préparation</option>
-        <option value="completed">Terminée</option>
-      </select>
-    </label>
-  </section>
-
-  <!-- Rencontre -->
+  <!-- Rencontre : seulement pour une vente sur place -->
+  {#if channel === 'comptoir'}
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
     <div class="mb-3 flex items-center justify-between">
       <h3 class="eyebrow">Rencontre <span class="font-normal normal-case text-muted-foreground">(si la vente a eu lieu sur place)</span></h3>
@@ -220,6 +206,7 @@
       <p class="mt-2 text-xs text-muted-foreground">La rencontre est créée avec les livres de cette commande ; vous pourrez la compléter depuis Rencontres. Date vide = date de la vente.</p>
     {/if}
   </section>
+  {/if}
 
   <!-- Lignes -->
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
@@ -284,9 +271,33 @@
     {/if}
   </section>
 
-  <!-- Livraison (optionnelle) -->
+  <!-- Règlement : après les livres, seulement s'il y a quelque chose à encaisser -->
+  {#if total > 0}
+    <section class="mb-5 grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
+      <label class={label}>Mode de paiement
+        <select bind:value={payment} class={input}>
+          <option value="sumup">Carte (SumUp)</option>
+          <option value="especes">Espèces</option>
+          <option value="cheque">Chèque</option>
+          <option value="virement">Virement</option>
+          <option value="autre">Autre</option>
+        </select>
+      </label>
+      <label class={label}>Statut initial
+        <select bind:value={status} class={input}>
+          <option value="paid">Payée</option>
+          <option value="pending">En attente</option>
+          <option value="processing">En préparation</option>
+          <option value="completed">Terminée</option>
+        </select>
+      </label>
+    </section>
+  {/if}
+
+  <!-- Livraison : ce qui part par la poste -->
+  {#if channel !== 'comptoir'}
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
-    <h3 class="eyebrow mb-3">Adresse de livraison <span class="font-normal normal-case text-muted-foreground">(optionnelle — vente par correspondance, sortie éditeur)</span></h3>
+    <h3 class="eyebrow mb-3">Adresse de livraison</h3>
     <div class="grid gap-3 sm:grid-cols-2">
       <label class={label}>Prénom <input bind:value={sf} class={input} /></label>
       <label class={label}>Nom <input bind:value={sl} class={input} /></label>
@@ -297,6 +308,8 @@
     </div>
   </section>
 
+  {/if}
+
   <!-- Champs cachés pour l'action -->
   <input type="hidden" name="customerMode" value={mode} />
   <input type="hidden" name="customerId" value={client?.id ?? ''} />
@@ -305,11 +318,11 @@
   <input type="hidden" name="newEmail" value={ne} />
   <input type="hidden" name="channel" value={channel} />
   <input type="hidden" name="status" value={status} />
-  <input type="hidden" name="payment_method" value={payment} />
+  <input type="hidden" name="payment_method" value={total > 0 ? payment : ''} />
   <input type="hidden" name="placed_at" value={placedAt} />
-  <input type="hidden" name="eventMode" value={eventMode} />
-  <input type="hidden" name="eventId" value={eventMode === 'existing' ? (evenement?.id ?? '') : ''} />
-  <input type="hidden" name="newEventTitle" value={eventMode === 'new' ? neTitle : ''} />
+  <input type="hidden" name="eventMode" value={channel === 'comptoir' ? eventMode : 'none'} />
+  <input type="hidden" name="eventId" value={channel === 'comptoir' && eventMode === 'existing' ? (evenement?.id ?? '') : ''} />
+  <input type="hidden" name="newEventTitle" value={channel === 'comptoir' && eventMode === 'new' ? neTitle : ''} />
   <input type="hidden" name="newEventDate" value={neDate} />
   <input type="hidden" name="newEventTime" value={neTime} />
   <input type="hidden" name="newEventVenue" value={neVenue} />
