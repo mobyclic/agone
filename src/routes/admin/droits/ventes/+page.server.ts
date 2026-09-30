@@ -40,7 +40,7 @@ export const actions: Actions = {
     });
     let n = 0;
     const raw = S('lines');
-    if (raw) n = await addSalesLines(reportId, parseLines(raw));
+    if (raw) n = (await addSalesLines(reportId, parseLines(raw))).inserees;
     throw redirect(303, withFlash('/admin/droits/ventes', `Relevé créé (${n} lignes).`, 'success'));
   },
 

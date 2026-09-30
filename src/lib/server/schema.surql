@@ -357,6 +357,27 @@ DEFINE TABLE OVERWRITE sales_channel SCHEMAFULL;
 DEFINE FIELD OVERWRITE code       ON sales_channel TYPE string;         -- 'web' | 'bldd' | …
 DEFINE FIELD OVERWRITE name       ON sales_channel TYPE string;
 DEFINE FIELD OVERWRITE sort       ON sales_channel TYPE int DEFAULT 0;
+-- Famille : vente directe (le site, le comptoir, la VPC…) ou indirecte (un
+-- distributeur, un diffuseur, une place de marché). Deux niveaux, pas plus :
+-- famille puis canal, et autant de canaux qu'on veut.
+DEFINE FIELD OVERWRITE family     ON sales_channel TYPE string
+  ASSERT $value IN ['direct','indirect'] DEFAULT 'direct' VALUE $value ?? 'direct';
+-- D'où viennent les chiffres : « api » (le site les tient, ou un connecteur
+-- les va chercher) ou « manuel » (un tableur importé, colonnes à faire
+-- correspondre). Un canal API sans connecteur est en veille : déclaré, pas
+-- encore branché.
+DEFINE FIELD OVERWRITE mode       ON sales_channel TYPE string
+  ASSERT $value IN ['api','manuel'] DEFAULT 'api' VALUE $value ?? 'api';
+DEFINE FIELD OVERWRITE connector  ON sales_channel TYPE option<string>;  -- 'orders' | 'bldd' | NONE (en veille)
+DEFINE FIELD OVERWRITE order_channel ON sales_channel TYPE option<string>; -- connecteur orders : quel order.channel lire
+-- Un canal de commandes vend du papier ET du numérique : dans les statistiques
+-- on veut les deux séries (« Site — papier », « Site — numérique »).
+DEFINE FIELD OVERWRITE split_by_format ON sales_channel TYPE bool DEFAULT false VALUE $value ?? false;
+-- Activé / désactivé : un canal désactivé reste dans les relevés passés mais
+-- ne se propose plus (statistiques, imports, collecte).
+DEFINE FIELD OVERWRITE enabled    ON sales_channel TYPE bool DEFAULT true VALUE $value ?? true;
+DEFINE FIELD OVERWRITE color      ON sales_channel TYPE string DEFAULT '#7a7a7a' VALUE $value ?? '#7a7a7a';
+DEFINE FIELD OVERWRITE notes      ON sales_channel TYPE option<string>;
 -- Les commandes du site et de la VPC sont expédiées ET FACTURÉES par Les Belles
 -- Lettres : leurs exemplaires papier reviennent dans le relevé BLDD. Sans ce
 -- drapeau, ils seraient comptés deux fois dans les droits. Le numérique, lui,

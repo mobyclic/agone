@@ -59,6 +59,7 @@ export const ADMIN_NAV: NavSection[] = [
       { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
       { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true },
       { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar', adminOnly: true },
+      { label: 'Canaux de vente', href: '/admin/canaux', icon: 'Storefront', adminOnly: true },
       { label: 'Journal', href: '/admin/journal', icon: 'ClockCounterClockwise', adminOnly: true }
     ]
   },

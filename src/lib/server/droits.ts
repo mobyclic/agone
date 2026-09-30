@@ -12,30 +12,10 @@ import { getSetting, setSetting } from './site';
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // ── Canaux ────────────────────────────────────────────────────
+/** Canaux : le référentiel vit dans ./canaux (semis et réparation compris). */
 export async function ensureChannels() {
-  const existing = await query<any>(`SELECT code, physical_via_bldd FROM sales_channel`);
-  const codes = new Set(existing.map((c) => c.code));
-  // Les canaux couvrent les deux origines de ventes : les commandes du site
-  // (order.channel) et les relevés du distributeur.
-  const defaults = [
-    { code: 'web', name: 'Vente directe (site)', sort: 0, physical_via_bldd: true },
-    { code: 'bldd', name: 'Les Belles Lettres (distribution)', sort: 1, physical_via_bldd: false },
-    { code: 'comptoir', name: 'Comptoir & rencontres', sort: 2, physical_via_bldd: false },
-    { code: 'vpc', name: 'Vente par correspondance', sort: 3, physical_via_bldd: true },
-    { code: 'sortie_editeur', name: 'Sortie éditeur', sort: 4, physical_via_bldd: false }
-  ];
-  for (const d of defaults) if (!codes.has(d.code)) await query(`CREATE sales_channel CONTENT $d`, { d });
-
-  // Réparation : le drapeau « papier facturé par Les Belles Lettres » a été
-  // ajouté après coup, et un DEFAULT ne vaut qu'à la création — les canaux
-  // existants restaient à NONE. Sans lui, le papier vendu sur le site était
-  // compté deux fois : dans le relevé du site ET dans celui du distributeur.
-  const aReparer = existing.filter((c) => c.physical_via_bldd === undefined || c.physical_via_bldd === null);
-  for (const c of aReparer) {
-    const d = defaults.find((x) => x.code === c.code);
-    if (!d) continue;
-    await query(`UPDATE sales_channel SET physical_via_bldd = $v WHERE code = $c`, { v: d.physical_via_bldd, c: d.code });
-  }
+  const { ensureCanaux } = await import('./canaux');
+  await ensureCanaux();
 }
 export async function listChannels() {
   return query<any>(`SELECT id, code, name, sort, physical_via_bldd FROM sales_channel ORDER BY sort ASC`);
@@ -240,24 +220,27 @@ export async function deleteReport(id: string) {
 }
 
 /** Ajoute des lignes de vente à un relevé ; résout le livre par ISBN. */
-export async function addSalesLines(reportId: string, lines: { isbn?: string; format?: string; units_sold: number; units_returned?: number; units_free?: number; gross_price?: number }[]) {
+export async function addSalesLines(reportId: string, lines: { isbn?: string; format?: string; units_sold: number; units_returned?: number; units_free?: number; gross_price?: number; gross_ht?: number; net_receipt?: number }[]): Promise<{ inserees: number; inconnus: string[] }> {
   // index ISBN → book
   const books = await query<any>(`SELECT id, isbn_paper, isbn_ebook FROM book WHERE isbn_paper != NONE OR isbn_ebook != NONE`);
   const byIsbn = new Map<string, string>();
   for (const b of books) { if (b.isbn_paper) byIsbn.set(String(b.isbn_paper).replace(/\D/g, ''), b.id); if (b.isbn_ebook) byIsbn.set(String(b.isbn_ebook).replace(/\D/g, ''), b.id); }
+  const inconnus: string[] = [];
   const rows = lines.filter((l) => (l.units_sold ?? 0) || (l.units_returned ?? 0)).map((l) => {
     const isbn = (l.isbn ?? '').replace(/\D/g, '');
     const bookId = isbn ? byIsbn.get(isbn) : undefined;
+    if (!bookId && isbn) inconnus.push(isbn);
     return {
       report: recId('sales_report', reportId),
       book: bookId ? recId('book', bookId) : undefined,
       isbn: isbn || undefined, format: l.format || 'paper',
       units_sold: Math.round(l.units_sold ?? 0), units_returned: Math.round(l.units_returned ?? 0),
-      units_free: Math.round(l.units_free ?? 0), gross_price: l.gross_price ?? undefined
+      units_free: Math.round(l.units_free ?? 0), gross_price: l.gross_price ?? undefined,
+      gross_ht: l.gross_ht ?? undefined, net_receipt: l.net_receipt ?? undefined
     };
   });
   for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
-  return rows.length;
+  return { inserees: rows.length, inconnus };
 }
 
 // ── Moteur de calcul ──────────────────────────────────────────
