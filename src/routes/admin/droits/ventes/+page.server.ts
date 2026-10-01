@@ -1,51 +1,16 @@
-import { redirect, fail, type Actions } from '@sveltejs/kit';
+import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { listReports, listChannels, createReport, addSalesLines, deleteReport } from '$lib/server/droits';
 import { lancerCollecte, etatCollecte } from '$lib/server/droits-job';
 import { resumeCanaux } from '$lib/server/ventesLignes';
-import { withFlash } from '$lib/toasts';
+import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ url }) => {
   const annee = Number(url.searchParams.get('annee')) || new Date().getUTCFullYear();
-  const [reports, channels, resume] = await Promise.all([listReports(), listChannels(), resumeCanaux(annee)]);
-  return { reports, channels, resume, annee, collecte: etatCollecte() };
+  return { resume: await resumeCanaux(annee), annee, collecte: etatCollecte() };
 };
 
-/** Parse un collage CSV/TSV : ISBN, unités_vendues[, retours][, format][, prix]. */
-function parseLines(raw: string) {
-  const out: { isbn?: string; units_sold: number; units_returned?: number; format?: string; gross_price?: number }[] = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t) continue;
-    const cells = t.split(/[;,\t]/).map((c) => c.trim());
-    // ignore une éventuelle ligne d'en-tête
-    if (!/\d/.test(cells[0]) && !/\d/.test(cells[1] ?? '')) continue;
-    const isbn = (cells[0] ?? '').replace(/\D/g, '');
-    const units_sold = Number((cells[1] ?? '0').replace(',', '.')) || 0;
-    const units_returned = Number((cells[2] ?? '0').replace(',', '.')) || 0;
-    const format = /epub|num|ebook/i.test(cells[3] ?? '') ? 'ebook' : /sousc/i.test(cells[3] ?? '') ? 'souscription' : 'paper';
-    const gross_price = cells[4] ? Number(cells[4].replace(',', '.')) : undefined;
-    if (isbn) out.push({ isbn, units_sold, units_returned, format, gross_price });
-  }
-  return out;
-}
-
 export const actions: Actions = {
-  create: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    const S = (k: string) => (fd.get(k) ? String(fd.get(k)).trim() : '');
-    if (!S('channelId') || !S('period_start') || !S('period_end')) return fail(400, { error: 'Canal et période requis.' });
-    const reportId = await createReport({
-      channelId: S('channelId'), period_start: S('period_start'), period_end: S('period_end'), label: S('label') || undefined
-    });
-    let n = 0;
-    const raw = S('lines');
-    if (raw) n = (await addSalesLines(reportId, parseLines(raw))).inserees;
-    throw redirect(303, withFlash('/admin/droits/ventes', `Relevé créé (${n} lignes).`, 'success'));
-  },
-
   /**
    * Relevé complet d'une période : toutes les sources, en tâche de fond.
    * L'action rend la main aussitôt ; la page suit l'avancement.
@@ -61,14 +26,7 @@ export const actions: Actions = {
     if (!debut || !fin || Number.isNaN(+debut) || Number.isNaN(+fin)) return fail(400, { error: 'Période requise.' });
     if (fin < debut) return fail(400, { error: 'La fin de période précède son début.' });
     lancerCollecte({ start: debut, end: fin, avecExport: fd.get('avecExport') === 'on' });
+    await journaliser(locals, { action: 'ventes.releve_lance', cible: { type: 'sales_report', id: debut.toISOString().slice(0, 10), libelle: `Relevé ${debut.toLocaleDateString('fr-FR')} → ${fin.toLocaleDateString('fr-FR')}` }, details: { debut: debut.toISOString().slice(0, 10), fin: fin.toISOString().slice(0, 10), export: fd.get('avecExport') === 'on' } });
     return { lance: true };
-  },
-
-  delete: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    const id = String(fd.get('reportId') || '');
-    if (id) await deleteReport(id);
-    throw redirect(303, withFlash('/admin/droits/ventes', 'Relevé supprimé.', 'success'));
   }
 };

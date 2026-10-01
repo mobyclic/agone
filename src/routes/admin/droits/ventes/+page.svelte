@@ -11,7 +11,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { Button } from '$lib/components/ui/button';
   import TableauVentesCanal from '$lib/components/TableauVentesCanal.svelte';
-  import { ArrowLeft, Trash, Plus, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle, DownloadSimple, CaretRight } from 'phosphor-svelte';
+  import { ArrowLeft, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle, DownloadSimple, CaretRight } from 'phosphor-svelte';
 
   let { data, form } = $props();
   const euros = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -159,51 +159,3 @@
   {/each}
 </div>
 
-<!-- Les relevés eux-mêmes (périodes importées), pour en supprimer un. -->
-<details class="mb-6 rounded-lg border border-border bg-card p-5">
-  <summary class="cursor-pointer text-sm font-medium">Relevés enregistrés <span class="font-normal text-muted-foreground">({data.reports.length})</span></summary>
-  <div class="mt-4 overflow-x-auto rounded-lg border border-border">
-  <table class="w-full text-sm">
-    <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-      <tr><th class="px-3 py-2 font-medium">Période</th><th class="px-3 py-2 font-medium">Canal</th><th class="px-3 py-2 text-right font-medium">Lignes</th><th class="px-3 py-2"></th></tr>
-    </thead>
-    <tbody class="divide-y divide-border">
-      {#each data.reports as r (r.id)}
-        <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2">{fmtP(r.period_start, r.period_end)}{#if r.label && r.label !== 'auto'}<span class="ml-2 text-xs text-muted-foreground">{r.label}</span>{/if}</td>
-          <td class="px-3 py-2">{r.channel_name}</td>
-          <td class="px-3 py-2 text-right">{r.line_count}</td>
-          <td class="px-3 py-2 text-right">
-            <form method="POST" action="?/delete" use:enhance>
-              <input type="hidden" name="reportId" value={String(r.id).replace('sales_report:', '')} />
-              <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Supprimer"
-                onclick={(e: Event) => { if (!confirm('Supprimer ce relevé et ses lignes ?')) e.preventDefault(); }}><Trash size={15} /></button>
-            </form>
-          </td>
-        </tr>
-      {/each}
-      {#if data.reports.length === 0}<tr><td colspan="4" class="px-3 py-8 text-center text-muted-foreground">Aucun relevé — lancez-en un ci-dessus.</td></tr>{/if}
-    </tbody>
-  </table>
-  </div>
-</details>
-
-<!-- Cas particulier : un relevé reçu sur papier ou par tableur. -->
-<details class="mt-6 rounded-lg border border-border bg-card p-5">
-  <summary class="cursor-pointer text-sm font-medium">Saisir un relevé à la main</summary>
-  <form method="POST" action="?/create" use:enhance class="mt-4 grid gap-3 sm:grid-cols-2">
-    <label class={lbl}>Canal
-      <select name="channelId" class={input}>
-        {#each data.channels as c (c.id)}<option value={String(c.id).replace('sales_channel:', '')}>{c.name}</option>{/each}
-      </select>
-    </label>
-    <label class={lbl}>Libellé <input name="label" placeholder="ex. S1 2026" class={input} /></label>
-    <label class={lbl}>Début <input name="period_start" type="date" required class={input} /></label>
-    <label class={lbl}>Fin <input name="period_end" type="date" required class={input} /></label>
-    <label class="{lbl} sm:col-span-2">Lignes de ventes (collage CSV)
-      <textarea name="lines" rows="6" placeholder="ISBN;vendus;retours;format;prix&#10;9782748906264;2500;12;paper;20" class="{input} h-auto py-2 font-mono text-xs"></textarea>
-    </label>
-    <p class="text-xs text-muted-foreground sm:col-span-2">Une ligne par titre. Colonnes : ISBN, unités vendues, retours (opt.), format (paper/ebook, opt.), prix (opt.). Le livre est retrouvé par ISBN.</p>
-    <div class="sm:col-span-2"><Button type="submit" variant="outline"><Plus size={15} /> Créer le relevé</Button></div>
-  </form>
-</details>
