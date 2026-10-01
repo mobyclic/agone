@@ -536,7 +536,9 @@ DEFINE FIELD OVERWRITE net_receipt    ON sales_line TYPE option<number>;
 -- Part des ventes réalisées hors France (sous-ensemble de units_sold) : les
 -- contrats y appliquent un taux diminué de moitié.
 DEFINE FIELD OVERWRITE units_export   ON sales_line TYPE option<int>;
+DEFINE FIELD OVERWRITE note           ON sales_line TYPE option<string>;   -- commentaire libre (correction, source…)
 DEFINE FIELD OVERWRITE created_at     ON sales_line TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at     ON sales_line TYPE option<datetime>;
 DEFINE INDEX OVERWRITE idx_saleline_report ON sales_line FIELDS report;
 DEFINE INDEX OVERWRITE idx_saleline_book   ON sales_line FIELDS book;
 

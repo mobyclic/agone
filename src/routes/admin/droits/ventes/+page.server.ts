@@ -3,11 +3,13 @@ import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
 import { listReports, listChannels, createReport, addSalesLines, deleteReport } from '$lib/server/droits';
 import { lancerCollecte, etatCollecte } from '$lib/server/droits-job';
+import { resumeCanaux } from '$lib/server/ventesLignes';
 import { withFlash } from '$lib/toasts';
 
-export const load: PageServerLoad = async () => {
-  const [reports, channels] = await Promise.all([listReports(), listChannels()]);
-  return { reports, channels, collecte: etatCollecte() };
+export const load: PageServerLoad = async ({ url }) => {
+  const annee = Number(url.searchParams.get('annee')) || new Date().getUTCFullYear();
+  const [reports, channels, resume] = await Promise.all([listReports(), listChannels(), resumeCanaux(annee)]);
+  return { reports, channels, resume, annee, collecte: etatCollecte() };
 };
 
 /** Parse un collage CSV/TSV : ISBN, unités_vendues[, retours][, format][, prix]. */

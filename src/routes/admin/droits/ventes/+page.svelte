@@ -7,18 +7,25 @@
    * avancement et affiche le récapitulatif de ce qui a été récupéré.
    */
   import { enhance } from '$app/forms';
-  import { invalidateAll } from '$app/navigation';
+  import { invalidateAll, goto } from '$app/navigation';
+  import { SvelteSet } from 'svelte/reactivity';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Trash, Plus, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle , DownloadSimple } from 'phosphor-svelte';
+  import TableauVentesCanal from '$lib/components/TableauVentesCanal.svelte';
+  import { ArrowLeft, Trash, Plus, ArrowsClockwise, CheckCircle, WarningCircle, CircleNotch, Circle, MinusCircle, DownloadSimple, CaretRight } from 'phosphor-svelte';
 
   let { data, form } = $props();
+  const euros = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  /** Canaux dépliés : chacun charge son tableau à l'ouverture. */
+  let deplies = $state(new SvelteSet<string>());
+  const basculer = (code: string) => (deplies.has(code) ? deplies.delete(code) : deplies.add(code));
+  const changerAnnee = (a: number) => goto(`?annee=${a}`, { keepFocus: true, noScroll: true });
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
   const fmtP = (s: string, e: string) => `${new Date(s).toLocaleDateString('fr-FR')} → ${new Date(e).toLocaleDateString('fr-FR')}`;
 
   const anneeCourante = new Date().getUTCFullYear();
   const annees = [0, 1, 2, 3, 4].map((n) => anneeCourante - n);
-  let annee = $state(anneeCourante);
+  const annee = $derived(data.annee);
   let avecExport = $state(false);
   /** Repli pour les cas particuliers : un semestre, un mois, un rattrapage. */
   let periodeLibre = $state(false);
@@ -64,7 +71,7 @@
 
 
 <!-- Le geste principal : une année, un bouton. -->
-<div class="mb-6 rounded-lg border border-link/40 bg-link/5 p-5">
+<div class="mb-6 rounded-lg border border-border bg-card p-5">
   <form method="POST" action="?/collecte" use:enhance={() => async ({ update }) => { await update({ reset: false }); await relire(); }}
     class="flex flex-wrap items-end gap-4">
     {#if periodeLibre}
@@ -72,7 +79,7 @@
       <label class={lbl}>Fin <input name="period_end" type="date" required bind:value={fin} class="{input} w-44" /></label>
     {:else}
       <label class={lbl}>Exercice
-        <select name="annee" bind:value={annee} class="{input} w-40">
+        <select name="annee" value={annee} onchange={(e: Event) => changerAnnee(Number((e.currentTarget as HTMLSelectElement).value))} class="{input} w-40">
           {#each annees as a (a)}<option value={a}>{a}</option>{/each}
         </select>
       </label>
@@ -122,13 +129,40 @@
   </div>
 {/if}
 
-<!-- Relevés enregistrés -->
-<div class="mb-2 flex justify-end">
+<!-- Les ventes de l'exercice, canal par canal : un tableau complet, à déplier. -->
+<div class="mb-2 flex items-baseline justify-between gap-3">
+  <h3 class="text-base font-semibold">Ventes {annee}, par canal</h3>
   <a href="/admin/droits/ventes/export.csv?annee={annee}" class="inline-flex items-center gap-1.5 text-xs text-link hover:underline">
     <DownloadSimple size={14} /> Export CSV des ventes {annee}
   </a>
 </div>
-<div class="overflow-x-auto rounded-lg border border-border bg-card">
+<div class="mb-6 space-y-3">
+  {#each data.resume as c (c.code)}
+    {@const ouvert = deplies.has(c.code)}
+    <div class="overflow-hidden rounded-lg border border-border bg-card {c.enabled ? '' : 'opacity-60'}">
+      <button type="button" onclick={() => basculer(c.code)} aria-expanded={ouvert}
+        class="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-muted/30 {ouvert ? 'border-b border-border' : ''}">
+        <CaretRight size={13} weight="bold" class="shrink-0 text-muted-foreground transition-transform {ouvert ? 'rotate-90' : ''}" />
+        <span class="inline-block size-3 rounded-sm" style="background:{c.color}"></span>
+        <span class="font-medium">{c.name}</span>
+        <span class="text-xs text-muted-foreground">{c.family === 'direct' ? 'vente directe' : 'vente indirecte'}{c.enabled ? '' : ' · désactivé'}</span>
+        <span class="ml-auto text-sm tabular-nums text-muted-foreground">
+          {#if c.lignes}
+            {c.lignes.toLocaleString('fr-FR')} ligne{c.lignes > 1 ? 's' : ''} · <span class="text-foreground">{c.qty.toLocaleString('fr-FR')} ex.</span> · {euros(c.montant)} <span class="text-[10px] uppercase">{c.nature}</span>
+          {:else}aucune vente relevée{/if}
+        </span>
+      </button>
+      {#if ouvert}
+        <TableauVentesCanal code={c.code} {annee} editable={c.editable} onchange={() => invalidateAll()} />
+      {/if}
+    </div>
+  {/each}
+</div>
+
+<!-- Les relevés eux-mêmes (périodes importées), pour en supprimer un. -->
+<details class="mb-6 rounded-lg border border-border bg-card p-5">
+  <summary class="cursor-pointer text-sm font-medium">Relevés enregistrés <span class="font-normal text-muted-foreground">({data.reports.length})</span></summary>
+  <div class="mt-4 overflow-x-auto rounded-lg border border-border">
   <table class="w-full text-sm">
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
       <tr><th class="px-3 py-2 font-medium">Période</th><th class="px-3 py-2 font-medium">Canal</th><th class="px-3 py-2 text-right font-medium">Lignes</th><th class="px-3 py-2"></th></tr>
@@ -151,7 +185,8 @@
       {#if data.reports.length === 0}<tr><td colspan="4" class="px-3 py-8 text-center text-muted-foreground">Aucun relevé — lancez-en un ci-dessus.</td></tr>{/if}
     </tbody>
   </table>
-</div>
+  </div>
+</details>
 
 <!-- Cas particulier : un relevé reçu sur papier ou par tableur. -->
 <details class="mt-6 rounded-lg border border-border bg-card p-5">
