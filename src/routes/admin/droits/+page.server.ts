@@ -4,25 +4,14 @@ import { requireAdmin } from '$lib/server/access';
 import { ensureChannels, listChannels, getReglagesDroits, setReglagesDroits, recapDroits, directeursPossibles } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 import { journaliser } from '$lib/server/journal';
-import { query } from '$lib/server/surreal';
-
-const countOf = (t: string) =>
-  query<any>(`SELECT count() AS n FROM ${t} GROUP ALL`).then((r) => r[0]?.n ?? 0);
 
 export const load: PageServerLoad = async ({ url }) => {
   await ensureChannels();
   const annee = Number(url.searchParams.get('annee')) || undefined;
-  const [channels, recap, contracts, reports, statements, cessions, reglages, directeurs] = await Promise.all([
-    listChannels(),
-    recapDroits(annee),
-    countOf('royalty_contract'),
-    countOf('sales_report'),
-    countOf('royalty_statement'),
-    countOf('rights_deal'),
-    getReglagesDroits(),
-    directeursPossibles()
+  const [channels, recap, reglages, directeurs] = await Promise.all([
+    listChannels(), recapDroits(annee), getReglagesDroits(), directeursPossibles()
   ]);
-  return { channels, recap, reglages, directeurs, stats: { contracts, reports, statements, cessions } };
+  return { channels, recap, reglages, directeurs };
 };
 
 export const actions: Actions = {
