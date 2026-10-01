@@ -27,9 +27,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 const lire = (fd: FormData) => {
   const S = (k: string) => String(fd.get(k) ?? '').trim();
   return {
-    code: S('code'), name: S('name'), family: S('family'), mode: S('mode'),
-    connector: S('connector') || undefined, order_channel: S('order_channel') || undefined,
-    enabled: fd.get('enabled') !== 'off',
+    code: S('code'), name: S('name'), family: S('family'), enabled: fd.get('enabled') !== 'off',
     color: S('color') || undefined, notes: S('notes') || undefined
   };
 };
@@ -39,10 +37,9 @@ export const actions: Actions = {
     requireAdmin(locals);
     const fd = await request.formData();
     const d = lire(fd);
-    if (!d.name) return fail(400, { error: 'Le nom est requis.' });
     try {
       const code = await upsertCanal(d, String(fd.get('existing') ?? '') || undefined);
-      await journaliser(locals, { action: 'canal.enregistre', cible: { type: 'sales_channel', id: code, libelle: d.name }, details: { famille: d.family, mode: d.mode, connecteur: d.connector ?? '—' } });
+      await journaliser(locals, { action: 'canal.enregistre', cible: { type: 'sales_channel', id: code, libelle: d.name || code }, details: { famille: d.family, notes: d.notes ?? '' } });
       throw redirect(303, withFlash('/admin/canaux', 'Canal enregistré.', 'success'));
     } catch (e) {
       if ((e as any)?.status === 303) throw e;

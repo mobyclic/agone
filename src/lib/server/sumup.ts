@@ -9,8 +9,8 @@
  *   2. le montant se décompose sur ces candidats (un titre × n, ou deux titres) ;
  *   3. une seule lecture possible → rapproché automatiquement ; plusieurs, ou
  *      aucune rencontre ce jour-là → proposé, à trancher à la main.
- * Les encaissements rapprochés (auto ou validés) font le relevé de ventes du
- * canal « sumup », que la reddition des droits lit comme les autres.
+ * Les encaissements rapprochés ont vocation à devenir des commandes du comptoir
+ * (payées « SumUp ») : c'est le canal « Comptoir & rencontres » qui les porte.
  *
  * API : https://developer.sumup.com/api — clé `SUMUP_API_KEY` (sup_sk_…), code
  * marchand lu une fois sur le profil (ou `SUMUP_MERCHANT_CODE`).
@@ -18,8 +18,6 @@
 import { env } from '$env/dynamic/private';
 import { query, recId } from './surreal';
 import { getSetting, setSetting } from './site';
-import { getCanal } from './canaux';
-import { createReport, deleteReport } from './droits';
 
 const API = 'https://api.sumup.com';
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -227,46 +225,4 @@ export async function comptesParEtat(): Promise<Record<string, number>> {
 export async function etatSumup() {
   const memo = await getSetting<{ merchant_code?: string; dernier_releve?: string }>('sumup');
   return { configure: sumupConfigure(), merchant_code: memo?.merchant_code, dernier_releve: memo?.dernier_releve };
-}
-
-// ── Relevé de ventes du canal ─────────────────────────────────
-/**
- * Les encaissements rapprochés de la période deviennent le relevé « auto » du
- * canal sumup (un remboursé compte en retour). Idempotent.
- */
-export async function genererRelevesSumup(periodStart: Date, periodEnd: Date) {
-  const canal = await getCanal('sumup');
-  if (!canal) throw new Error('Canal sumup absent du référentiel.');
-  const txs = await query<any>(
-    `SELECT status, amount, items, etat FROM sumup_transaction WHERE at >= $s AND at <= $e AND etat IN ['auto','valide','a_traiter'] AND status IN ['SUCCESSFUL','REFUNDED']`,
-    { s: periodStart, e: periodEnd }
-  );
-  const aTraiter = txs.filter((t: any) => t.etat === 'a_traiter').length;
-  const parLivre = new Map<string, { sold: number; returned: number; ca: number }>();
-  let encaissements = 0;
-  for (const t of txs) {
-    if (t.etat === 'a_traiter') continue;
-    encaissements++;
-    for (const i of t.items ?? []) {
-      const k = String(i.book);
-      const l = parLivre.get(k) ?? { sold: 0, returned: 0, ca: 0 };
-      if (t.status === 'REFUNDED') l.returned += Number(i.qty);
-      else { l.sold += Number(i.qty); l.ca += Number(i.qty) * Number(i.price); }
-      parLivre.set(k, l);
-    }
-  }
-  const anciens = await query<any>(
-    `SELECT id FROM sales_report WHERE channel = $c AND period_start = $s AND period_end = $e AND label = 'auto'`,
-    { c: recId('sales_channel', canal.id), s: periodStart, e: periodEnd }
-  );
-  for (const a of anciens) await deleteReport(String(a.id).replace(/^sales_report:/, ''));
-  if (!parLivre.size) return { encaissements, lignes: 0, unites: 0, aTraiter };
-  const reportId = await createReport({ channelId: canal.id, period_start: periodStart.toISOString(), period_end: periodEnd.toISOString(), label: 'auto' });
-  const rows = [...parLivre.entries()].map(([book, l]) => ({
-    report: recId('sales_report', reportId), book: recId('book', book.replace(/^book:/, '')), format: 'paper',
-    units_sold: l.sold, units_returned: l.returned, units_free: 0,
-    gross_price: l.sold > 0 ? r2(l.ca / l.sold) : undefined
-  }));
-  for (let i = 0; i < rows.length; i += 100) await query(`INSERT INTO sales_line $d`, { d: rows.slice(i, i + 100) });
-  return { encaissements, lignes: rows.length, unites: rows.reduce((n, r) => n + r.units_sold - r.units_returned, 0), aTraiter };
 }

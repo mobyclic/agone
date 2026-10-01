@@ -3,13 +3,12 @@
  *
  * Deux familles — vente directe, vente indirecte — et sous chacune autant de
  * canaux qu'on veut. Chaque canal dit d'où viennent ses chiffres :
- *   - mode « api » avec un connecteur : `orders` (les commandes du site, par
- *     order.channel), `bldd` (l'extranet des Belles Lettres) ou `sumup` (les
- *     encaissements du terminal, rapprochés du catalogue) ;
- *   - mode « api » sans connecteur : déclaré, pas encore branché — en veille ;
- *   - mode « manuel » : un tableur importé, colonnes à faire correspondre.
- * Un canal se désactive d'un commutateur : ses relevés passés restent, il ne se
- * propose plus nulle part.
+ *   - les canaux de la maison (mode « api ») : `orders` (les commandes du site,
+ *     par order.channel) ou `bldd` (l'extranet des Belles Lettres) — fixes ;
+ *   - les canaux ajoutés : toujours en mode « manuel », un tableur importé,
+ *     colonnes à faire correspondre. Un commutateur les montre ou non dans
+ *     « Ventes par exercice » (un canal qui a des relevés sur l'année s'y montre
+ *     de toute façon) et dans les statistiques.
  */
 import { query, recId } from './surreal';
 
@@ -19,30 +18,38 @@ export interface Canal {
   name: string;
   family: 'direct' | 'indirect';
   mode: 'api' | 'manuel';
-  connector?: 'orders' | 'bldd' | 'sumup';
+  connector?: 'orders' | 'bldd';
   order_channel?: string;
   enabled: boolean;
   color: string;
   notes?: string;
+  /** Canal de la maison : toujours là, non modifiable (couleur et notes exceptées). */
+  fixe: boolean;
 }
 
 /** Palette de repli, une teinte par rang : distinctes entre elles et lisibles empilées. */
 export const PALETTE = ['#26425b', '#5b8fbf', '#2e8b57', '#8fbf5b', '#b5a642', '#d4211c', '#e07a1f', '#8e44ad', '#16a085', '#7f8c8d'];
 
-const DEFAUTS: Omit<Canal, 'id'>[] = [
+/**
+ * Les canaux de la maison : ils existent toujours, dans cet ordre, et ne se
+ * modifient pas (sauf leur couleur et leurs notes). Les encaissements SumUp ne
+ * sont pas un canal : ils relèvent du comptoir (commandes payées « SumUp »).
+ */
+const DEFAUTS: Omit<Canal, 'id' | 'fixe'>[] = [
   { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', notes: 'Commandes du site, payées par Stripe. Le papier est expédié par Les Belles Lettres, mais ces ventes ne figurent pas sur leur extranet.' },
-  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57' },
-  { code: 'vpc', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b' },
-  { code: 'sortie_editeur', name: 'Sortie éditeur', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642' },
-  { code: 'sumup', name: 'SumUp (rencontres & salons)', family: 'direct', mode: 'api', connector: 'sumup', enabled: true, color: '#8e44ad', notes: 'Encaissements du terminal, rapprochés des rencontres du jour et du catalogue.' },
+  { code: 'vpc', name: 'Vente par correspondance (stock Belles Lettres)', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b' },
+  { code: 'sortie_editeur', name: 'Sortie éditeur (bon de commande)', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642' },
+  { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57', notes: 'Ventes sur place, saisies à la main ou importées ; les encaissements SumUp s’y rapprochent.' },
   { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c' }
 ];
+const FIXES = new Set(DEFAUTS.map((d) => d.code));
+const rang = (code: string) => { const i = DEFAUTS.findIndex((d) => d.code === code); return i < 0 ? 99 : i; };
 
 const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, enabled, color, notes`;
 
 /**
- * Sème les canaux de base et RÉPARE les lignes anciennes : un champ ajouté après
- * coup reste NONE sur l'existant (DEFAULT ne vaut qu'à la création).
+ * Sème les canaux de la maison et les maintient tels quels (nom, famille,
+ * source, actifs) : seuls leur couleur et leurs notes appartiennent à l'utilisateur.
  */
 export async function ensureCanaux(): Promise<void> {
   const existants = await query<any>(`SELECT ${CHAMPS} FROM sales_channel`);
@@ -50,12 +57,11 @@ export async function ensureCanaux(): Promise<void> {
   for (const d of DEFAUTS) {
     const e = parCode.get(d.code);
     if (!e) { await query(`CREATE sales_channel CONTENT $d`, { d }); continue; }
-    // On ne touche qu'à ce qui n'a jamais été renseigné : le reste appartient à l'utilisateur.
     const set: Record<string, unknown> = {};
-    for (const k of ['family', 'mode', 'connector', 'order_channel', 'enabled', 'color'] as const) {
-      if (e[k] === undefined || e[k] === null) set[k] = (d as any)[k];
+    for (const k of ['name', 'family', 'mode', 'connector', 'order_channel', 'enabled'] as const) {
+      if (e[k] !== (d as any)[k]) set[k] = (d as any)[k];
     }
-    if (e.color === '#7a7a7a' && d.color) set.color = d.color;
+    if (!e.color || e.color === '#7a7a7a') set.color = d.color;
     if (Object.keys(set).length) await query(`UPDATE $id MERGE $set`, { id: recId('sales_channel', e.id), set });
   }
 }
@@ -64,8 +70,8 @@ export async function listCanaux(opts: { enabledOnly?: boolean } = {}): Promise<
   const rows = await query<any>(
     `SELECT ${CHAMPS} FROM sales_channel ${opts.enabledOnly ? 'WHERE enabled = true' : ''}`
   );
-  // Vente directe d'abord, puis par nom — en ordre alphabétique français, pas en ordre d'octets.
-  return rows.map(normaliser).sort((a, b) => a.family.localeCompare(b.family) || a.name.localeCompare(b.name, 'fr'));
+  // Vente directe d'abord ; les canaux de la maison dans leur ordre, puis les canaux ajoutés, par nom.
+  return rows.map(normaliser).sort((a, b) => a.family.localeCompare(b.family) || rang(a.code) - rang(b.code) || a.name.localeCompare(b.name, 'fr'));
 }
 
 export async function getCanal(code: string): Promise<Canal | null> {
@@ -79,12 +85,12 @@ const normaliser = (r: any): Canal => ({
   mode: r.mode === 'manuel' ? 'manuel' : 'api',
   connector: r.connector ?? undefined, order_channel: r.order_channel ?? undefined,
   enabled: r.enabled !== false,
-  color: r.color ?? '#7a7a7a', notes: r.notes ?? undefined
+  color: r.color ?? '#7a7a7a', notes: r.notes ?? undefined,
+  fixe: FIXES.has(r.code)
 });
 
 export interface CanalInput {
-  code: string; name: string; family: string; mode: string; connector?: string; order_channel?: string;
-  enabled?: boolean; color?: string; notes?: string;
+  code?: string; name: string; family?: string; enabled?: boolean; color?: string; notes?: string;
 }
 
 /** Code : lettres, chiffres, tirets bas — stable, il sert de clé dans les relevés. */
@@ -92,37 +98,44 @@ export const codeCanal = (v: string) =>
   v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
 
 export async function upsertCanal(d: CanalInput, existingCode?: string): Promise<string> {
-  const code = codeCanal(d.code || d.name);
+  const couleur = /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color : undefined;
+  const notes = d.notes?.trim() || undefined;
+  const existant = existingCode ? await getCanal(existingCode) : null;
+  if (existant?.fixe) {
+    // Canal de la maison : seuls la couleur et les notes se changent.
+    await query(`UPDATE $id MERGE $c`, { id: recId('sales_channel', existant.id), c: { color: couleur ?? existant.color, notes } });
+    return existant.code;
+  }
+  const code = existant?.code ?? codeCanal(d.code || d.name);
   if (!code) throw new Error('Code de canal vide.');
-  const connecteur = d.mode === 'manuel' ? undefined : (d.connector === 'orders' || d.connector === 'bldd' ? d.connector : undefined);
+  if (!d.name?.trim()) throw new Error('Le nom est requis.');
+  // Un canal ajouté est toujours alimenté par un tableur.
   const champs = {
     code, name: d.name.trim(), family: d.family === 'indirect' ? 'indirect' : 'direct',
-    mode: d.mode === 'manuel' ? 'manuel' : 'api',
-    connector: connecteur,
-    order_channel: connecteur === 'orders' ? (d.order_channel || code) : undefined,
-    enabled: d.enabled !== false,
-    color: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color : undefined,
-    notes: d.notes?.trim() || undefined
+    mode: 'manuel', connector: undefined, order_channel: undefined,
+    enabled: d.enabled !== false, color: couleur, notes
   };
-  const existant = existingCode ? await getCanal(existingCode) : null;
   if (existant) {
     await query(`UPDATE $id MERGE $c`, { id: recId('sales_channel', existant.id), c: { ...champs, color: champs.color ?? existant.color } });
     return code;
   }
-  const deja = await getCanal(code);
-  if (deja) throw new Error(`Le code « ${code} » existe déjà.`);
+  if (FIXES.has(code) || (await getCanal(code))) throw new Error(`Le code « ${code} » existe déjà.`);
   const n = (await listCanaux()).length;
   await query(`CREATE sales_channel CONTENT $c`, { c: { ...champs, color: champs.color ?? PALETTE[n % PALETTE.length] } });
   return code;
 }
 
-export const setCanalEnabled = (code: string, enabled: boolean) =>
-  query(`UPDATE sales_channel SET enabled = $e WHERE code = $c`, { e: enabled, c: code });
+/** Montrer / cacher un canal ajouté ; ceux de la maison restent toujours actifs. */
+export async function setCanalEnabled(code: string, enabled: boolean): Promise<void> {
+  if (FIXES.has(code)) return;
+  await query(`UPDATE sales_channel SET enabled = $e WHERE code = $c`, { e: enabled, c: code });
+}
 
-/** Suppression : refusée si des relevés s'y rattachent (ils ont besoin du canal). */
+/** Suppression : jamais pour un canal de la maison, ni si des relevés s'y rattachent. */
 export async function deleteCanal(code: string): Promise<{ ok: boolean; error?: string }> {
   const c = await getCanal(code);
   if (!c) return { ok: false, error: 'Canal introuvable.' };
+  if (c.fixe) return { ok: false, error: 'Ce canal fait partie de la maison : il ne se supprime pas.' };
   const n = await query<any>(`SELECT count() AS n FROM sales_report WHERE channel = $id GROUP ALL`, { id: recId('sales_channel', c.id) });
   if (n[0]?.n) return { ok: false, error: `${n[0].n} relevé(s) s'appuient sur ce canal : désactivez-le plutôt.` };
   await query(`DELETE $id`, { id: recId('sales_channel', c.id) });

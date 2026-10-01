@@ -7,8 +7,8 @@
  *     par mois (exemplaires nets, chiffre au prix public) ; à défaut les
  *     mouvements de stock mensuels (exemplaires × prix du livre) ; à défaut
  *     encore le relevé annuel, rangé au mois 0 (« non ventilé ») ;
- *   - tableurs importés (mode manuel) et encaissements SumUp rapprochés : les
- *     lignes de leurs relevés, au mois du relevé s'il couvre un mois, sinon au mois 0.
+ *   - tableurs importés (mode manuel) : les lignes de leurs relevés, au mois du
+ *     relevé s'il couvre un mois, sinon au mois 0.
  * Le mois 0 compte dans les totaux de l'année, pas dans la courbe mensuelle.
  */
 import { query, recId } from './surreal';
@@ -150,7 +150,7 @@ export async function ventesParCanal(opts: { annee?: number; bookSlug?: string }
       }
       points.push(...agr.values());
       livres.push(...parLivre.values());
-    } else if (c.mode === 'manuel' || c.connector === 'sumup') {
+    } else if (c.mode === 'manuel') {
       const lignes = await query<any>(
         `SELECT report.period_start AS ps, report.period_end AS pe, book, book.title AS title, book.slug AS slug, format,
                 units_sold, units_returned, gross_ht, gross_price

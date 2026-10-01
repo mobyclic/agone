@@ -156,7 +156,7 @@ export async function resumeCanaux(annee: number) {
       n = Number(r?.n ?? 0); qty = Number(r?.qty ?? 0); montant = r2(Number(r?.montant ?? 0)); nature = Number(r?.ht ?? 0) > 0 ? 'ht' : 'ttc';
     }
     return { code: c.code, name: c.name, color: c.color, family: c.family, connector: c.connector, mode: c.mode, enabled: c.enabled, lignes: n, qty, montant, nature, editable: c.connector !== 'orders' };
-  }));
+  })).then((l) => l.filter((c) => c.enabled || c.lignes > 0)); // un canal caché se montre quand même s'il a vendu
 }
 
 /** Correction d'une ligne de relevé ; l'ISBN modifié fait retrouver le livre. */
