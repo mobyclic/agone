@@ -48,9 +48,11 @@
                 {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                 <span class="text-muted-foreground">{fmt(a.published_at)}</span>
               </div>
-              <h2 class="display-title mt-1 text-xl leading-tight group-hover:underline group-hover:underline-offset-4">{a.title}</h2>
+              <h2 class="display-title mt-1 text-xl leading-tight">{a.title}</h2>
               {#if a.author}<p class="mt-0.5 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
               {#if a.excerpt}<p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>{/if}
+              <!-- Tout le bloc est cliquable ; seul « Lire l'article » se souligne. -->
+              <span class="mt-2 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
             </a>
           {/each}
         </div>
