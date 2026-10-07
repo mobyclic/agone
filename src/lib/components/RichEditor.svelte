@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Editor, Node, mergeAttributes } from '@tiptap/core';
+  import { Editor, Node, Extension, mergeAttributes } from '@tiptap/core';
   import StarterKit from '@tiptap/starter-kit';
   import {
     TextB, TextItalic, TextUnderline, ListBullets, ListNumbers, Quotes,
@@ -84,13 +84,23 @@
   let ready = $state(false);
   let tick = $state(0); // force la réévaluation des états actifs de la barre d'outils
 
+  /** Espace insécable : bouton de la barre, ou Ctrl/⌘ + Maj + Espace comme dans un traitement de texte. */
+  const EspaceInsecable = Extension.create({
+    name: 'espaceInsecable',
+    addKeyboardShortcuts() {
+      return { 'Mod-Shift-Space': () => this.editor.chain().focus().insertContent('\u00a0').run() };
+    }
+  });
+  const insererInsecable = () => editor?.chain().focus().insertContent('\u00a0').run();
+
   onMount(() => {
     if (!element) return;
     editor = new Editor({
       element,
       extensions: [
         StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, HTMLAttributes: { rel: 'noopener' } } }),
-        NoteDeBasDePage
+        NoteDeBasDePage,
+        EspaceInsecable
       ],
       editorProps: {
         // Clic sur un appel de note → on saute à son texte dans le panneau des notes.
@@ -156,6 +166,10 @@
     <button type="button" onclick={ajouterNote} tabindex="-1" title="Insérer une note de bas de page à la position du curseur"
       class="inline-flex h-8 items-center gap-1 rounded px-2 font-display text-xs font-bold text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
       <span class="text-[0.7rem] leading-none"><sup>1</sup></span> Note
+    </button>
+    <button type="button" onclick={insererInsecable} tabindex="-1" title="Insérer une espace insécable (Ctrl + Maj + Espace) — avant un « : », « ; », « ? », « ! » ou entre un nombre et son unité"
+      class="inline-flex h-8 items-center gap-1 rounded px-2 font-display text-xs font-bold text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
+      <span class="font-mono text-sm leading-none">⎵</span> Insécable
     </button>
     <span class="mx-0.5 h-5 w-px bg-border"></span>
     {@render tb(ArrowUUpLeft, () => run((c) => c.undo()))}
