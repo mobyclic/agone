@@ -102,66 +102,11 @@
   const totalTTC = $derived(lines.reduce((s, l) => s + l.qty * ttcDe(l), 0) + portHT * (1 + shippingVat / 100));
 </script>
 
-<form method="POST" action="?/brouillon" use:enhance class="max-w-3xl">
+<form method="POST" action="?/brouillon" use:enhance>
 
-  <!-- Type, sens des prix, date -->
-  <section class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg border border-border bg-card p-4">
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-medium">Type</span>
-      <div class="flex overflow-hidden rounded-md border border-border text-sm">
-        <button type="button" class="px-3 py-1.5 {kind === 'invoice' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'invoice')}>Facture</button>
-        <button type="button" class="px-3 py-1.5 {kind === 'credit_note' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'credit_note')}>Avoir</button>
-      </div>
-    </div>
-    <div class="flex items-center gap-2" title="Les prix des lignes sont saisis dans ce sens, et le document s’imprime de même.">
-      <span class="text-sm font-medium">Prix</span>
-      <div class="flex overflow-hidden rounded-md border border-border text-sm">
-        <button type="button" class="px-3 py-1.5 {mode === 'ht' ? 'bg-foreground text-background' : ''}" onclick={() => basculerMode('ht')}>HT</button>
-        <button type="button" class="px-3 py-1.5 {mode === 'ttc' ? 'bg-foreground text-background' : ''}" onclick={() => basculerMode('ttc')}>TTC</button>
-      </div>
-    </div>
-    <label class="flex items-center gap-2 text-sm" title="Date d'émission si vous émettez maintenant ; un brouillon la garde en mémoire."><span class="font-medium">Date</span><input type="date" bind:value={issuedAt} class="h-9 rounded-md border border-border bg-background px-2 text-sm" /></label>
-  </section>
-
-  <!-- Client -->
-  <section class="mb-5 rounded-lg border border-border bg-card p-4">
-    <h3 class="eyebrow mb-3">Facturé à</h3>
-    {#if clientType}
-      <p class="mb-3 flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-        {#if clientType === 'pro'}<Buildings size={15} class="text-muted-foreground" />{:else}<User size={15} class="text-muted-foreground" />{/if}
-        <span class="font-medium">{name}</span>
-        <span class="text-xs text-muted-foreground">{clientType === 'pro' ? 'client professionnel' : 'client du site'}</span>
-        <button type="button" onclick={detacher} class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Détacher"><X size={14} /></button>
-      </p>
-    {:else}
-      <div class="relative mb-3">
-        <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input bind:value={cq} oninput={csearch} placeholder="Chercher un client — professionnel ou particulier…" autocomplete="off" class="{input} pl-9" />
-        {#if chits.length}
-          <ul class="absolute z-10 mt-1 w-full divide-y divide-border overflow-hidden rounded-md border border-border bg-background shadow-lg">
-            {#each chits as c (c.type + c.id)}
-              <li><button type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40" onclick={() => pickClient(c)}>
-                {#if c.type === 'pro'}<Buildings size={15} class="shrink-0 text-muted-foreground" />{:else}<User size={15} class="shrink-0 text-muted-foreground" />{/if}
-                <span class="font-medium">{c.label}</span>{#if c.detail}<span class="ml-auto text-xs text-muted-foreground">{c.detail}</span>{/if}
-              </button></li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-      <p class="mb-3 text-xs text-muted-foreground">Ou saisissez le client ci-dessous — pour une personne morale récurrente, <a href="/admin/clients/pro/nouveau" class="text-link hover:underline">créez-la</a> plutôt dans Clients.</p>
-    {/if}
-    <div class="grid gap-3 sm:grid-cols-2">
-      <label class="sm:col-span-2"><span class={label}>Nom / raison sociale</span><input bind:value={name} class={input} /></label>
-      <label><span class={label}>À l’attention de</span><input bind:value={contactName} class={input} /></label>
-      <label><span class={label}>Email</span><input bind:value={email} type="email" class={input} /></label>
-      <label class="sm:col-span-2"><span class={label}>Adresse</span><input bind:value={address_1} class={input} /></label>
-      <label><span class={label}>Code postal</span><input bind:value={postcode} class={input} /></label>
-      <label><span class={label}>Ville</span><input bind:value={city} class={input} /></label>
-      <label><span class={label}>Pays</span><input bind:value={country} class={input} /></label>
-      <label><span class={label}>N° TVA / SIRET</span><div class="flex gap-2"><input bind:value={vatNumber} placeholder="FR…" class="{input} font-mono" /><input bind:value={siret} placeholder="SIRET" class="{input} font-mono" /></div></label>
-    </div>
-  </section>
-
+  <!-- Deux colonnes : le contenu (objet, lignes, notes) à gauche ; le cadre (type, prix, date, client) à droite. -->
+  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div>
   <!-- Objet -->
   <section class="mb-5 rounded-lg border border-border bg-card p-4">
     <span class={label}>Objet <span class="font-normal text-muted-foreground">(imprimé avant le tableau : « 500 exemplaires à prix coûtant tel qu’énoncé dans le contrat… »)</span></span>
@@ -236,6 +181,69 @@
     <span class={label}>Notes <span class="font-normal text-muted-foreground">(imprimées après les totaux : adresse de livraison, conditions…)</span></span>
     <textarea bind:value={notes} rows="2" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"></textarea>
   </section>
+
+    </div>
+    <div>
+  <!-- Type, sens des prix, date -->
+  <section class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg border border-border bg-card p-4">
+    <div class="flex items-center gap-2">
+      <span class="text-sm font-medium">Type</span>
+      <div class="flex overflow-hidden rounded-md border border-border text-sm">
+        <button type="button" class="px-3 py-1.5 {kind === 'invoice' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'invoice')}>Facture</button>
+        <button type="button" class="px-3 py-1.5 {kind === 'credit_note' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'credit_note')}>Avoir</button>
+      </div>
+    </div>
+    <div class="flex items-center gap-2" title="Les prix des lignes sont saisis dans ce sens, et le document s’imprime de même.">
+      <span class="text-sm font-medium">Prix</span>
+      <div class="flex overflow-hidden rounded-md border border-border text-sm">
+        <button type="button" class="px-3 py-1.5 {mode === 'ht' ? 'bg-foreground text-background' : ''}" onclick={() => basculerMode('ht')}>HT</button>
+        <button type="button" class="px-3 py-1.5 {mode === 'ttc' ? 'bg-foreground text-background' : ''}" onclick={() => basculerMode('ttc')}>TTC</button>
+      </div>
+    </div>
+    <label class="flex items-center gap-2 text-sm" title="Date d'émission si vous émettez maintenant ; un brouillon la garde en mémoire."><span class="font-medium">Date</span><input type="date" bind:value={issuedAt} class="h-9 rounded-md border border-border bg-background px-2 text-sm" /></label>
+  </section>
+
+  <!-- Client -->
+  <section class="mb-5 rounded-lg border border-border bg-card p-4">
+    <h3 class="eyebrow mb-3">Facturé à</h3>
+    {#if clientType}
+      <p class="mb-3 flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+        {#if clientType === 'pro'}<Buildings size={15} class="text-muted-foreground" />{:else}<User size={15} class="text-muted-foreground" />{/if}
+        <span class="font-medium">{name}</span>
+        <span class="text-xs text-muted-foreground">{clientType === 'pro' ? 'client professionnel' : 'client du site'}</span>
+        <button type="button" onclick={detacher} class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Détacher"><X size={14} /></button>
+      </p>
+    {:else}
+      <div class="relative mb-3">
+        <MagnifyingGlass size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input bind:value={cq} oninput={csearch} placeholder="Chercher un client — professionnel ou particulier…" autocomplete="off" class="{input} pl-9" />
+        {#if chits.length}
+          <ul class="absolute z-10 mt-1 w-full divide-y divide-border overflow-hidden rounded-md border border-border bg-background shadow-lg">
+            {#each chits as c (c.type + c.id)}
+              <li><button type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40" onclick={() => pickClient(c)}>
+                {#if c.type === 'pro'}<Buildings size={15} class="shrink-0 text-muted-foreground" />{:else}<User size={15} class="shrink-0 text-muted-foreground" />{/if}
+                <span class="font-medium">{c.label}</span>{#if c.detail}<span class="ml-auto text-xs text-muted-foreground">{c.detail}</span>{/if}
+              </button></li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+      <p class="mb-3 text-xs text-muted-foreground">Ou saisissez le client ci-dessous — pour une personne morale récurrente, <a href="/admin/clients/pro/nouveau" class="text-link hover:underline">créez-la</a> plutôt dans Clients.</p>
+    {/if}
+    <div class="grid gap-3 sm:grid-cols-2">
+      <label class="sm:col-span-2"><span class={label}>Nom / raison sociale</span><input bind:value={name} class={input} /></label>
+      <label><span class={label}>À l’attention de</span><input bind:value={contactName} class={input} /></label>
+      <label><span class={label}>Email</span><input bind:value={email} type="email" class={input} /></label>
+      <label class="sm:col-span-2"><span class={label}>Adresse</span><input bind:value={address_1} class={input} /></label>
+      <label><span class={label}>Code postal</span><input bind:value={postcode} class={input} /></label>
+      <label><span class={label}>Ville</span><input bind:value={city} class={input} /></label>
+      <label><span class={label}>Pays</span><input bind:value={country} class={input} /></label>
+      <label><span class={label}>N° TVA / SIRET</span><div class="flex gap-2"><input bind:value={vatNumber} placeholder="FR…" class="{input} font-mono" /><input bind:value={siret} placeholder="SIRET" class="{input} font-mono" /></div></label>
+    </div>
+  </section>
+
+    </div>
+  </div>
 
   <!-- Champs cachés -->
   <input type="hidden" name="kind" value={kind} />
