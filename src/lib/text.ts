@@ -55,8 +55,19 @@ export function accentRegex(qRaw: string): string {
  * Un texte qui se termine déjà sur une ponctuation forte est laissé intact — il
  * s'agit alors d'un chapô rédigé, pas d'une troncature.
  */
+/**
+ * Espaces insécables de la typographie française : avant « : ; ? ! » et le
+ * guillemet fermant, après le guillemet ouvrant. Celles déjà posées à la main
+ * (dans l'éditeur) sont conservées : seule l'espace ordinaire est remplacée.
+ */
+export const typographieFr = (s: string) =>
+  s.replace(/ ([:;?!»])/g, '\u00a0$1').replace(/« /g, '«\u00a0');
+
+/** Replie les suites d'espaces ordinaires et de sauts de ligne — sans toucher aux insécables. */
+const replierEspaces = (s: string) => s.replace(/[ \t\r\n]+/g, ' ').trim();
+
 export function extraitPropre(texte?: string | null, max?: number): string | undefined {
-  const s = (texte ?? '').replace(/\s+/g, ' ').trim();
+  const s = typographieFr(replierEspaces(texte ?? ''));
   if (!s) return undefined;
   const coupe = max != null && s.length > max ? s.slice(0, max) : s;
   const tronque = coupe.length < s.length;

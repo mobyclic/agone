@@ -1,6 +1,7 @@
 /**
  * L'Antichambre — articles éditoriaux + rubriques.
  */
+import { typographieFr } from '$lib/text';
 import { query, recId } from './surreal';
 import { uniqueSlug } from './slug';
 import { accentRegex, sansScripts, notesDeBasDePage } from '$lib/text';
@@ -29,12 +30,16 @@ export interface ArticleCard {
   summary?: string;
 }
 
-/** HTML → texte brut (décode les entités, supprime les balises, normalise les espaces). */
+/**
+ * HTML → texte brut (décode les entités, supprime les balises, normalise les
+ * espaces). Les espaces insécables — posées dans l'éditeur ou imposées par la
+ * typographie française — restent insécables.
+ */
 function htmlToText(html: string): string {
-  return html
+  return typographieFr(html
     .replace(/<\/?(strong|em|b|i|u|sup|sub|span|a|mark|small|code)\b[^>]*>/gi, '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
+    .replace(/&nbsp;|&#160;/g, '\u00a0')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -42,8 +47,8 @@ function htmlToText(html: string): string {
     .replace(/&#8230;|&hellip;/g, '…')
     .replace(/&laquo;/g, '«')
     .replace(/&raquo;/g, '»')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/[ \t\r\n]+/g, ' ')
+    .trim());
 }
 
 /** Coupe une chaîne à maxLen en FIN DE MOT et ajoute « … ». */
