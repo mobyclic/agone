@@ -32,9 +32,9 @@
           <a href="/antichambre" class="link shrink-0 whitespace-nowrap pb-1 font-display text-sm font-medium uppercase tracking-wide">Le magazine →</a>
         </div>
 
-        <!-- Même gabarit que les articles suivants : rubrique en rouge · date,
-             puis le titre, puis l'auteur seul — en plus grand. -->
-        <div class="flex flex-wrap items-center gap-x-2 font-display text-sm uppercase tracking-wide">
+        <!-- Même gabarit et même taille que les articles suivants : rubrique en
+             rouge · date, le titre, l'auteur ; seul le chapeau est plus long. -->
+        <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
           {#if article.rubrique_name}
             <a href="/antichambre?rubrique={article.rubrique_slug}" class="font-semibold text-link hover:underline">{article.rubrique_name}</a>
             {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
@@ -42,19 +42,19 @@
           {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
         </div>
 
-        <a href="/article/{article.slug}" class="group mt-2 block">
-          <h1 class="display-title break-words text-4xl leading-[1.04] group-hover:underline group-hover:underline-offset-4 sm:text-5xl lg:text-[2.25rem] xl:text-5xl">{article.title}</h1>
+        <a href="/article/{article.slug}" class="group mt-1 block">
+          <h1 class="display-title break-words text-xl leading-tight group-hover:underline group-hover:underline-offset-4">{article.title}</h1>
         </a>
 
         {#if article.author}
-          <p class="mt-2 font-display text-sm uppercase tracking-[0.14em] text-muted-foreground">{article.author}</p>
+          <p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{article.author}</p>
         {/if}
 
         {#if lede}
-          <p class="mt-5 max-w-prose text-base leading-relaxed text-foreground/80">{lede}</p>
+          <p class="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground/75">{lede}</p>
         {/if}
 
-        <a href="/article/{article.slug}" class="link mt-5 inline-flex w-fit items-center gap-2 font-display text-sm font-semibold uppercase tracking-wider">
+        <a href="/article/{article.slug}" class="link mt-3 inline-flex w-fit items-center gap-2 font-display text-xs font-semibold uppercase tracking-wider">
           Lire l’article <span aria-hidden="true">→</span>
         </a>
 
