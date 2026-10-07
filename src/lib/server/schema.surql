@@ -848,6 +848,11 @@ DEFINE FIELD OVERWRITE vat_rate    ON invoice TYPE number DEFAULT 5.5;
 DEFINE FIELD OVERWRITE price_mode  ON invoice TYPE string DEFAULT 'ttc' VALUE $value ?? 'ttc'
   ASSERT $value IN ['ttc','ht'];
 DEFINE FIELD OVERWRITE intro       ON invoice TYPE option<string>;        -- texte avant le tableau (objet, contrat…)
+-- Règlement : l'état se déduit des règlements enregistrés (invoice_payment).
+DEFINE FIELD OVERWRITE status      ON invoice TYPE string DEFAULT 'unpaid' VALUE $value ?? 'unpaid'
+  ASSERT $value IN ['unpaid','partial','paid','cancelled'];
+DEFINE FIELD OVERWRITE paid_total  ON invoice TYPE number DEFAULT 0 VALUE $value ?? 0;
+DEFINE FIELD OVERWRITE due_at      ON invoice TYPE option<datetime>;      -- échéance (professionnels)
 DEFINE FIELD OVERWRITE subtotal_ht ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE tax_total   ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE total_ttc   ON invoice TYPE number DEFAULT 0;
@@ -858,6 +863,19 @@ DEFINE INDEX OVERWRITE idx_invoice_ref    ON invoice FIELDS ref UNIQUE;
 DEFINE INDEX OVERWRITE idx_invoice_order  ON invoice FIELDS order;
 DEFINE INDEX OVERWRITE idx_invoice_issued ON invoice FIELDS issued_at;
 DEFINE INDEX OVERWRITE idx_invoice_client ON invoice FIELDS client;
+DEFINE INDEX OVERWRITE idx_invoice_status ON invoice FIELDS status;
+
+-- Règlements d'une facture : un par encaissement (Stripe, SumUp, chèque, virement, espèces).
+DEFINE TABLE OVERWRITE invoice_payment SCHEMAFULL;
+DEFINE FIELD OVERWRITE invoice    ON invoice_payment TYPE record<invoice>;
+DEFINE FIELD OVERWRITE amount     ON invoice_payment TYPE number;
+DEFINE FIELD OVERWRITE paid_at    ON invoice_payment TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE method     ON invoice_payment TYPE string
+  ASSERT $value IN ['stripe','sumup','especes','cheque','virement','autre'] DEFAULT 'virement';
+DEFINE FIELD OVERWRITE reference  ON invoice_payment TYPE option<string>;  -- n° de chèque, libellé du virement…
+DEFINE FIELD OVERWRITE note       ON invoice_payment TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at ON invoice_payment TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_payment_invoice ON invoice_payment FIELDS invoice;
 
 -- ————————————————————— Codes promo —————————————————————
 DEFINE TABLE OVERWRITE promo_code SCHEMAFULL;

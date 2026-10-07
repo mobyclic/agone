@@ -148,26 +148,30 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
   if (existing[0]) return existing[0].id;
 
   const o = (
-    await query<any>(`SELECT number, customer, email, billing, shipping FROM order WHERE id = $id LIMIT 1`, {
+    await query<any>(`SELECT number, customer, email, billing, shipping, status, channel, payment_method, paid_at, total FROM order WHERE id = $id LIMIT 1`, {
       id: recId('order', orderId)
     })
   )[0];
   if (!o) return null;
 
   const rawLines = await query<any>(
-    `SELECT out.title AS title, title_snapshot, format, qty, unit_price FROM contains WHERE in = $id`,
+    `SELECT out.title AS title, out.vat_rate AS vat, meta::id(out) AS book, out.isbn_paper AS isbn, title_snapshot, format, qty, unit_price FROM contains WHERE in = $id`,
     { id: recId('order', orderId) }
   );
-  const { vat_rate } = await getCompany(); // TVA par défaut (livres) appliquée à chaque ligne
+  const { vat_rate } = await getCompany(); // TVA par défaut, si le livre n'en porte pas
   const cleanText = (s: string) =>
     s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, '’').replace(/\s+/g, ' ').trim();
-  const lines: InvoiceLine[] = rawLines.map((l) => ({
-    description: `${cleanText(String(l.title_snapshot || l.title || 'Livre'))}${l.format && l.format !== 'papier' ? ` (${l.format})` : ''}`,
-    qty: l.qty ?? 1,
-    unit_price_ttc: l.unit_price ?? 0,
-    line_total_ttc: r2((l.qty ?? 1) * (l.unit_price ?? 0)),
-    vat_rate
-  }));
+  const lines: InvoiceLine[] = rawLines.map((l) => {
+    const vat = Number.isFinite(Number(l.vat)) ? Number(l.vat) : vat_rate;
+    return {
+      description: `${cleanText(String(l.title_snapshot || l.title || 'Livre'))}${l.format && l.format !== 'papier' ? ` (${l.format})` : ''}`,
+      qty: l.qty ?? 1,
+      unit_price_ttc: l.unit_price ?? 0,
+      unit_price_ht: r2((l.unit_price ?? 0) / (1 + vat / 100)),
+      line_total_ttc: r2((l.qty ?? 1) * (l.unit_price ?? 0)),
+      vat_rate: vat, book: l.book ? String(l.book) : undefined, isbn: l.isbn ?? undefined
+    };
+  });
 
   let name = '';
   let email = o.email ?? '';
@@ -189,7 +193,60 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
       bill_to, lines, vat_rate, ...totals
     }
   });
-  return String(rows[0].id).replace(/^invoice:/, '');
+  const id = String(rows[0].id).replace(/^invoice:/, '');
+  // Une commande payée est réglée du même coup : le règlement s'enregistre avec
+  // son mode (Stripe pour le site, sinon celui saisi sur la commande).
+  if (PAYEES.has(o.status)) {
+    const method = PAYMENT_METHODS.includes(o.payment_method) ? o.payment_method : o.channel === 'web' ? 'stripe' : 'autre';
+    await addPayment(id, { amount: totals.total_ttc, paid_at: o.paid_at ? new Date(o.paid_at) : new Date(), method, note: `Commande n° ${o.number}` });
+  }
+  return id;
+}
+
+/* ————————————————————— Règlements ————————————————————— */
+
+const PAYEES = new Set(['paid', 'processing', 'sent_to_bl', 'completed']);
+export const PAYMENT_METHODS = ['stripe', 'sumup', 'especes', 'cheque', 'virement', 'autre'];
+
+export async function listPayments(invoiceId: string) {
+  return query<any>(
+    `SELECT meta::id(id) AS id, amount, paid_at, method, reference, note FROM invoice_payment WHERE invoice = $i ORDER BY paid_at ASC`,
+    { i: recId('invoice', invoiceId) }
+  );
+}
+
+/** Recalcule le réglé et l'état d'une facture à partir de ses règlements. */
+export async function recomputeInvoiceStatus(invoiceId: string): Promise<{ status: string; paid_total: number }> {
+  const id = recId('invoice', invoiceId);
+  const inv = (await query<any>(`SELECT total_ttc, kind, status FROM ONLY $id`, { id })) as any;
+  if (!inv) throw new Error('Facture introuvable');
+  const [som] = await query<any>(`SELECT math::sum(amount) AS total FROM invoice_payment WHERE invoice = $id GROUP ALL`, { id });
+  const paid_total = r2(Number(som?.total ?? 0));
+  const total = r2(Number(inv.total_ttc ?? 0));
+  const status = inv.status === 'cancelled' ? 'cancelled' : paid_total <= 0 ? 'unpaid' : paid_total + 0.005 >= total ? 'paid' : 'partial';
+  await query(`UPDATE $id SET status = $s, paid_total = $p`, { id, s: status, p: paid_total });
+  return { status, paid_total };
+}
+
+export async function addPayment(invoiceId: string, p: { amount: number; paid_at?: Date; method?: string; reference?: string; note?: string }): Promise<string> {
+  const amount = r2(Number(p.amount));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Montant invalide.');
+  const rows = await query<any>(`CREATE invoice_payment CONTENT $c`, {
+    c: {
+      invoice: recId('invoice', invoiceId), amount, paid_at: p.paid_at ?? new Date(),
+      method: PAYMENT_METHODS.includes(p.method ?? '') ? p.method : 'virement',
+      reference: p.reference?.trim() || undefined, note: p.note?.trim() || undefined
+    }
+  });
+  await recomputeInvoiceStatus(invoiceId);
+  return String(rows[0].id).replace(/^invoice_payment:/, '');
+}
+
+export async function deletePayment(paymentId: string): Promise<void> {
+  const p = (await query<any>(`SELECT invoice FROM ONLY $id`, { id: recId('invoice_payment', paymentId) })) as any;
+  if (!p) return;
+  await query(`DELETE $id`, { id: recId('invoice_payment', paymentId) });
+  await recomputeInvoiceStatus(String(p.invoice).replace(/^invoice:/, ''));
 }
 
 /* ————————————————————— Création manuelle (facture ou avoir) ————————————————————— */
@@ -247,7 +304,7 @@ export async function createManualInvoice(input: ManualInvoiceInput): Promise<st
 /* ————————————————————— Lecture ————————————————————— */
 
 const INV_FIELDS = `
-  meta::id(id) AS id, ref, kind, year, number, bill_to, lines, vat_rate, price_mode, intro,
+  meta::id(id) AS id, ref, kind, year, number, bill_to, lines, vat_rate, price_mode, intro, status, paid_total, due_at,
   subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number,
   IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
   IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id
@@ -270,17 +327,20 @@ export async function getInvoiceIdForOrder(orderId: string): Promise<string | nu
   return rows[0]?.id ?? null;
 }
 
-export async function listInvoices(opts: { q?: string; kind?: string; limit?: number; offset?: number } = {}) {
+export async function listInvoices(opts: { q?: string; kind?: string; status?: string; limit?: number; offset?: number } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.kind) { where.push('kind = $kind'); vars.kind = opts.kind; }
+  // « À encaisser » : les factures (pas les avoirs) qui ne sont pas soldées.
+  if (opts.status === 'due') where.push("kind = 'invoice' AND status IN ['unpaid','partial']");
+  else if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
   if (opts.q && opts.q.trim()) {
     vars.q = opts.q.trim().toLowerCase();
     where.push('(string::lowercase(ref) CONTAINS $q OR string::lowercase(bill_to.name ?? "") CONTAINS $q)');
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, ref, kind, bill_to.name AS name, total_ttc, issued_at, order.number AS order_number
+    `SELECT meta::id(id) AS id, ref, kind, bill_to.name AS name, total_ttc, status, paid_total, issued_at, order.number AS order_number
        FROM invoice ${whereSql} ORDER BY issued_at DESC LIMIT $limit START $start`,
     vars
   );

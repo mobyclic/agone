@@ -9,11 +9,15 @@
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
   const KINDS = [{ k: '', label: 'Tout' }, { k: 'invoice', label: 'Factures' }, { k: 'credit_note', label: 'Avoirs' }];
+  const STATUT: Record<string, { texte: string; cls: string }> = {
+    unpaid: { texte: 'À encaisser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partielle', cls: 'bg-warning/15 text-warning' },
+    paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' }
+  };
 
   let q = $state(untrack(() => data.q ?? ''));
   let timer: ReturnType<typeof setTimeout>;
   function nav(params: Record<string, string | number | undefined>) {
-    const merged: Record<string, string | number | undefined> = { q, kind: data.kind, page: data.page, ...params };
+    const merged: Record<string, string | number | undefined> = { q, kind: data.kind, status: data.status, page: data.page, ...params };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
       if (v === undefined || v === '' || (k === 'page' && v === 1)) continue;
@@ -46,6 +50,11 @@
       <button type="button" class="px-3 py-2 text-sm {(data.kind ?? '') === w.k ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ kind: w.k || undefined, page: 1 })}>{w.label}</button>
     {/each}
   </div>
+  <div class="flex overflow-hidden rounded-md border border-border">
+    <button type="button" class="px-3 py-2 text-sm {!data.status ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: undefined, page: 1 })}>Tous états</button>
+    <button type="button" class="px-3 py-2 text-sm {data.status === 'due' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: 'due', kind: undefined, page: 1 })}>À encaisser</button>
+    <button type="button" class="px-3 py-2 text-sm {data.status === 'paid' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: 'paid', page: 1 })}>Réglées</button>
+  </div>
 </div>
 
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
@@ -57,6 +66,7 @@
         <th class="px-3 py-2 font-medium">Client</th>
         <th class="px-3 py-2 font-medium">Commande</th>
         <th class="px-3 py-2 text-right font-medium">Total TTC</th>
+        <th class="px-3 py-2 font-medium">État</th>
         <th class="px-3 py-2 text-right font-medium">Date</th>
         <th class="px-3 py-2 text-right font-medium">PDF</th>
       </tr>
@@ -71,12 +81,16 @@
           <td class="px-3 py-2 text-muted-foreground">{f.name || '—'}</td>
           <td class="px-3 py-2 text-muted-foreground">{#if f.order_number}<a href="/admin/commandes/{f.order_number}" class="hover:text-link">#{f.order_number}</a>{:else}—{/if}</td>
           <td class="px-3 py-2 text-right tabular-nums">{f.kind === 'credit_note' ? '−' : ''}{euros(f.total_ttc)}</td>
+          <td class="px-3 py-2">
+            {#if f.kind === 'credit_note'}<span class="text-muted-foreground">—</span>
+            {:else}{@const st = STATUT[f.status ?? 'unpaid']}<span class="whitespace-nowrap rounded px-2 py-0.5 text-xs {st.cls}">{st.texte}{#if f.status === 'partial'} · {euros(f.paid_total)}{/if}</span>{/if}
+          </td>
           <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(f.issued_at)}</td>
           <td class="px-3 py-2 text-right"><a href="/admin/factures/{f.id}/pdf?dl=1" class="inline-flex text-muted-foreground hover:text-foreground" aria-label="Télécharger"><Download size={16} /></a></td>
         </tr>
       {/each}
       {#if data.invoices.length === 0}
-        <tr><td colspan="7" class="px-3 py-10 text-center text-muted-foreground">Aucune facture pour le moment.</td></tr>
+        <tr><td colspan="8" class="px-3 py-10 text-center text-muted-foreground">Aucune facture{data.status || data.q ? " pour ce filtre" : " pour le moment"}.</td></tr>
       {/if}
     </tbody>
   </table>

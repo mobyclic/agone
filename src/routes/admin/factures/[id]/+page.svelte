@@ -1,8 +1,8 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Download, Printer, Receipt } from 'phosphor-svelte';
-  import { euros } from '$lib/labels';
+  import { ArrowLeft, Download, Printer, Receipt, Trash, Plus } from 'phosphor-svelte';
+  import { euros, PAYMENT_LABEL } from '$lib/labels';
 
   let { data } = $props();
   const f = $derived(data.invoice);
@@ -11,6 +11,13 @@
   const eur = (n?: number) => euros(n) ?? '—';
   const sign = $derived(isCredit ? '−' : '');
 
+  const reste = $derived(Math.max(0, Math.round(((f.total_ttc ?? 0) - (f.paid_total ?? 0)) * 100) / 100));
+  const STATUT: Record<string, { texte: string; cls: string }> = {
+    unpaid: { texte: 'À encaisser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partiellement réglée', cls: 'bg-warning/15 text-warning' },
+    paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' }
+  };
+  const dateCourte = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR') : '');
+  const aujourdhui = new Date().toISOString().slice(0, 10);
   let frame = $state<HTMLIFrameElement | null>(null);
   function printPdf() {
     try {
@@ -32,7 +39,8 @@
   <div>
     <div class="flex items-center gap-2">
       <h2 class="text-xl font-bold">{isCredit ? 'Avoir' : 'Facture'} n° {f.ref}</h2>
-      {#if isCredit}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>{/if}
+      {#if isCredit}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>
+      {:else}{@const st = STATUT[f.status ?? 'unpaid']}<span class="rounded px-2 py-0.5 text-xs {st.cls}">{st.texte}{#if f.status === 'partial'} · reste {eur(reste)}{/if}</span>{/if}
     </div>
     <p class="text-sm text-muted-foreground">
       Émis le {dateFr(f.issued_at)}
@@ -93,6 +101,49 @@
     {/if}
   </div>
 
+  <div class="space-y-5">
+  {#if !isCredit}
+    <!-- Règlements : ce qui a été encaissé, et ce qui reste -->
+    <div class="rounded-lg border border-border bg-card p-4">
+      <h3 class="eyebrow mb-2">Règlements</h3>
+      {#if data.payments.length}
+        <ul class="mb-3 divide-y divide-border text-sm">
+          {#each data.payments as p (p.id)}
+            <li class="flex items-start gap-2 py-1.5">
+              <div class="min-w-0 flex-1">
+                <span class="tabular-nums font-medium">{eur(p.amount)}</span>
+                <span class="text-muted-foreground"> · {PAYMENT_LABEL[p.method] ?? p.method} · {dateCourte(p.paid_at)}</span>
+                {#if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
+              </div>
+              <form method="POST" action="?/payment_delete" use:enhance onsubmit={(e: Event) => { if (!confirm('Retirer ce règlement ?')) e.preventDefault(); }}>
+                <input type="hidden" name="paymentId" value={p.id} />
+                <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Retirer"><Trash size={13} /></button>
+              </form>
+            </li>
+          {/each}
+        </ul>
+        <p class="mb-3 text-sm">Réglé <span class="tabular-nums font-medium">{eur(f.paid_total ?? 0)}</span> sur {eur(f.total_ttc)}{#if reste > 0} · reste <span class="tabular-nums font-medium">{eur(reste)}</span>{/if}</p>
+      {:else}
+        <p class="mb-3 text-sm text-muted-foreground">Aucun règlement enregistré — {eur(f.total_ttc)} à encaisser.</p>
+      {/if}
+      {#if f.status !== 'paid'}
+        <form method="POST" action="?/payment_add" use:enhance class="space-y-2 border-t border-border pt-3">
+          <div class="grid grid-cols-2 gap-2">
+            <label class="text-xs text-muted-foreground">Montant (€)<input name="amount" type="number" step="0.01" min="0.01" value={reste || ''} required class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm" /></label>
+            <label class="text-xs text-muted-foreground">Date<input name="paid_at" type="date" value={aujourdhui} class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm" /></label>
+          </div>
+          <label class="block text-xs text-muted-foreground">Mode
+            <select name="method" class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm">
+              {#each data.methods.filter((m) => m !== 'stripe') as m (m)}<option value={m}>{PAYMENT_LABEL[m] ?? m}</option>{/each}
+            </select>
+          </label>
+          <input name="reference" placeholder="référence (n° de chèque, virement…)" class="h-9 w-full rounded-md border border-border bg-background px-2 text-sm" />
+          <Button type="submit" size="sm" variant="outline" class="w-full"><Plus size={14} /> Enregistrer le règlement</Button>
+        </form>
+      {/if}
+    </div>
+  {/if}
+
   <!-- Client -->
   <div class="rounded-lg border border-border bg-card p-4">
     <h3 class="eyebrow mb-2">Facturé à</h3>
@@ -103,5 +154,6 @@
       {#if f.bill_to?.country}<div>{f.bill_to.country}</div>{/if}
       {#if f.bill_to?.email}<div>{f.bill_to.email}</div>{/if}
     </div>
+  </div>
   </div>
 </div>
