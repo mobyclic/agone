@@ -10,7 +10,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { Button } from '$lib/components/ui/button';
   import Pagination from '$lib/components/Pagination.svelte';
-  import { Plus, MagnifyingGlass, Download, Funnel, X, ChartBar } from 'phosphor-svelte';
+  import { Plus, MagnifyingGlass, Download, Funnel, X, ChartBar, FileZip } from 'phosphor-svelte';
   import { euros } from '$lib/labels';
 
   let { data } = $props();
@@ -54,13 +54,16 @@
     data.from || data.to ? `${data.from ? `du ${dateFr(data.from)}` : ''} ${data.to ? `au ${dateFr(data.to)}` : ''}`.trim() : '',
     data.sort && data.sort !== 'date_desc' ? TRIS.find((t) => t.v === data.sort)?.label ?? '' : ''
   ].filter(Boolean));
-  const exportFiltre = $derived(`/admin/factures/export.csv?${new URLSearchParams(Object.fromEntries(Object.entries({ q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort }).filter(([, v]) => v)) as Record<string, string>)}`);
+  const parametresFiltre = $derived(new URLSearchParams(Object.fromEntries(Object.entries({ q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort }).filter(([, v]) => v)) as Record<string, string>).toString());
+  const exportFiltre = $derived(`/admin/factures/export.csv?${parametresFiltre}`);
+  const zipFiltre = $derived(`/admin/factures/export.zip?${parametresFiltre}`);
 
   // ── Sélection : cases à cocher, actions groupées ──
   let coches = $state(new SvelteSet<string>());
   const toutes = $derived(data.invoices.length > 0 && data.invoices.every((f: any) => coches.has(f.id)));
   function cocherTout(oui: boolean) { if (oui) for (const f of data.invoices) coches.add(f.id); else coches.clear(); }
   const selection = $derived(data.invoices.filter((f: any) => coches.has(f.id)));
+  const idsSelection = $derived(selection.map((f: any) => f.id).join(','));
   let stats = $state(false);
   /** Les chiffres de la sélection, lus sur les lignes affichées (avoirs en négatif, annulées hors compte). */
   const chiffres = $derived.by(() => {
@@ -99,14 +102,18 @@
   <Button type="button" variant="outline" class="h-10" onclick={ouvrir}><Funnel size={16} /> Trier &amp; filtrer{#if filtresActifs.length}<span class="ml-1 rounded-full bg-foreground px-1.5 text-[10px] text-background">{filtresActifs.length}</span>{/if}</Button>
   {#each filtresActifs as f (f)}<span class="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">{f}</span>{/each}
   {#if filtresActifs.length}<button type="button" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onclick={reinitialiser}><X size={12} /> Effacer</button>{/if}
-  <a href={exportFiltre} class="ml-auto inline-flex h-10 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted" title="Export CSV de tout ce filtre"><Download size={15} /> CSV</a>
+  <div class="ml-auto flex gap-2">
+    <a href={exportFiltre} class="inline-flex h-10 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted" title="Export CSV de tout ce filtre"><Download size={15} /> CSV</a>
+    <a href={zipFiltre} class="inline-flex h-10 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted" title="Les PDF de tout ce filtre, en archive ZIP, avec le CSV (500 documents au plus)"><FileZip size={15} /> ZIP des PDF</a>
+  </div>
 </div>
 
 <!-- Barre d'actions groupées, dès qu'une case est cochée -->
 {#if selection.length}
   <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-foreground/20 bg-muted/40 px-3 py-2 text-sm">
     <span class="font-medium">{selection.length} document{selection.length > 1 ? 's' : ''} coché{selection.length > 1 ? 's' : ''}</span>
-    <a href="/admin/factures/export.csv?ids={selection.map((f: any) => f.id).join(',')}" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted"><Download size={14} /> Exporter en CSV</a>
+    <a href="/admin/factures/export.csv?ids={idsSelection}" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted"><Download size={14} /> CSV</a>
+    <a href="/admin/factures/export.zip?ids={idsSelection}" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted"><FileZip size={14} /> ZIP des PDF</a>
     <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted" onclick={() => (stats = true)}><ChartBar size={14} /> Chiffres de la sélection</button>
     <button type="button" class="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => coches.clear()}><X size={12} /> Tout décocher</button>
   </div>
@@ -210,7 +217,8 @@
         </tbody></table>
       {/if}
       <div class="mt-4 flex justify-end gap-2">
-        <a href="/admin/factures/export.csv?ids={selection.map((f: any) => f.id).join(',')}" class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted"><Download size={14} /> Exporter ces documents</a>
+        <a href="/admin/factures/export.csv?ids={idsSelection}" class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted"><Download size={14} /> CSV</a>
+        <a href="/admin/factures/export.zip?ids={idsSelection}" class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted"><FileZip size={14} /> ZIP des PDF</a>
         <Button type="button" variant="outline" onclick={() => (stats = false)}>Fermer</Button>
       </div>
     </div>
