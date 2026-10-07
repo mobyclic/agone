@@ -418,6 +418,8 @@ export async function getInvoiceIdForOrder(orderId: string): Promise<string | nu
 
 export interface FiltreFactures {
   q?: string; kind?: string; status?: string; from?: string; to?: string;
+  /** Un client professionnel, ou un compte particulier. */
+  clientId?: string; customerId?: string;
   sort?: 'date_desc' | 'date_asc' | 'total_desc' | 'total_asc' | 'ref' | 'client';
   limit?: number; offset?: number;
   /** Une sélection explicite (actions groupées) : prime sur le reste du filtre. */
@@ -436,6 +438,8 @@ function whereFactures(opts: FiltreFactures) {
   // « À encaisser » : les factures (pas les avoirs) qui ne sont pas soldées.
   if (opts.status === 'due') where.push("kind = 'invoice' AND status IN ['unpaid','partial']");
   else if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  if (opts.clientId) { where.push('client = $client'); vars.client = recId('client', opts.clientId); }
+  if (opts.customerId) { where.push('customer = $customer'); vars.customer = recId('user', opts.customerId); }
   if (opts.from) { where.push('issued_at >= $from'); vars.from = new Date(`${opts.from}T00:00:00Z`); }
   if (opts.to) { where.push('issued_at <= $to'); vars.to = new Date(`${opts.to}T23:59:59Z`); }
   if (opts.q && opts.q.trim()) {

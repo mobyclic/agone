@@ -30,7 +30,8 @@
   let timer: ReturnType<typeof setTimeout>;
   function nav(params: Record<string, string | number | undefined>) {
     const merged: Record<string, string | number | undefined> = {
-      q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort, limit: data.limit, page: data.page, ...params
+      q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort, limit: data.limit, page: data.page,
+      client: data.clientFiltre?.type === 'pro' ? data.clientFiltre.id : undefined, customer: data.clientFiltre?.type === 'user' ? data.clientFiltre.id : undefined, ...params
     };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
@@ -45,16 +46,45 @@
   // ── Fenêtre « Trier & filtrer » ──
   let fenetre = $state(false);
   let fKind = $state(''), fStatus = $state(''), fFrom = $state(''), fTo = $state(''), fSort = $state('date_desc'), fLimit = $state(50);
-  function ouvrir() { fKind = data.kind ?? ''; fStatus = data.status ?? ''; fFrom = data.from ?? ''; fTo = data.to ?? ''; fSort = data.sort ?? 'date_desc'; fLimit = data.limit; fenetre = true; }
-  function appliquer() { fenetre = false; nav({ kind: fKind || undefined, status: fStatus || undefined, from: fFrom || undefined, to: fTo || undefined, sort: fSort, limit: fLimit, page: 1 }); }
-  function reinitialiser() { fenetre = false; nav({ kind: undefined, status: undefined, from: undefined, to: undefined, sort: 'date_desc', limit: 50, page: 1 }); }
+  type Choix = { type: 'pro' | 'user'; id: string; label: string; detail?: string };
+  let fClient = $state<Choix | null>(null);
+  let cq = $state('');
+  let chits = $state<Choix[]>([]);
+  let ctimer: ReturnType<typeof setTimeout>;
+  function csearch() {
+    clearTimeout(ctimer);
+    const t = cq.trim();
+    if (t.length < 2) { chits = []; return; }
+    ctimer = setTimeout(async () => { const r = await fetch(`/admin/api/clients?q=${encodeURIComponent(t)}`); chits = r.ok ? (await r.json()).results : []; }, 200);
+  }
+  function ouvrir() {
+    fKind = data.kind ?? ''; fStatus = data.status ?? ''; fFrom = data.from ?? ''; fTo = data.to ?? ''; fSort = data.sort ?? 'date_desc'; fLimit = data.limit;
+    fClient = data.clientFiltre ? { ...data.clientFiltre } : null; cq = ''; chits = []; fenetre = true;
+  }
+  function appliquer() {
+    fenetre = false;
+    nav({ kind: fKind || undefined, status: fStatus || undefined, from: fFrom || undefined, to: fTo || undefined, sort: fSort, limit: fLimit, page: 1,
+      client: fClient?.type === 'pro' ? fClient.id : undefined, customer: fClient?.type === 'user' ? fClient.id : undefined });
+  }
+  function reinitialiser() { fenetre = false; nav({ kind: undefined, status: undefined, from: undefined, to: undefined, sort: 'date_desc', limit: 50, page: 1, client: undefined, customer: undefined }); }
+  /** Raccourcis de période : ils remplissent Du / Au, qu'on peut encore retoucher. */
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const RACCOURCIS: { label: string; de: () => [string, string] }[] = [
+    { label: 'J-30', de: () => { const n = new Date(); return [iso(new Date(n.getTime() - 30 * 86400000)), iso(n)]; } },
+    { label: 'Ce mois', de: () => { const n = new Date(); return [iso(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 1))), iso(n)]; } },
+    { label: 'M-1', de: () => { const n = new Date(); const a = n.getUTCFullYear(), m = n.getUTCMonth(); return [iso(new Date(Date.UTC(a, m - 1, 1))), iso(new Date(Date.UTC(a, m, 0)))]; } },
+    { label: 'Ce trimestre', de: () => { const n = new Date(); const t = Math.floor(n.getUTCMonth() / 3) * 3; return [iso(new Date(Date.UTC(n.getUTCFullYear(), t, 1))), iso(n)]; } },
+    { label: 'Cette année', de: () => { const n = new Date(); return [`${n.getUTCFullYear()}-01-01`, iso(n)]; } },
+    { label: 'Année dernière', de: () => { const a = new Date().getUTCFullYear() - 1; return [`${a}-01-01`, `${a}-12-31`]; } }
+  ];
   const filtresActifs = $derived([
+    data.clientFiltre ? data.clientFiltre.label : '',
     data.kind ? (data.kind === 'credit_note' ? 'Avoirs' : 'Factures') : '',
     data.status ? ETATS.find((e) => e.s === data.status)?.label ?? data.status : '',
     data.from || data.to ? `${data.from ? `du ${dateFr(data.from)}` : ''} ${data.to ? `au ${dateFr(data.to)}` : ''}`.trim() : '',
     data.sort && data.sort !== 'date_desc' ? TRIS.find((t) => t.v === data.sort)?.label ?? '' : ''
   ].filter(Boolean));
-  const parametresFiltre = $derived(new URLSearchParams(Object.fromEntries(Object.entries({ q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort }).filter(([, v]) => v)) as Record<string, string>).toString());
+  const parametresFiltre = $derived(new URLSearchParams(Object.fromEntries(Object.entries({ q, kind: data.kind, status: data.status, from: data.from, to: data.to, sort: data.sort, client: data.clientFiltre?.type === 'pro' ? data.clientFiltre.id : undefined, customer: data.clientFiltre?.type === 'user' ? data.clientFiltre.id : undefined }).filter(([, v]) => v)) as Record<string, string>).toString());
   const exportFiltre = $derived(`/admin/factures/export.csv?${parametresFiltre}`);
   const zipFiltre = $derived(`/admin/factures/export.zip?${parametresFiltre}`);
 
@@ -167,6 +197,34 @@
     <form class="relative z-10 w-full max-w-md space-y-4 rounded-lg border border-border bg-background p-6 shadow-2xl" onsubmit={(e) => { e.preventDefault(); appliquer(); }}>
       <button type="button" onclick={() => (fenetre = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
       <h3 class="text-lg font-bold">Trier &amp; filtrer</h3>
+      <!-- Client : professionnel ou particulier, par recherche -->
+      <div class="text-sm font-medium">Client
+        {#if fClient}
+          <div class="mt-1 flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-normal">
+            <span><span class="font-medium">{fClient.label}</span>{#if fClient.detail}<span class="ml-2 text-xs text-muted-foreground">{fClient.detail}</span>{/if}</span>
+            <button type="button" class="text-muted-foreground hover:text-foreground" onclick={() => (fClient = null)} aria-label="Retirer"><X size={14} /></button>
+          </div>
+        {:else}
+          <div class="relative mt-1">
+            <MagnifyingGlass size={14} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input bind:value={cq} oninput={csearch} placeholder="Professionnel ou particulier…" autocomplete="off" class="h-10 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm font-normal outline-none focus:border-primary" />
+            {#if chits.length}
+              <ul class="absolute z-10 mt-1 max-h-56 w-full divide-y divide-border overflow-auto rounded-md border border-border bg-background shadow-lg">
+                {#each chits as c (c.type + c.id)}
+                  <li><button type="button" class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-normal hover:bg-muted/40" onclick={() => { fClient = c; cq = ''; chits = []; }}><span class="font-medium">{c.label}</span>{#if c.detail}<span class="text-xs text-muted-foreground">{c.detail}</span>{/if}</button></li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        {/if}
+      </div>
+      <!-- Période : raccourcis, puis dates libres -->
+      <div class="flex flex-wrap gap-1.5">
+        {#each RACCOURCIS as r (r.label)}
+          <button type="button" class="rounded-full border border-border px-2.5 py-1 text-xs uppercase tracking-wide text-muted-foreground hover:border-foreground hover:text-foreground" onclick={() => { [fFrom, fTo] = r.de(); }}>{r.label}</button>
+        {/each}
+        {#if fFrom || fTo}<button type="button" class="px-2 py-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => { fFrom = ''; fTo = ''; }}>toute période</button>{/if}
+      </div>
       <div class="grid grid-cols-2 gap-3">
         <label class="text-sm font-medium">Type
           <select bind:value={fKind} class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"><option value="">Tout</option><option value="invoice">Factures</option><option value="credit_note">Avoirs</option></select>

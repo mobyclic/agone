@@ -18,6 +18,7 @@ export function filtreDepuisUrl(p: URLSearchParams): FiltreFactures {
   const ids = (p.get('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   return {
     ids: ids.length ? ids : undefined, q: p.get('q') ?? undefined, kind: p.get('kind') ?? undefined, status: p.get('status') ?? undefined,
+    clientId: p.get('client') ?? undefined, customerId: p.get('customer') ?? undefined,
     from: p.get('from') ?? undefined, to: p.get('to') ?? undefined, sort: (p.get('sort') as FiltreFactures['sort']) || 'date_desc'
   };
 }
