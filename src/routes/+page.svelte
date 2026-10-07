@@ -8,7 +8,7 @@
   let { data } = $props();
   const article = $derived(data.feature ?? data.articles[0]);
   const lede = $derived(article?.summary ?? article?.excerpt);
-  const secondary = $derived((data.articles ?? []).filter((a) => a.slug !== article?.slug).slice(0, 3));
+  const secondary = $derived((data.articles ?? []).filter((a) => a.slug !== article?.slug).slice(0, 4));
   const books = $derived(data.recent.slice(0, 6));
   const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 </script>
@@ -51,14 +51,14 @@
         {/if}
 
         {#if lede}
-          <p class="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground/75">{lede}</p>
+          <p class="mt-1.5 text-sm leading-relaxed text-foreground/75">{lede}</p>
         {/if}
 
         <a href="/article/{article.slug}" class="link mt-3 inline-flex w-fit items-center gap-2 font-display text-xs font-semibold uppercase tracking-wider">
           Lire l’article <span aria-hidden="true">→</span>
         </a>
 
-        <!-- 3 articles récents (thème · date, titre, auteur) -->
+        <!-- 4 articles récents (thème · date, titre, auteur) -->
         {#if secondary.length}
           <div class="mt-8 divide-y divide-border border-t-2 border-foreground">
             {#each secondary as a (a.slug)}
