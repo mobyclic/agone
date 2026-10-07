@@ -15,6 +15,7 @@ export function lienCible(type?: string, id?: string, details?: any): string | n
     case 'rights_deal': return `/admin/droits/cessions/${id}`;
     case 'article': return `/admin/articles/${id}`;
     case 'user': return `/admin/utilisateurs/${id}`;
+    case 'client': return `/admin/clients/pro/${id}`;
     default: return null;
   }
 }

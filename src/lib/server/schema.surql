@@ -800,6 +800,33 @@ DEFINE INDEX OVERWRITE idx_nl_token  ON newsletter_subscriber FIELDS token;
 DEFINE INDEX OVERWRITE idx_nl_status ON newsletter_subscriber FIELDS status;
 
 -- ============================================================================
+-- CLIENTS PROFESSIONNELS — personnes morales qu'on facture (libraires, écoles,
+-- associations, collectivités, auteurs achetant des exemplaires…). Les
+-- particuliers sont des comptes `user` ; un professionnel peut être relié au
+-- compte de son contact.
+-- ============================================================================
+DEFINE TABLE OVERWRITE client SCHEMAFULL;
+DEFINE FIELD OVERWRITE name         ON client TYPE string;                 -- raison sociale
+DEFINE FIELD OVERWRITE kind         ON client TYPE string
+  ASSERT $value IN ['librairie','entreprise','association','collectivite','ecole','auteur','autre'] DEFAULT 'autre';
+DEFINE FIELD OVERWRITE siret        ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE vat_number   ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE contact_name ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE email        ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE phone        ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE address_1    ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE address_2    ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE postcode     ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE city         ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE country      ON client TYPE string DEFAULT 'France' VALUE $value ?? 'France';
+DEFINE FIELD OVERWRITE notes        ON client TYPE option<string>;
+DEFINE FIELD OVERWRITE user         ON client TYPE option<record<user>>;   -- compte du contact, s'il en a un
+DEFINE FIELD OVERWRITE created_at   ON client TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at   ON client TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_client_name ON client FIELDS name;
+DEFINE INDEX OVERWRITE ft_client_name  ON client FIELDS name FULLTEXT ANALYZER ana_text BM25;
+
+-- ============================================================================
 -- FACTURATION — factures & avoirs. Numérotation LÉGALE continue par année
 -- (ref « 2026-0001 »). Une facture est IMMUABLE : lignes + client figés (snapshot).
 -- Prix TTC (TVA livres 5,5 %). Générée auto à la commande payée, ou manuellement.
@@ -812,6 +839,7 @@ DEFINE FIELD OVERWRITE kind        ON invoice TYPE string
   ASSERT $value IN ['invoice','credit_note'] DEFAULT 'invoice';
 DEFINE FIELD OVERWRITE order       ON invoice TYPE option<record<order>>;
 DEFINE FIELD OVERWRITE customer    ON invoice TYPE option<record<user>>;
+DEFINE FIELD OVERWRITE client      ON invoice TYPE option<record<client>>;  -- client professionnel facturé
 DEFINE FIELD OVERWRITE bill_to     ON invoice TYPE object FLEXIBLE;     -- snapshot client { name, email, address… }
 DEFINE FIELD OVERWRITE lines       ON invoice TYPE array;                -- [{ description, qty, unit_price_ttc, line_total_ttc }]
 DEFINE FIELD OVERWRITE lines[*]     ON invoice TYPE object FLEXIBLE;
@@ -825,6 +853,7 @@ DEFINE FIELD OVERWRITE created_at  ON invoice TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_invoice_ref    ON invoice FIELDS ref UNIQUE;
 DEFINE INDEX OVERWRITE idx_invoice_order  ON invoice FIELDS order;
 DEFINE INDEX OVERWRITE idx_invoice_issued ON invoice FIELDS issued_at;
+DEFINE INDEX OVERWRITE idx_invoice_client ON invoice FIELDS client;
 
 -- ————————————————————— Codes promo —————————————————————
 DEFINE TABLE OVERWRITE promo_code SCHEMAFULL;

@@ -1,6 +1,6 @@
 <script lang="ts" module>
   import {
-    SquaresFour, BookOpen, Books, Users, User, Receipt, ShoppingBag, ShoppingCart,
+    SquaresFour, BookOpen, Books, Users, User, UserGear, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
     ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent, ClockCounterClockwise, FileText
@@ -8,7 +8,7 @@
 
   // Registre nom → composant (icônes utilisées dans la navigation & les listes).
   const MAP: Record<string, any> = {
-    SquaresFour, BookOpen, Books, Users, User, Receipt, ShoppingBag, ShoppingCart,
+    SquaresFour, BookOpen, Books, Users, User, UserGear, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
     ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent

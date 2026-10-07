@@ -54,7 +54,7 @@ export const ADMIN_NAV: NavSection[] = [
     title: 'Boutique',
     items: [
       { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt', adminOnly: true },
-      { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'Users', adminOnly: true },
+      { label: 'Clients', href: '/admin/clients', icon: 'Users', adminOnly: true },
       { label: 'Codes promo', href: '/admin/promos', icon: 'Percent', adminOnly: true },
       { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
       { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true }
@@ -77,6 +77,7 @@ export const ADMIN_NAV: NavSection[] = [
     items: [
       { label: 'Statistiques', href: '/admin/statistiques', icon: 'ChartBar', adminOnly: true },
       { label: 'Newsletter', href: '/admin/newsletter', icon: 'EnvelopeSimple' },
+      { label: 'Utilisateurs', href: '/admin/utilisateurs', icon: 'UserGear', adminOnly: true },
       { label: 'Journal', href: '/admin/journal', icon: 'ClockCounterClockwise', adminOnly: true },
       { label: 'Paramètres', href: '/admin/parametres', icon: 'GearSix', adminOnly: true }
     ]
