@@ -148,11 +148,11 @@ export async function searchBooksForPicker(q: string): Promise<{ id: string; tit
 /** Recherche livres pour la commande rapide : id + titre + prix + ISBN (par titre ou ISBN). */
 export async function searchBooksForOrder(
   qRaw: string
-): Promise<{ id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string }[]> {
+): Promise<{ id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string; vat_rate?: number }[]> {
   const q = (qRaw ?? '').trim().toLowerCase();
   if (q.length < 2) return [];
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, title, price_paper, price_ebook, isbn_paper FROM book
+    `SELECT meta::id(id) AS id, title, price_paper, price_ebook, isbn_paper, vat_rate FROM book
        WHERE string::lowercase(title) CONTAINS $q OR (isbn_paper ?? '') CONTAINS $q
        ORDER BY title ASC LIMIT 12`,
     { q }
@@ -162,7 +162,8 @@ export async function searchBooksForOrder(
     title: r.title,
     price_paper: r.price_paper ?? undefined,
     price_ebook: r.price_ebook ?? undefined,
-    isbn_paper: r.isbn_paper ?? undefined
+    isbn_paper: r.isbn_paper ?? undefined,
+    vat_rate: r.vat_rate ?? 5.5
   }));
 }
 
@@ -545,6 +546,8 @@ export interface BookInput {
   title_original?: string; title_alt?: string; language_original?: string;
   status: string; isbn_paper?: string; isbn_ebook?: string;
   price_paper?: number; price_ebook?: number; subscription_price?: number; subscription_end?: string;
+  /** TVA du titre (%) : 5,5 pour un livre, 20 pour ce qui n'en est pas un (carte, affiche…). */
+  vat_rate?: number;
   published_at?: string; page_count?: number; width_cm?: number; height_cm?: number; weight_grams?: number;
   stock_qty?: number; featured?: boolean; keywords?: string[];
   /** Nouveau slug (édition) : l'ancien est gardé dans `old_slugs` pour la redirection. */
@@ -574,6 +577,7 @@ export async function upsertBook(id: string | null, d: BookInput): Promise<strin
     language_original: d.language_original, status: d.status || 'draft',
     isbn_paper: d.isbn_paper, isbn_ebook: d.isbn_ebook,
     price_paper: d.price_paper, price_ebook: d.price_ebook, subscription_price: d.subscription_price,
+    vat_rate: d.vat_rate ?? 5.5,
     subscription_end: d.subscription_end ? new Date(d.subscription_end) : undefined,
     published_at: d.published_at ? new Date(d.published_at) : undefined,
     page_count: d.page_count, width_cm: d.width_cm, height_cm: d.height_cm, weight_grams: d.weight_grams,

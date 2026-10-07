@@ -844,6 +844,10 @@ DEFINE FIELD OVERWRITE bill_to     ON invoice TYPE object FLEXIBLE;     -- snaps
 DEFINE FIELD OVERWRITE lines       ON invoice TYPE array;                -- [{ description, qty, unit_price_ttc, line_total_ttc }]
 DEFINE FIELD OVERWRITE lines[*]     ON invoice TYPE object FLEXIBLE;
 DEFINE FIELD OVERWRITE vat_rate    ON invoice TYPE number DEFAULT 5.5;
+-- Prix saisis HT (professionnels) ou TTC (particuliers) : décide des colonnes du PDF.
+DEFINE FIELD OVERWRITE price_mode  ON invoice TYPE string DEFAULT 'ttc' VALUE $value ?? 'ttc'
+  ASSERT $value IN ['ttc','ht'];
+DEFINE FIELD OVERWRITE intro       ON invoice TYPE option<string>;        -- texte avant le tableau (objet, contrat…)
 DEFINE FIELD OVERWRITE subtotal_ht ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE tax_total   ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE total_ttc   ON invoice TYPE number DEFAULT 0;

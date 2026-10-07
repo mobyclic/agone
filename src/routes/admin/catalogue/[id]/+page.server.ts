@@ -66,6 +66,7 @@ export const actions: Actions = {
       isbn_ebook: S('isbn_ebook') || undefined,
       price_paper: N('price_paper'),
       price_ebook: N('price_ebook'),
+      vat_rate: N('vat_rate'),
       subscription_price: N('subscription_price'),
       subscription_end: S('subscription_end') || undefined,
       published_at: S('published_at') || undefined,

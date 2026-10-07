@@ -190,6 +190,11 @@
         <label class="{label} col-span-2 sm:col-span-1">ISBN ebook <input name="isbn_ebook" value={b?.isbn_ebook ?? ''} class={input} /></label>
         <label class={label}>Prix papier (€) <input name="price_paper" type="number" step="0.01" value={b?.price_paper ?? ''} class={input} /></label>
         <label class={label}>Prix ebook (€) <input name="price_ebook" type="number" step="0.01" value={b?.price_ebook ?? ''} class={input} /></label>
+        <label class={label} title="5,5 % pour un livre ; 20 % pour ce qui n'en est pas un (carte, affiche, objet).">TVA
+          <select name="vat_rate" class={input}>
+            {#each [5.5, 20, 10, 2.1, 0] as t (t)}<option value={t} selected={(b?.vat_rate ?? 5.5) === t}>{String(t).replace('.', ',')} %</option>{/each}
+          </select>
+        </label>
         <label class={label}>Prix souscription (€) <input name="subscription_price" type="number" step="0.01" value={b?.subscription_price ?? ''} class={input} /></label>
         <label class={label}>Souscription jusqu'au <input name="subscription_end" type="date" value={subEndDate} class={input} /></label>
         <label class={label}>Parution <input name="published_at" type="date" value={pubDate} class={input} /></label>

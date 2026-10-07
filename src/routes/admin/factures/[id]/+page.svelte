@@ -37,6 +37,8 @@
     <p class="text-sm text-muted-foreground">
       Émis le {dateFr(f.issued_at)}
       {#if f.order_number}· <a href="/admin/commandes/{f.order_number}" class="text-link hover:underline">Commande #{f.order_number}</a>{/if}
+      {#if f.client_id}· <a href="/admin/clients/pro/{f.client_id}" class="text-link hover:underline">{f.client_name}</a>{:else if f.customer_id}· <a href="/admin/utilisateurs/{f.customer_id}" class="text-link hover:underline">compte client</a>{/if}
+      {#if f.price_mode === 'ht'}· prix HT{/if}
     </p>
   </div>
   <div class="flex gap-2">
@@ -56,16 +58,16 @@
     <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full text-sm">
         <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-          <tr><th class="px-3 py-2 font-medium">Désignation</th><th class="px-3 py-2 text-center font-medium">Qté</th><th class="px-3 py-2 text-right font-medium">P.U. TTC</th><th class="px-3 py-2 text-center font-medium">TVA</th><th class="px-3 py-2 text-right font-medium">Total TTC</th></tr>
+          <tr><th class="px-3 py-2 font-medium">Désignation</th><th class="px-3 py-2 text-center font-medium">Qté</th><th class="px-3 py-2 text-right font-medium">P.U. {f.price_mode === 'ht' ? 'HT' : 'TTC'}</th><th class="px-3 py-2 text-center font-medium">TVA</th><th class="px-3 py-2 text-right font-medium">{f.price_mode === 'ht' ? 'Montant HT' : 'Total TTC'}</th></tr>
         </thead>
         <tbody class="divide-y divide-border">
           {#each f.lines ?? [] as l (l.description + l.unit_price_ttc)}
             <tr>
               <td class="px-3 py-2">{l.description}</td>
               <td class="px-3 py-2 text-center">{l.qty}</td>
-              <td class="px-3 py-2 text-right tabular-nums">{eur(l.unit_price_ttc)}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{eur(f.price_mode === 'ht' ? (l.unit_price_ht ?? l.unit_price_ttc / (1 + (l.vat_rate ?? f.vat_rate) / 100)) : l.unit_price_ttc)}</td>
               <td class="px-3 py-2 text-center text-muted-foreground">{String(l.vat_rate ?? f.vat_rate).replace('.', ',')} %</td>
-              <td class="px-3 py-2 text-right tabular-nums">{eur(l.line_total_ttc)}</td>
+              <td class="px-3 py-2 text-right tabular-nums">{eur(f.price_mode === 'ht' ? Math.round(l.qty * (l.unit_price_ht ?? l.unit_price_ttc / (1 + (l.vat_rate ?? f.vat_rate) / 100)) * 100) / 100 : l.line_total_ttc)}</td>
             </tr>
           {/each}
         </tbody>
@@ -79,6 +81,7 @@
       </table>
     </div>
 
+    {#if f.intro}<p class="rounded-md bg-muted/40 px-3 py-2 text-sm">{f.intro}</p>{/if}
     {#if f.notes}<p class="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{f.notes}</p>{/if}
 
     {#if !isCredit}

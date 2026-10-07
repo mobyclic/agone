@@ -8,6 +8,7 @@ export function lienCible(type?: string, id?: string, details?: any): string | n
   if (!type || !id) return null;
   switch (type) {
     case 'order': return details?.number ? `/admin/commandes/${details.number}` : null;
+    case 'invoice': return `/admin/factures/${id}`;
     case 'book': return details?.slug ? `/admin/catalogue/${details.slug}` : null;
     case 'author': return details?.slug ? `/admin/auteurs/${details.slug}` : null;
     case 'royalty_contract': return details?.book_id ? `/admin/droits/contrats/${details.book_id}` : null;

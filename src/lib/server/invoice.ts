@@ -78,35 +78,51 @@ export interface InvoiceLine {
   unit_price_ttc: number;
   line_total_ttc: number;
   vat_rate: number; // TVA de la ligne (%)
+  /** Prix unitaire HT (toujours renseigné ; saisi tel quel en mode HT). */
+  unit_price_ht?: number;
+  /** Titre du catalogue, s'il y en a un derrière la ligne. */
+  book?: string;
+  isbn?: string;
 }
 
-/** Totaux d'une facture multi-taux (prix TTC → HT + TVA, agrégés). */
-function computeTotals(lines: InvoiceLine[]) {
+/**
+ * Totaux d'une facture multi-taux. En mode TTC, les montants partent du prix TTC
+ * (HT = TTC / (1 + taux)) ; en mode HT, du prix HT saisi (TVA = HT × taux), pour
+ * que 500 × 1,50 € fassent bien 750,00 € HT et non le TTC arrondi ramené en HT.
+ */
+function computeTotals(lines: InvoiceLine[], mode: 'ttc' | 'ht' = 'ttc') {
   let total_ttc = 0;
   let subtotal_ht = 0;
   for (const l of lines) {
-    const ttc = l.qty * l.unit_price_ttc;
-    total_ttc += ttc;
-    subtotal_ht += ttc / (1 + (l.vat_rate ?? 0) / 100);
+    const rate = l.vat_rate ?? 0;
+    if (mode === 'ht' && l.unit_price_ht != null) {
+      const ht = l.qty * l.unit_price_ht;
+      subtotal_ht += ht;
+      total_ttc += ht * (1 + rate / 100);
+    } else {
+      const ttc = l.qty * l.unit_price_ttc;
+      total_ttc += ttc;
+      subtotal_ht += ttc / (1 + rate / 100);
+    }
   }
   total_ttc = r2(total_ttc);
   subtotal_ht = r2(subtotal_ht);
   return { total_ttc, subtotal_ht, tax_total: r2(total_ttc - subtotal_ht) };
 }
 
-/** Ventilation de la TVA par taux (pour l'affichage et le PDF). */
-export function vatBreakdown(lines: InvoiceLine[]): { rate: number; base_ht: number; tax: number }[] {
-  const byRate = new Map<number, number>();
+/** Ventilation de la TVA par taux (pour l'affichage et le PDF), dans le sens du document. */
+export function vatBreakdown(lines: InvoiceLine[], mode: 'ttc' | 'ht' = 'ttc'): { rate: number; base_ht: number; tax: number }[] {
+  const byRate = new Map<number, { ht: number; ttc: number }>();
   for (const l of lines) {
     const rate = l.vat_rate ?? 0;
-    byRate.set(rate, (byRate.get(rate) ?? 0) + l.qty * l.unit_price_ttc);
+    const e = byRate.get(rate) ?? { ht: 0, ttc: 0 };
+    if (mode === 'ht' && l.unit_price_ht != null) { const ht = l.qty * l.unit_price_ht; e.ht += ht; e.ttc += ht * (1 + rate / 100); }
+    else { const ttc = l.qty * l.unit_price_ttc; e.ttc += ttc; e.ht += ttc / (1 + rate / 100); }
+    byRate.set(rate, e);
   }
   return [...byRate.entries()]
     .sort((a, b) => b[0] - a[0])
-    .map(([rate, ttc]) => {
-      const base_ht = r2(ttc / (1 + rate / 100));
-      return { rate, base_ht, tax: r2(ttc - base_ht) };
-    });
+    .map(([rate, e]) => ({ rate, base_ht: r2(e.ht), tax: r2(r2(e.ttc) - r2(e.ht)) }));
 }
 
 /* ————————————————————— Snapshot client ————————————————————— */
@@ -181,33 +197,48 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
 export interface ManualInvoiceInput {
   kind: 'invoice' | 'credit_note';
   customerId?: string;
-  bill_to: { name: string; email?: string; address_1?: string; postcode?: string; city?: string; country?: string };
-  lines: { description: string; qty: number; unit_price_ttc: number; vat_rate?: number }[];
+  /** Client professionnel facturé (personne morale). */
+  clientId?: string;
+  bill_to: { name: string; email?: string; address_1?: string; postcode?: string; city?: string; country?: string; vat_number?: string; siret?: string; contact_name?: string };
+  /** Les prix des lignes sont saisis HT ou TTC ; le document s'imprime dans le même sens. */
+  price_mode?: 'ttc' | 'ht';
+  lines: { description: string; qty: number; unit_price: number; vat_rate?: number; book?: string; isbn?: string }[];
   vat_rate?: number; // taux de base (défaut des lignes sans taux)
+  intro?: string;
   notes?: string;
+  issued_at?: Date;
 }
 
 export async function createManualInvoice(input: ManualInvoiceInput): Promise<string> {
   const base = input.vat_rate != null ? input.vat_rate : (await getCompany()).vat_rate;
+  const ht = input.price_mode === 'ht';
   const lines: InvoiceLine[] = input.lines
     .filter((l) => l.description.trim() && l.qty > 0)
-    .map((l) => ({
-      description: l.description.trim(),
-      qty: l.qty,
-      unit_price_ttc: r2(l.unit_price_ttc),
-      line_total_ttc: r2(l.qty * l.unit_price_ttc),
-      vat_rate: l.vat_rate != null ? l.vat_rate : base
-    }));
-  const totals = computeTotals(lines);
+    .map((l) => {
+      const vat = l.vat_rate != null ? l.vat_rate : base;
+      // En mode HT le prix saisi est HT et le TTC en découle ; en mode TTC, l'inverse.
+      const unit_ht = ht ? l.unit_price : l.unit_price / (1 + vat / 100);
+      const unit_ttc = ht ? l.unit_price * (1 + vat / 100) : l.unit_price;
+      return {
+        description: l.description.trim(), qty: l.qty, vat_rate: vat,
+        unit_price_ht: r2(unit_ht), unit_price_ttc: r2(unit_ttc),
+        // Le total de ligne se calcule sur le prix saisi, pour que le PDF tombe juste dans son sens.
+        line_total_ttc: ht ? r2(l.qty * unit_ht * (1 + vat / 100)) : r2(l.qty * l.unit_price),
+        book: l.book || undefined, isbn: l.isbn || undefined
+      };
+    });
+  const totals = computeTotals(lines, ht ? 'ht' : 'ttc');
   const vat_rate = base;
-  const year = new Date().getFullYear();
+  const year = (input.issued_at ?? new Date()).getFullYear();
   const { number, ref } = await nextInvoiceRef(year);
   const rows = await query<any>(`CREATE invoice CONTENT $c`, {
     c: {
       year, number, ref, kind: input.kind,
       customer: input.customerId ? recId('user', input.customerId) : undefined,
-      bill_to: input.bill_to, lines, vat_rate, ...totals,
-      notes: input.notes || undefined
+      client: input.clientId ? recId('client', input.clientId) : undefined,
+      bill_to: input.bill_to, lines, vat_rate, ...totals, price_mode: ht ? 'ht' : 'ttc',
+      intro: input.intro || undefined, notes: input.notes || undefined,
+      issued_at: input.issued_at ?? undefined
     }
   });
   return String(rows[0].id).replace(/^invoice:/, '');
@@ -216,8 +247,10 @@ export async function createManualInvoice(input: ManualInvoiceInput): Promise<st
 /* ————————————————————— Lecture ————————————————————— */
 
 const INV_FIELDS = `
-  meta::id(id) AS id, ref, kind, year, number, bill_to, lines, vat_rate,
-  subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number
+  meta::id(id) AS id, ref, kind, year, number, bill_to, lines, vat_rate, price_mode, intro,
+  subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number,
+  IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
+  IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id
 `;
 
 export async function getInvoice(id: string) {
@@ -226,7 +259,7 @@ export async function getInvoice(id: string) {
   });
   const inv = rows[0];
   if (!inv) return null;
-  inv.vat_breakdown = vatBreakdown(inv.lines ?? []);
+  inv.vat_breakdown = vatBreakdown(inv.lines ?? [], inv.price_mode === 'ht' ? 'ht' : 'ttc');
   return inv;
 }
 
@@ -258,6 +291,19 @@ export async function listInvoices(opts: { q?: string; kind?: string; limit?: nu
 /* ————————————————————— PDF (pdf-lib) ————————————————————— */
 
 const fmtEur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+/** Coupe un paragraphe en lignes qui tiennent dans la largeur donnée. */
+function wrapText(s: string, font: any, size: number, width: number): string[] {
+  const out: string[] = [];
+  for (const para of s.split(/\r?\n/)) {
+    let ligne = '';
+    for (const mot of para.split(' ')) {
+      const essai = ligne ? `${ligne} ${mot}` : mot;
+      if (font.widthOfTextAtSize(essai, size) > width && ligne) { out.push(ligne); ligne = mot; } else ligne = essai;
+    }
+    out.push(ligne);
+  }
+  return out;
+}
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('fr-FR') : '');
 
 export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
@@ -310,35 +356,49 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   text('Facturé à', M, y, { size: 8, bold: true, color: grey }); y += 14;
   const bt = inv.bill_to ?? {};
   text(bt.name || 'Client', M, y, { size: 10, bold: true }); y += 13;
-  for (const l of [bt.address_1, [bt.postcode, bt.city].filter(Boolean).join(' '), bt.country, bt.email].filter(Boolean)) {
+  for (const l of [bt.contact_name ? `À l’attention de ${bt.contact_name}` : '', bt.address_1, [bt.postcode, bt.city].filter(Boolean).join(' '), bt.country, bt.email,
+    bt.vat_number ? `TVA ${bt.vat_number}` : '', bt.siret ? `SIRET ${bt.siret}` : ''].filter(Boolean)) {
     text(String(l), M, y, { size: 9, color: grey }); y += 12;
   }
 
-  // — Tableau des lignes —
+  // — Objet / texte d'introduction —
+  if (inv.intro) {
+    y += 16;
+    for (const l of wrapText(String(inv.intro), font, 9, W - 2 * M)) { text(l, M, y, { size: 9 }); y += 12; }
+  }
+
+  // — Tableau des lignes : en mode HT, prix unitaire HT, montant HT et taux de TVA ;
+  //   en mode TTC, prix et total TTC. —
+  const modeHT = inv.price_mode === 'ht';
   y += 18;
-  const colQty = W - M - 210;
-  const colPU = W - M - 120;
   const colTot = W - M;
+  const colTva = modeHT ? W - M - 70 : 0;
+  const colPU = modeHT ? W - M - 160 : W - M - 120;
+  const colQty = modeHT ? W - M - 240 : W - M - 210;
   text('Désignation', M, y, { size: 8, bold: true, color: grey });
   text('Qté', colQty, y, { size: 8, bold: true, color: grey, right: colQty + 30 });
-  text('P.U. TTC', colPU, y, { size: 8, bold: true, color: grey, right: colPU + 70 });
-  text('Total TTC', colTot, y, { size: 8, bold: true, color: grey, right: colTot });
+  text(modeHT ? 'P.U. HT' : 'P.U. TTC', colPU, y, { size: 8, bold: true, color: grey, right: colPU + 70 });
+  if (modeHT) text('TVA', colTva, y, { size: 8, bold: true, color: grey, right: colTva + 30 });
+  text(modeHT ? 'Montant HT' : 'Total TTC', colTot, y, { size: 8, bold: true, color: grey, right: colTot });
   y += 6; hline(y); y += 14;
 
+  const maxDesc = modeHT ? 50 : 58;
   for (const l of (inv.lines ?? []) as InvoiceLine[]) {
     let desc = l.description || '';
-    if (desc.length > 58) desc = desc.slice(0, 57) + '…';
+    if (desc.length > maxDesc) desc = desc.slice(0, maxDesc - 1) + '…';
+    const unitHt = l.unit_price_ht ?? l.unit_price_ttc / (1 + (l.vat_rate ?? 0) / 100);
     text(desc, M, y, { size: 9 });
     text(String(l.qty), colQty, y, { size: 9, right: colQty + 30 });
-    text(fmtEur(l.unit_price_ttc), colPU, y, { size: 9, right: colPU + 70 });
-    text(fmtEur(l.line_total_ttc), colTot, y, { size: 9, right: colTot });
+    text(fmtEur(modeHT ? unitHt : l.unit_price_ttc), colPU, y, { size: 9, right: colPU + 70 });
+    if (modeHT) text(`${String(l.vat_rate ?? inv.vat_rate).replace('.', ',')} %`, colTva, y, { size: 9, right: colTva + 30 });
+    text(fmtEur(modeHT ? r2(l.qty * unitHt) : l.line_total_ttc), colTot, y, { size: 9, right: colTot });
     y += 15;
   }
   y += 2; hline(y); y += 16;
 
   // — Totaux (droite), avec ventilation TVA par taux —
   const sign = isCredit ? -1 : 1;
-  const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[]);
+  const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[], inv.price_mode === 'ht' ? 'ht' : 'ttc');
   const totRows: [string, string, boolean][] = [
     ['Total HT', fmtEur(sign * inv.subtotal_ht), false],
     ...breakdown.map(
