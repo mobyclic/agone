@@ -44,7 +44,7 @@ export const actions: Actions = {
     const issued_at = jour ? heureParisVersDate(`${jour}T12:00`) ?? undefined : undefined;
 
     const id = await createManualInvoice({
-      kind: S('kind') === 'credit_note' ? 'credit_note' : 'invoice',
+      kind: S('kind') === 'credit_note' ? 'credit_note' : S('kind') === 'proforma' ? 'proforma' : 'invoice',
       customerId: S('customerId') || undefined,
       clientId: S('clientId') || undefined,
       price_mode: S('price_mode') === 'ht' ? 'ht' : 'ttc',

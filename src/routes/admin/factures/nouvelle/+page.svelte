@@ -16,7 +16,7 @@
   const euro = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
   const vatLabel = (r: number) => `${String(r).replace('.', ',')} %`;
 
-  let kind = $state<'invoice' | 'credit_note'>('invoice');
+  let kind = $state<'invoice' | 'credit_note' | 'proforma'>('invoice');
   let baseVat = $state(untrack(() => data.defaultVat));
   let mode = $state<'ht' | 'ttc'>(untrack(() => (data.pro ? 'ht' : 'ttc')));
   let issuedAt = $state(new Date().toISOString().slice(0, 10));
@@ -95,7 +95,7 @@
 </a>
 
 <form method="POST" action="?/save" use:enhance class="max-w-3xl">
-  <div class="mb-4"><h2 class="text-xl font-bold">Facture / avoir manuel</h2></div>
+  <div class="mb-4"><h2 class="text-xl font-bold">Facture, pro forma ou avoir</h2></div>
 
   <!-- Type, sens des prix, date -->
   <section class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg border border-border bg-card p-4">
@@ -103,6 +103,7 @@
       <span class="text-sm font-medium">Type</span>
       <div class="flex overflow-hidden rounded-md border border-border text-sm">
         <button type="button" class="px-3 py-1.5 {kind === 'invoice' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'invoice')}>Facture</button>
+        <button type="button" class="px-3 py-1.5 {kind === 'proforma' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'proforma')} title="Sans valeur comptable, numérotée à part ; la facture définitive naît de sa validation.">Pro forma</button>
         <button type="button" class="px-3 py-1.5 {kind === 'credit_note' ? 'bg-foreground text-background' : ''}" onclick={() => (kind = 'credit_note')}>Avoir</button>
       </div>
     </div>

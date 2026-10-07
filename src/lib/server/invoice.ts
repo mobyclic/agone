@@ -56,9 +56,13 @@ export async function getCompany(): Promise<Company> {
 
 /* ————————————————————— Numérotation ————————————————————— */
 
-/** Séquence continue par année via site_setting.counters.invoice_<année>. */
-async function nextInvoiceRef(year: number): Promise<{ number: number; ref: string }> {
-  const field = `invoice_${year}`; // année = entier maîtrisé, interpolation sûre
+/**
+ * Séquence continue par année via site_setting.counters.invoice_<année> ; les
+ * proformas ont la leur (proforma_<année>, « PRO-2026-0001 ») : elles ne
+ * consomment pas de numéro de facture.
+ */
+async function nextInvoiceRef(year: number, kind: 'invoice' | 'proforma' = 'invoice'): Promise<{ number: number; ref: string }> {
+  const field = `${kind}_${year}`; // année = entier maîtrisé, interpolation sûre
   const rows = await query<any>(
     `UPDATE site_setting SET value.${field} = (value.${field} ?? 0) + 1 WHERE key = 'counters' RETURN AFTER`
   );
@@ -67,7 +71,7 @@ async function nextInvoiceRef(year: number): Promise<{ number: number; ref: stri
     await query(`CREATE site_setting CONTENT { key: 'counters', value: { ${field}: 1 } }`);
     n = 1;
   }
-  return { number: n, ref: `${year}-${String(n).padStart(4, '0')}` };
+  return { number: n, ref: `${kind === 'proforma' ? 'PRO-' : ''}${year}-${String(n).padStart(4, '0')}` };
 }
 
 /* ————————————————————— Totaux (prix TTC → HT + TVA) ————————————————————— */
@@ -203,6 +207,22 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
   return id;
 }
 
+/** Une proforma validée (ou convertie à la main) devient une facture, numérotée dans la séquence. */
+export async function convertirProforma(id: string): Promise<string> {
+  const p = await getInvoice(id);
+  if (!p) throw new Error('Proforma introuvable');
+  if (p.kind !== 'proforma') throw new Error('Ce document n’est pas une proforma');
+  if (p.converted_to_id) return p.converted_to_id;
+  const ht = p.price_mode === 'ht';
+  const nid = await createManualInvoice({
+    kind: 'invoice', bill_to: p.bill_to, clientId: p.client_id ?? undefined, customerId: p.customer_id ?? undefined,
+    price_mode: ht ? 'ht' : 'ttc', vat_rate: p.vat_rate, intro: p.intro ?? undefined, notes: p.notes ?? undefined, fromProformaId: id,
+    lines: (p.lines ?? []).map((l: any) => ({ description: l.description, qty: l.qty, unit_price: ht ? (l.unit_price_ht ?? l.unit_price_ttc) : l.unit_price_ttc, vat_rate: l.vat_rate, book: l.book, isbn: l.isbn }))
+  });
+  await query(`UPDATE $id SET converted_to = $n, status = 'converted'`, { id: recId('invoice', id), n: recId('invoice', nid) });
+  return nid;
+}
+
 /* ————————————————————— Règlements ————————————————————— */
 
 const PAYEES = new Set(['paid', 'processing', 'sent_to_bl', 'completed']);
@@ -220,6 +240,7 @@ export async function recomputeInvoiceStatus(invoiceId: string): Promise<{ statu
   const id = recId('invoice', invoiceId);
   const inv = (await query<any>(`SELECT total_ttc, kind, status FROM ONLY $id`, { id })) as any;
   if (!inv) throw new Error('Facture introuvable');
+  if (inv.status === 'converted') return { status: 'converted', paid_total: 0 };
   const [som] = await query<any>(`SELECT math::sum(amount) AS total FROM invoice_payment WHERE invoice = $id GROUP ALL`, { id });
   const paid_total = r2(Number(som?.total ?? 0));
   const total = r2(Number(inv.total_ttc ?? 0));
@@ -252,7 +273,7 @@ export async function deletePayment(paymentId: string): Promise<void> {
 /* ————————————————————— Création manuelle (facture ou avoir) ————————————————————— */
 
 export interface ManualInvoiceInput {
-  kind: 'invoice' | 'credit_note';
+  kind: 'invoice' | 'credit_note' | 'proforma';
   customerId?: string;
   /** Client professionnel facturé (personne morale). */
   clientId?: string;
@@ -264,6 +285,8 @@ export interface ManualInvoiceInput {
   intro?: string;
   notes?: string;
   issued_at?: Date;
+  /** Facture née d'une proforma validée. */
+  fromProformaId?: string;
 }
 
 export async function createManualInvoice(input: ManualInvoiceInput): Promise<string> {
@@ -287,12 +310,13 @@ export async function createManualInvoice(input: ManualInvoiceInput): Promise<st
   const totals = computeTotals(lines, ht ? 'ht' : 'ttc');
   const vat_rate = base;
   const year = (input.issued_at ?? new Date()).getFullYear();
-  const { number, ref } = await nextInvoiceRef(year);
+  const { number, ref } = await nextInvoiceRef(year, input.kind === 'proforma' ? 'proforma' : 'invoice');
   const rows = await query<any>(`CREATE invoice CONTENT $c`, {
     c: {
       year, number, ref, kind: input.kind,
       customer: input.customerId ? recId('user', input.customerId) : undefined,
       client: input.clientId ? recId('client', input.clientId) : undefined,
+      converted_from: input.fromProformaId ? recId('invoice', input.fromProformaId) : undefined,
       bill_to: input.bill_to, lines, vat_rate, ...totals, price_mode: ht ? 'ht' : 'ttc',
       intro: input.intro || undefined, notes: input.notes || undefined,
       issued_at: input.issued_at ?? undefined
@@ -308,7 +332,10 @@ const INV_FIELDS = `
   subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number,
   IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
   IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id,
-  shipping_ht, imported_from, external_ref, document.key AS document_key, document.filename AS document_name
+  shipping_ht, imported_from, external_ref, document.key AS document_key, document.filename AS document_name,
+  sent_at, sent_to, validated_at, validation_token,
+  IF converted_to != NONE THEN meta::id(converted_to) ELSE NONE END AS converted_to_id, converted_to.ref AS converted_to_ref,
+  IF converted_from != NONE THEN meta::id(converted_from) ELSE NONE END AS converted_from_id, converted_from.ref AS converted_from_ref
 `;
 
 export async function getInvoice(id: string) {
@@ -400,6 +427,7 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
     page.drawLine({ start: { x: x1, y: H - yTop }, end: { x: x2, y: H - yTop }, thickness: 0.7, color: c });
 
   const isCredit = inv.kind === 'credit_note';
+  const isProforma = inv.kind === 'proforma';
 
   // — En-tête société (gauche) —
   let y = M + 4;
@@ -413,7 +441,7 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   if (idBits) { text(idBits, M, y, { size: 8, color: grey }); y += 12; }
 
   // — Titre + réf (droite) —
-  text(isCredit ? 'AVOIR' : 'FACTURE', W - M, M + 6, { size: 20, bold: true, right: W - M });
+  text(isCredit ? 'AVOIR' : isProforma ? 'FACTURE PRO FORMA' : 'FACTURE', W - M, M + 6, { size: isProforma ? 16 : 20, bold: true, right: W - M });
   text(`N° ${inv.ref}`, W - M, M + 26, { size: 11, bold: true, right: W - M });
   text(`Date : ${fmtDate(inv.issued_at)}`, W - M, M + 42, { size: 9, color: grey, right: W - M });
   if (inv.order_number) text(`Commande n° ${inv.order_number}`, W - M, M + 55, { size: 9, color: grey, right: W - M });
@@ -488,6 +516,7 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
     company.footer,
     [company.iban ? `IBAN ${company.iban}` : '', company.bic ? `BIC ${company.bic}` : ''].filter(Boolean).join('  ·  '),
     [company.rcs ? `RCS ${company.rcs}` : '', company.ape ? `APE ${company.ape}` : '', company.capital ? `Capital ${company.capital}` : ''].filter(Boolean).join('  ·  '),
+    isProforma ? 'Facture pro forma : document sans valeur comptable, émis pour accord. La facture définitive suit votre validation.' : '',
     isCredit ? '' : 'TVA acquittée sur les encaissements. Pas d’escompte pour paiement anticipé.'
   ].filter(Boolean) as string[];
   page.drawLine({ start: { x: M, y: fy + 8 }, end: { x: W - M, y: fy + 8 }, thickness: 0.7, color: rgb(0.85, 0.85, 0.85) });

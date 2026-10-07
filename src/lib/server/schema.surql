@@ -837,8 +837,11 @@ DEFINE TABLE OVERWRITE invoice SCHEMAFULL;
 DEFINE FIELD OVERWRITE year        ON invoice TYPE int;
 DEFINE FIELD OVERWRITE number      ON invoice TYPE int;                 -- séquence continue dans l'année
 DEFINE FIELD OVERWRITE ref         ON invoice TYPE string;              -- « 2026-0001 »
+-- 'proforma' : sans valeur comptable, numérotée à part (PRO-2026-0001) ; une fois
+-- validée par le client (lien dans l'e-mail) ou convertie à la main, elle donne
+-- naissance à la facture définitive, numérotée dans la séquence légale.
 DEFINE FIELD OVERWRITE kind        ON invoice TYPE string
-  ASSERT $value IN ['invoice','credit_note'] DEFAULT 'invoice';
+  ASSERT $value IN ['invoice','credit_note','proforma'] DEFAULT 'invoice';
 DEFINE FIELD OVERWRITE order       ON invoice TYPE option<record<order>>;
 DEFINE FIELD OVERWRITE customer    ON invoice TYPE option<record<user>>;
 DEFINE FIELD OVERWRITE client      ON invoice TYPE option<record<client>>;  -- client professionnel facturé
@@ -852,7 +855,14 @@ DEFINE FIELD OVERWRITE price_mode  ON invoice TYPE string DEFAULT 'ttc' VALUE $v
 DEFINE FIELD OVERWRITE intro       ON invoice TYPE option<string>;        -- texte avant le tableau (objet, contrat…)
 -- Règlement : l'état se déduit des règlements enregistrés (invoice_payment).
 DEFINE FIELD OVERWRITE status      ON invoice TYPE string DEFAULT 'unpaid' VALUE $value ?? 'unpaid'
-  ASSERT $value IN ['unpaid','partial','paid','cancelled'];
+  ASSERT $value IN ['unpaid','partial','paid','cancelled','converted'];
+-- Envoi au client et, pour une proforma, validation par lien.
+DEFINE FIELD OVERWRITE sent_at          ON invoice TYPE option<datetime>;
+DEFINE FIELD OVERWRITE sent_to          ON invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE validation_token ON invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE validated_at     ON invoice TYPE option<datetime>;
+DEFINE FIELD OVERWRITE converted_to     ON invoice TYPE option<record<invoice>>;   -- proforma → facture
+DEFINE FIELD OVERWRITE converted_from   ON invoice TYPE option<record<invoice>>;   -- facture ← proforma
 DEFINE FIELD OVERWRITE paid_total  ON invoice TYPE number DEFAULT 0 VALUE $value ?? 0;
 DEFINE FIELD OVERWRITE due_at      ON invoice TYPE option<datetime>;      -- échéance (professionnels)
 -- Frais de port HT (TVA 20 %), à part des lignes ; et provenance d'une facture importée
@@ -872,6 +882,7 @@ DEFINE INDEX OVERWRITE idx_invoice_order  ON invoice FIELDS order;
 DEFINE INDEX OVERWRITE idx_invoice_issued ON invoice FIELDS issued_at;
 DEFINE INDEX OVERWRITE idx_invoice_client ON invoice FIELDS client;
 DEFINE INDEX OVERWRITE idx_invoice_status ON invoice FIELDS status;
+DEFINE INDEX OVERWRITE idx_invoice_token  ON invoice FIELDS validation_token;
 
 -- Règlements d'une facture : un par encaissement (Stripe, SumUp, chèque, virement, espèces).
 DEFINE TABLE OVERWRITE invoice_payment SCHEMAFULL;

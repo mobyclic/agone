@@ -39,6 +39,8 @@ export interface SendMailOptions {
   from?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  /** Pièces jointes (PDF de facture…) ; le contenu part tel quel à Resend. */
+  attachments?: { filename: string; content: Buffer }[];
   bypassDryRun?: boolean;
 }
 
@@ -65,7 +67,8 @@ export async function sendMail(
       html: opts.html,
       text: opts.text,
       replyTo: opts.replyTo || REPLY_TO,
-      headers: opts.headers
+      headers: opts.headers,
+      attachments: opts.attachments?.map((a) => ({ filename: a.filename, content: a.content }))
     });
     if (res.error) return { ok: false, error: String(res.error.message ?? res.error) };
     return { ok: true, id: res.data?.id };

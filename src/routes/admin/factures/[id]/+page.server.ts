@@ -3,6 +3,8 @@ import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
 import { getInvoice, createManualInvoice, listPayments, addPayment, deletePayment, PAYMENT_METHODS } from '$lib/server/invoice';
 import { heureParisVersDate } from '$lib/dates';
+import { envoyerFacture } from '$lib/server/factureMail';
+import { convertirProforma } from '$lib/server/invoice';
 import { withFlash } from '$lib/toasts';
 import { journaliser } from '$lib/server/journal';
 
@@ -14,6 +16,28 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
+  /** Envoi au client, PDF joint ; une proforma part avec son lien de validation. */
+  envoyer: async ({ request, params, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const to = String(fd.get('to') ?? '').trim();
+    const r = await envoyerFacture(params.id!, { to, message: String(fd.get('message') ?? '').trim() || undefined });
+    if (!r.ok) return fail(400, { error: r.error ?? 'Envoi impossible.' });
+    await journaliser(locals, { action: 'facture.envoyee', cible: { type: 'invoice', id: params.id!, libelle: 'Facture envoyée' }, details: { a: to } });
+    throw redirect(303, withFlash(`/admin/factures/${params.id}`, `Envoyée à ${to}.`, 'success'));
+  },
+  /** Proforma → facture définitive, sans attendre la validation du client. */
+  convertir: async ({ params, locals }) => {
+    requireAdmin(locals);
+    try {
+      const nid = await convertirProforma(params.id!);
+      await journaliser(locals, { action: 'proforma.convertie', cible: { type: 'invoice', id: nid, libelle: 'Facture issue d’une proforma' }, details: { proforma: params.id } });
+      throw redirect(303, withFlash(`/admin/factures/${nid}`, 'Facture créée à partir de la proforma.', 'success'));
+    } catch (e) {
+      if ((e as any)?.status === 303) throw e;
+      return fail(400, { error: e instanceof Error ? e.message : 'Conversion impossible.' });
+    }
+  },
   /** Un règlement : montant, date, mode, référence. L'état de la facture suit. */
   payment_add: async ({ request, params, locals }) => {
     requireAdmin(locals);

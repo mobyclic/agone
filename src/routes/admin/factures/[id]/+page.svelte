@@ -1,12 +1,14 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Download, Printer, Receipt, Trash, Plus } from 'phosphor-svelte';
+  import { ArrowLeft, Download, Printer, Receipt, Trash, Plus, PaperPlaneTilt, X, ArrowRight } from 'phosphor-svelte';
   import { euros, PAYMENT_LABEL } from '$lib/labels';
 
   let { data } = $props();
   const f = $derived(data.invoice);
   const isCredit = $derived(f.kind === 'credit_note');
+  const isProforma = $derived(f.kind === 'proforma');
+  let envoi = $state(false);
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—');
   const eur = (n?: number) => euros(n) ?? '—';
   const sign = $derived(isCredit ? '−' : '');
@@ -38,8 +40,12 @@
 <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
   <div>
     <div class="flex items-center gap-2">
-      <h2 class="text-xl font-bold">{isCredit ? 'Avoir' : 'Facture'} n° {f.ref}</h2>
+      <h2 class="text-xl font-bold">{isCredit ? 'Avoir' : isProforma ? 'Pro forma' : 'Facture'} n° {f.ref}</h2>
       {#if isCredit}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>
+      {:else if isProforma}
+        {#if f.converted_to_id}<span class="rounded bg-success/15 px-2 py-0.5 text-xs text-success">Validée → facture <a href="/admin/factures/{f.converted_to_id}" class="underline">{f.converted_to_ref}</a></span>
+        {:else if f.sent_at}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Envoyée, en attente de validation</span>
+        {:else}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Pro forma, non envoyée</span>{/if}
       {:else}{@const st = STATUT[f.status ?? 'unpaid']}<span class="rounded px-2 py-0.5 text-xs {st.cls}">{st.texte}{#if f.status === 'partial'} · reste {eur(reste)}{/if}</span>{/if}
     </div>
     <p class="text-sm text-muted-foreground">
@@ -47,9 +53,17 @@
       {#if f.order_number}· <a href="/admin/commandes/{f.order_number}" class="text-link hover:underline">Commande #{f.order_number}</a>{/if}
       {#if f.client_id}· <a href="/admin/clients/pro/{f.client_id}" class="text-link hover:underline">{f.client_name}</a>{:else if f.customer_id}· <a href="/admin/utilisateurs/{f.customer_id}" class="text-link hover:underline">compte client</a>{/if}
       {#if f.price_mode === 'ht'}· prix HT{/if}{#if f.imported_from === 'meg'}· importée de MEG{/if}{#if f.external_ref}· réf. {f.external_ref}{/if}
+      {#if f.converted_from_id}· issue de la pro forma <a href="/admin/factures/{f.converted_from_id}" class="text-link hover:underline">{f.converted_from_ref}</a>{/if}
+      {#if f.sent_at}· envoyée le {dateCourte(f.sent_at)} à {f.sent_to}{/if}{#if f.validated_at}· validée par le client le {dateCourte(f.validated_at)}{/if}
     </p>
   </div>
-  <div class="flex gap-2">
+  <div class="flex flex-wrap gap-2">
+    {#if isProforma && !f.converted_to_id}
+      <form method="POST" action="?/convertir" use:enhance><Button type="submit" variant="outline" onclick={(e: Event) => { if (!confirm('Créer la facture définitive sans attendre la validation du client ?')) e.preventDefault(); }}><ArrowRight size={16} /> Convertir en facture</Button></form>
+    {/if}
+    {#if !(isProforma && f.converted_to_id)}
+      <Button type="button" variant="outline" onclick={() => (envoi = true)}><PaperPlaneTilt size={16} /> {f.sent_at ? 'Renvoyer' : 'Envoyer'} par e-mail</Button>
+    {/if}
     <Button type="button" onclick={printPdf} variant="outline"><Printer size={16} /> Imprimer</Button>
     <Button href="/admin/factures/{f.id}/{f.document_key ? 'original' : 'pdf'}?dl=1" variant="brand"><Download size={16} /> Télécharger{#if f.document_key} l’original{/if}</Button>
   </div>
@@ -158,3 +172,23 @@
   </div>
   </div>
 </div>
+
+<!-- Envoi par e-mail : destinataire, mot d'accompagnement, PDF joint. -->
+{#if envoi}
+  <div class="fixed inset-0 z-[60] grid place-items-center p-4">
+    <button type="button" class="absolute inset-0 cursor-default bg-black/50" aria-label="Fermer" onclick={() => (envoi = false)}></button>
+    <form method="POST" action="?/envoyer" use:enhance class="relative z-10 w-full max-w-md space-y-3 rounded-lg border border-border bg-background p-6 shadow-2xl">
+      <button type="button" onclick={() => (envoi = false)} class="absolute right-3 top-3 grid size-8 place-items-center text-muted-foreground hover:text-foreground" aria-label="Fermer"><X size={18} /></button>
+      <h3 class="text-lg font-bold">Envoyer {isProforma ? 'la pro forma' : isCredit ? 'l’avoir' : 'la facture'} {f.ref}</h3>
+      <p class="text-xs text-muted-foreground">Le PDF part en pièce jointe{isProforma ? ', avec un bouton « Valider la facture » : la facture définitive sera émise et envoyée dès que le client aura cliqué' : ''}.</p>
+      <label class="block text-sm font-medium">Destinataire <input name="to" type="email" required value={f.sent_to ?? f.bill_to?.email ?? ''} class="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+      <label class="block text-sm font-medium">Message <span class="font-normal text-muted-foreground">(facultatif)</span>
+        <textarea name="message" rows="3" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"></textarea>
+      </label>
+      <div class="flex justify-end gap-2 pt-2">
+        <Button type="button" variant="outline" onclick={() => (envoi = false)}>Annuler</Button>
+        <Button type="submit" variant="brand"><PaperPlaneTilt size={16} /> Envoyer</Button>
+      </div>
+    </form>
+  </div>
+{/if}
