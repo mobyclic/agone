@@ -32,7 +32,7 @@
   }
 
   // — Type / statut / règlement / date —
-  let channel = $state(untrack(() => data.types[0]?.value ?? 'vpc'));
+  let channel = $state(untrack(() => data.types[0]?.value ?? 'web'));
   let status = $state('paid');
   let payment = $state('sumup');
   let placedAt = $state(new Date().toISOString().slice(0, 10));
@@ -113,7 +113,7 @@
         {#each data.types as t (t.value)}<option value={t.value}>{t.label}</option>{/each}
       </select>
       <span class="mt-1 block text-xs font-normal text-muted-foreground">
-        {#if channel === 'vpc'}Expédiée par Les Belles Lettres (export du soir).{:else if channel === 'sortie_editeur'}Expédiée par Agone : un bon de livraison sera généré.{:else}Vendue sur place, remise en main propre.{/if}
+        {#if channel === 'comptoir'}Vendue sur place, remise en main propre.{:else}Commande reçue par courrier ou mail : expédiée par Les Belles Lettres, comme une commande du site.{/if}
       </span>
     </label>
   </section>

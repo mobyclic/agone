@@ -36,13 +36,18 @@ export const PALETTE = ['#26425b', '#5b8fbf', '#2e8b57', '#8fbf5b', '#b5a642', '
  * sont pas un canal : ils relèvent du comptoir (commandes payées « SumUp »).
  */
 const DEFAUTS: Omit<Canal, 'id' | 'fixe'>[] = [
-  { code: 'web', name: 'agone.org', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', notes: 'Commandes du site, payées par Stripe. Le papier est expédié par Les Belles Lettres, mais ces ventes ne figurent pas sur leur extranet.' },
-  { code: 'vpc', name: 'Vente par correspondance (stock Belles Lettres)', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'vpc', enabled: true, color: '#8fbf5b' },
-  { code: 'sortie_editeur', name: 'Sortie éditeur (bon de commande)', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'sortie_editeur', enabled: true, color: '#b5a642' },
+  { code: 'web', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', notes: 'Commandes du site (Stripe) et commandes reçues par courrier ou mail, saisies à la main. Le papier est expédié par Les Belles Lettres, mais ces ventes ne figurent pas sur leur extranet.' },
   { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57', notes: 'Ventes sur place, saisies à la main ou importées ; les encaissements SumUp s’y rapprochent.' },
   { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c' }
 ];
 const FIXES = new Set(DEFAUTS.map((d) => d.code));
+/** Anciens canaux de la maison : s'ils réapparaissent sans relevé, on les écarte. */
+const OBSOLETES = ['vpc', 'sortie_editeur', 'sumup'];
+
+/** Sous-canaux d'un canal : ce qu'il vend, par support — c'est la clé des séries statistiques. */
+export const SOUS_CANAUX: Record<string, { format: 'paper' | 'ebook'; nom: string }[]> = {
+  web: [{ format: 'paper', nom: 'Livre papier' }, { format: 'ebook', nom: 'Livre numérique' }]
+};
 const rang = (code: string) => { const i = DEFAUTS.findIndex((d) => d.code === code); return i < 0 ? 99 : i; };
 
 const CHAMPS = `meta::id(id) AS id, code, name, family, mode, connector, order_channel, enabled, color, notes`;
@@ -63,6 +68,12 @@ export async function ensureCanaux(): Promise<void> {
     }
     if (!e.color || e.color === '#7a7a7a') set.color = d.color;
     if (Object.keys(set).length) await query(`UPDATE $id MERGE $set`, { id: recId('sales_channel', e.id), set });
+  }
+  for (const code of OBSOLETES) {
+    const e = parCode.get(code);
+    if (!e) continue;
+    const n = await query<any>(`SELECT count() AS n FROM sales_report WHERE channel = $id GROUP ALL`, { id: recId('sales_channel', e.id) });
+    if (!n[0]?.n) await query(`DELETE $id`, { id: recId('sales_channel', e.id) });
   }
 }
 
@@ -170,14 +181,12 @@ export function eclaircir(hex: string, f: number): string {
 }
 
 /**
- * Les types de commande saisissables à la main : les canaux directs alimentés par
- * les commandes, hors site — dans l'ordre du formulaire : ce qui part aux Belles
- * Lettres, ce qu'Agone expédie, ce qui se vend sur place.
+ * Les types de commande saisissables à la main : les canaux alimentés par les
+ * commandes — la vente par correspondance (expédiée par Les Belles Lettres,
+ * comme une commande du site), puis la vente sur place.
  */
 export async function typesCommandeSaisie(): Promise<{ value: string; label: string }[]> {
-  const rang = (code: string) => ['vpc', 'sortie_editeur', 'comptoir'].indexOf(code);
   return (await listCanaux({ enabledOnly: true }))
-    .filter((c) => c.connector === 'orders' && c.order_channel && c.order_channel !== 'web')
-    .sort((a, b) => (rang(a.order_channel!) + 1 || 99) - (rang(b.order_channel!) + 1 || 99))
+    .filter((c) => c.connector === 'orders' && c.order_channel)
     .map((c) => ({ value: c.order_channel!, label: c.name }));
 }

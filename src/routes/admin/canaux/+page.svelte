@@ -13,7 +13,7 @@
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
 
   const FAMILLES: { id: 'direct' | 'indirect'; nom: string; desc: string }[] = [
-    { id: 'direct', nom: 'Vente directe', desc: 'Ce qu’Agone vend lui-même : le site, le comptoir, la correspondance.' },
+    { id: 'direct', nom: 'Vente directe', desc: 'Ce qu’Agone vend lui-même : par correspondance (site, courrier) et sur place.' },
     { id: 'indirect', nom: 'Vente indirecte', desc: 'Ce que d’autres vendent pour Agone : distributeur, diffuseur, places de marché.' }
   ];
   const CONNECTEURS: Record<string, string> = { orders: 'Commandes du site', bldd: 'Extranet Belles Lettres' };
@@ -112,6 +112,16 @@
           {#if edition === c.code}
             <tr><td colspan="7" class="border-t border-border p-4">{@render formulaire()}</td></tr>
           {/if}
+          <!-- Sous-canaux : par support, ce que ce canal vend (séries distinctes dans les statistiques). -->
+          {#each data.sousCanaux[c.code] ?? [] as sc (sc.format)}
+            <tr class="bg-muted/15 text-sm">
+              <td class="px-4 py-1.5"></td>
+              <td class="py-1.5 pl-6 pr-2 text-muted-foreground" colspan="6">
+                <span class="mr-1.5 opacity-50">└</span>{sc.nom}
+                <span class="ml-1.5 text-xs">sous-canal · {sc.format === 'ebook' ? 'numérique' : 'papier'}</span>
+              </td>
+            </tr>
+          {/each}
         {/each}
         {#if parFamille(f.id).length === 0}
           <tr><td colspan="7" class="px-4 py-6 text-center text-muted-foreground">Aucun canal dans cette famille.</td></tr>

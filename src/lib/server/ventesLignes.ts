@@ -11,7 +11,7 @@
  *     montants et commentaire se corrigent sur place.
  */
 import { query, recId } from './surreal';
-import { listCanaux, type Canal } from './canaux';
+import { listCanaux, SOUS_CANAUX, type Canal } from './canaux';
 
 const PAYEES = "['completed','paid','processing','sent_to_bl']";
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -140,12 +140,18 @@ export async function resumeCanaux(annee: number) {
   const b = bornes(annee);
   return Promise.all(canaux.map(async (c) => {
     let n = 0, qty = 0, montant = 0, nature: 'ttc' | 'ht' = 'ttc';
+    const sous: { format: string; nom: string; qty: number; montant: number }[] = [];
     if (c.connector === 'orders' && c.order_channel) {
-      const [r] = await query<any>(
-        `SELECT count() AS n, math::sum(qty) AS qty, math::sum(line_total) AS montant FROM contains
-          WHERE in.status IN ${PAYEES} AND in.channel = $oc AND time::year(in.paid_at ?? in.created_at) = $annee GROUP ALL`,
+      const parFormat = await query<any>(
+        `SELECT format, count() AS n, math::sum(qty) AS qty, math::sum(line_total) AS montant FROM contains
+          WHERE in.status IN ${PAYEES} AND in.channel = $oc AND time::year(in.paid_at ?? in.created_at) = $annee GROUP BY format`,
         { oc: c.order_channel, annee });
-      n = Number(r?.n ?? 0); qty = Number(r?.qty ?? 0); montant = r2(Number(r?.montant ?? 0));
+      for (const r of parFormat) { n += Number(r.n ?? 0); qty += Number(r.qty ?? 0); montant += Number(r.montant ?? 0); }
+      montant = r2(montant);
+      for (const sc of SOUS_CANAUX[c.code] ?? []) {
+        const lignes = parFormat.filter((r: any) => (r.format === 'epub' ? 'ebook' : 'paper') === sc.format);
+        sous.push({ format: sc.format, nom: sc.nom, qty: lignes.reduce((a: number, r: any) => a + Number(r.qty ?? 0), 0), montant: r2(lignes.reduce((a: number, r: any) => a + Number(r.montant ?? 0), 0)) });
+      }
     } else {
       const [r] = await query<any>(
         `SELECT count() AS n, math::sum(units_sold - units_returned) AS qty,
@@ -155,7 +161,7 @@ export async function resumeCanaux(annee: number) {
         { ch: recId('sales_channel', c.id), ...b });
       n = Number(r?.n ?? 0); qty = Number(r?.qty ?? 0); montant = r2(Number(r?.montant ?? 0)); nature = Number(r?.ht ?? 0) > 0 ? 'ht' : 'ttc';
     }
-    return { code: c.code, name: c.name, color: c.color, family: c.family, connector: c.connector, mode: c.mode, enabled: c.enabled, lignes: n, qty, montant, nature, editable: c.connector !== 'orders' };
+    return { code: c.code, name: c.name, color: c.color, family: c.family, connector: c.connector, mode: c.mode, enabled: c.enabled, lignes: n, qty, montant, nature, sous, editable: c.connector !== 'orders' };
   })).then((l) => l.filter((c) => c.enabled || c.lignes > 0)); // un canal caché se montre quand même s'il a vendu
 }
 

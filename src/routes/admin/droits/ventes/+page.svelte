@@ -146,9 +146,12 @@
         <span class="inline-block size-3 rounded-sm" style="background:{c.color}"></span>
         <span class="font-medium">{c.name}</span>
         <span class="text-xs text-muted-foreground">{c.family === 'direct' ? 'vente directe' : 'vente indirecte'}{c.enabled ? '' : ' · désactivé'}</span>
-        <span class="ml-auto text-sm tabular-nums text-muted-foreground">
+        <span class="ml-auto text-right text-sm tabular-nums text-muted-foreground">
           {#if c.lignes}
             {c.lignes.toLocaleString('fr-FR')} ligne{c.lignes > 1 ? 's' : ''} · <span class="text-foreground">{c.qty.toLocaleString('fr-FR')} ex.</span> · {euros(c.montant)} <span class="text-[10px] uppercase">{c.nature}</span>
+            {#if c.sous?.length}
+              <span class="block text-xs">{#each c.sous as sc, i (sc.format)}{i ? ' · ' : ''}{sc.nom.toLowerCase()} {sc.qty.toLocaleString('fr-FR')} ex. ({euros(sc.montant)}){/each}</span>
+            {/if}
           {:else}aucune vente relevée{/if}
         </span>
       </button>

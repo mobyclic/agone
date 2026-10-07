@@ -1,7 +1,7 @@
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { ensureCanaux, listCanaux, upsertCanal, setCanalEnabled, deleteCanal } from '$lib/server/canaux';
+import { ensureCanaux, listCanaux, upsertCanal, setCanalEnabled, deleteCanal, SOUS_CANAUX } from '$lib/server/canaux';
 import { query } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
 import { journaliser } from '$lib/server/journal';
@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ locals }) => {
     e.n++;
     if (r.period_end && (!e.dernier || new Date(r.period_end) > new Date(e.dernier))) e.dernier = String(r.period_end);
   }
-  return { canaux, releves: parCode };
+  return { canaux, releves: parCode, sousCanaux: SOUS_CANAUX };
 };
 
 const lire = (fd: FormData) => {

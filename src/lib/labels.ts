@@ -28,10 +28,11 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
 
 /** Canal / type de commande (libellés FR). */
 export const CHANNEL_LABEL: Record<string, string> = {
-  web: 'agone.org',
+  web: 'Vente par correspondance',
   comptoir: 'Comptoir & rencontres',
-  vpc: 'Vente par correspondance',
-  sortie_editeur: 'Sortie éditeur'
+  // Anciens types, gardés pour relire les commandes qui les portent encore.
+  vpc: 'Vente par correspondance (ancien)',
+  sortie_editeur: 'Sortie éditeur (ancien)'
 };
 
 /** Mode de règlement d'une commande. */
