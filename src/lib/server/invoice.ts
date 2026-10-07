@@ -416,26 +416,52 @@ export async function getInvoiceIdForOrder(orderId: string): Promise<string | nu
   return rows[0]?.id ?? null;
 }
 
-export async function listInvoices(opts: { q?: string; kind?: string; status?: string; limit?: number; offset?: number } = {}) {
+export interface FiltreFactures {
+  q?: string; kind?: string; status?: string; from?: string; to?: string;
+  sort?: 'date_desc' | 'date_asc' | 'total_desc' | 'total_asc' | 'ref' | 'client';
+  limit?: number; offset?: number;
+  /** Une sélection explicite (actions groupées) : prime sur le reste du filtre. */
+  ids?: string[];
+}
+
+const TRI: Record<NonNullable<FiltreFactures['sort']>, string> = {
+  date_desc: 'issued_at DESC', date_asc: 'issued_at ASC', total_desc: 'total_ttc DESC', total_asc: 'total_ttc ASC', ref: 'ref ASC', client: 'name ASC'
+};
+
+function whereFactures(opts: FiltreFactures) {
   const where: string[] = [];
-  const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
+  const vars: Record<string, unknown> = {};
+  if (opts.ids?.length) { where.push('id IN $ids'); vars.ids = opts.ids.map((i) => recId('invoice', i)); }
   if (opts.kind) { where.push('kind = $kind'); vars.kind = opts.kind; }
   // « À encaisser » : les factures (pas les avoirs) qui ne sont pas soldées.
   if (opts.status === 'due') where.push("kind = 'invoice' AND status IN ['unpaid','partial']");
   else if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
-  // Par défaut, les brouillons restent visibles : ils attendent qu'on les finisse.
+  if (opts.from) { where.push('issued_at >= $from'); vars.from = new Date(`${opts.from}T00:00:00Z`); }
+  if (opts.to) { where.push('issued_at <= $to'); vars.to = new Date(`${opts.to}T23:59:59Z`); }
   if (opts.q && opts.q.trim()) {
     vars.q = opts.q.trim().toLowerCase();
     where.push('(string::lowercase(ref) CONTAINS $q OR string::lowercase(bill_to.name ?? "") CONTAINS $q)');
   }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  return { whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '', vars };
+}
+
+const LISTE_CHAMPS = `meta::id(id) AS id, ref, kind, bill_to.name AS name, subtotal_ht, tax_total, total_ttc, status, paid_total, issued_at, due_at,
+  order.number AS order_number, imported_from, price_mode, IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id`;
+
+export async function listInvoices(opts: FiltreFactures = {}) {
+  const { whereSql, vars } = whereFactures(opts);
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, ref, kind, bill_to.name AS name, total_ttc, status, paid_total, issued_at, order.number AS order_number
-       FROM invoice ${whereSql} ORDER BY issued_at DESC LIMIT $limit START $start`,
-    vars
+    `SELECT ${LISTE_CHAMPS} FROM invoice ${whereSql} ORDER BY ${TRI[opts.sort ?? 'date_desc']} LIMIT $limit START $start`,
+    { ...vars, limit: opts.limit ?? 50, start: opts.offset ?? 0 }
   );
   const count = await query<any>(`SELECT count() AS n FROM invoice ${whereSql} GROUP ALL`, vars);
   return { invoices: rows, total: count[0]?.n ?? 0 };
+}
+
+/** Toutes les lignes d'un filtre (ou d'une sélection), pour l'export. */
+export async function exportInvoices(opts: FiltreFactures = {}) {
+  const { whereSql, vars } = whereFactures(opts);
+  return query<any>(`SELECT ${LISTE_CHAMPS}, bill_to, sent_at FROM invoice ${whereSql} ORDER BY ${TRI[opts.sort ?? 'date_desc']} LIMIT 20000`, vars);
 }
 
 /* ————————————————————— PDF (pdf-lib) ————————————————————— */
