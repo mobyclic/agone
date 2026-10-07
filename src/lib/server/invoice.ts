@@ -307,7 +307,8 @@ const INV_FIELDS = `
   meta::id(id) AS id, ref, kind, year, number, bill_to, lines, vat_rate, price_mode, intro, status, paid_total, due_at,
   subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number,
   IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
-  IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id
+  IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id,
+  shipping_ht, imported_from, external_ref, document.key AS document_key, document.filename AS document_name
 `;
 
 export async function getInvoice(id: string) {
@@ -317,6 +318,12 @@ export async function getInvoice(id: string) {
   const inv = rows[0];
   if (!inv) return null;
   inv.vat_breakdown = vatBreakdown(inv.lines ?? [], inv.price_mode === 'ht' ? 'ht' : 'ttc');
+  // Les frais de port (TVA 20 %) s'ajoutent à la ventilation.
+  if (inv.shipping_ht) {
+    const port = { rate: 20, base_ht: r2(inv.shipping_ht), tax: r2(inv.shipping_ht * 0.2) };
+    const e = inv.vat_breakdown.find((b: any) => b.rate === 20);
+    if (e) { e.base_ht = r2(e.base_ht + port.base_ht); e.tax = r2(e.tax + port.tax); } else inv.vat_breakdown.push(port);
+  }
   return inv;
 }
 
@@ -460,6 +467,7 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   const sign = isCredit ? -1 : 1;
   const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[], inv.price_mode === 'ht' ? 'ht' : 'ttc');
   const totRows: [string, string, boolean][] = [
+    ...(inv.shipping_ht ? [[`Total HT lignes`, fmtEur(sign * r2(inv.subtotal_ht - inv.shipping_ht)), false] as [string, string, boolean], [`Frais de port HT`, fmtEur(sign * inv.shipping_ht), false] as [string, string, boolean]] : []),
     ['Total HT', fmtEur(sign * inv.subtotal_ht), false],
     ...breakdown.map(
       (b) => [`TVA ${String(b.rate).replace('.', ',')} %`, fmtEur(sign * b.tax), false] as [string, string, boolean]

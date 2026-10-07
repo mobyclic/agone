@@ -821,10 +821,12 @@ DEFINE FIELD OVERWRITE city         ON client TYPE option<string>;
 DEFINE FIELD OVERWRITE country      ON client TYPE string DEFAULT 'France' VALUE $value ?? 'France';
 DEFINE FIELD OVERWRITE notes        ON client TYPE option<string>;
 DEFINE FIELD OVERWRITE user         ON client TYPE option<record<user>>;   -- compte du contact, s'il en a un
+DEFINE FIELD OVERWRITE external_ref ON client TYPE option<string>;         -- n° client dans l'ancien outil (MEG : CLT00000087)
 DEFINE FIELD OVERWRITE created_at   ON client TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at   ON client TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_client_name ON client FIELDS name;
 DEFINE INDEX OVERWRITE ft_client_name  ON client FIELDS name FULLTEXT ANALYZER ana_text BM25;
+DEFINE INDEX OVERWRITE idx_client_ext  ON client FIELDS external_ref;
 
 -- ============================================================================
 -- FACTURATION — factures & avoirs. Numérotation LÉGALE continue par année
@@ -853,6 +855,12 @@ DEFINE FIELD OVERWRITE status      ON invoice TYPE string DEFAULT 'unpaid' VALUE
   ASSERT $value IN ['unpaid','partial','paid','cancelled'];
 DEFINE FIELD OVERWRITE paid_total  ON invoice TYPE number DEFAULT 0 VALUE $value ?? 0;
 DEFINE FIELD OVERWRITE due_at      ON invoice TYPE option<datetime>;      -- échéance (professionnels)
+-- Frais de port HT (TVA 20 %), à part des lignes ; et provenance d'une facture importée
+-- de l'ancien outil (MEG) : son PDF d'origine fait foi, on le garde.
+DEFINE FIELD OVERWRITE shipping_ht   ON invoice TYPE option<number>;
+DEFINE FIELD OVERWRITE imported_from ON invoice TYPE option<string>;
+DEFINE FIELD OVERWRITE external_ref  ON invoice TYPE option<string>;      -- facture visée par un avoir, etc.
+DEFINE FIELD OVERWRITE document      ON invoice TYPE option<record<media>>;
 DEFINE FIELD OVERWRITE subtotal_ht ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE tax_total   ON invoice TYPE number DEFAULT 0;
 DEFINE FIELD OVERWRITE total_ttc   ON invoice TYPE number DEFAULT 0;

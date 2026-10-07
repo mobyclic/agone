@@ -157,6 +157,18 @@
   </form>
 </div>
 
+<!-- Anciennes factures : import des PDF MEG -->
+<div class="mt-10 rounded-lg border border-border bg-card p-5">
+  <div class="mb-1 flex items-center gap-2">
+    <Receipt size={20} class="text-link" />
+    <h3 class="text-base font-semibold">Anciennes factures (MEG)</h3>
+  </div>
+  <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+    Reprend les factures et avoirs émis dans MEG à partir de leurs PDF : numéro d'origine, client professionnel créé au passage, règlement, PDF conservé.
+  </p>
+  <a href="/admin/parametres/factures-meg" class="inline-flex items-center gap-1.5 text-sm text-link hover:underline">Importer des factures MEG <ArrowRight size={14} /></a>
+</div>
+
 <!-- Synchronisation pré-production -->
 <div class="mt-10">
   <div class="mb-1 flex items-center gap-2">

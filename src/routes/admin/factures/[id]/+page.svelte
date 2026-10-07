@@ -46,18 +46,19 @@
       Émis le {dateFr(f.issued_at)}
       {#if f.order_number}· <a href="/admin/commandes/{f.order_number}" class="text-link hover:underline">Commande #{f.order_number}</a>{/if}
       {#if f.client_id}· <a href="/admin/clients/pro/{f.client_id}" class="text-link hover:underline">{f.client_name}</a>{:else if f.customer_id}· <a href="/admin/utilisateurs/{f.customer_id}" class="text-link hover:underline">compte client</a>{/if}
-      {#if f.price_mode === 'ht'}· prix HT{/if}
+      {#if f.price_mode === 'ht'}· prix HT{/if}{#if f.imported_from === 'meg'}· importée de MEG{/if}{#if f.external_ref}· réf. {f.external_ref}{/if}
     </p>
   </div>
   <div class="flex gap-2">
     <Button type="button" onclick={printPdf} variant="outline"><Printer size={16} /> Imprimer</Button>
-    <Button href="/admin/factures/{f.id}/pdf?dl=1" variant="brand"><Download size={16} /> Télécharger</Button>
+    <Button href="/admin/factures/{f.id}/{f.document_key ? 'original' : 'pdf'}?dl=1" variant="brand"><Download size={16} /> Télécharger{#if f.document_key} l’original{/if}</Button>
   </div>
 </div>
 
 <!-- Aperçu PDF embarqué -->
 <div class="mb-6 overflow-hidden rounded-lg border border-border bg-muted/30">
-  <iframe bind:this={frame} src="/admin/factures/{f.id}/pdf#toolbar=0" title="Aperçu {f.ref}" class="h-[78vh] max-h-[900px] w-full bg-white"></iframe>
+  <!-- Une facture importée s'affiche par son PDF d'origine : c'est lui qui fait foi. -->
+  <iframe bind:this={frame} src="/admin/factures/{f.id}/{f.document_key ? 'original' : 'pdf'}#toolbar=0" title="Aperçu {f.ref}" class="h-[78vh] max-h-[900px] w-full bg-white"></iframe>
 </div>
 
 <div class="grid gap-5 lg:grid-cols-[1fr_260px]">
