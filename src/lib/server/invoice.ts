@@ -207,22 +207,6 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
   return id;
 }
 
-/** Une proforma validée (ou convertie à la main) devient une facture, numérotée dans la séquence. */
-export async function convertirProforma(id: string): Promise<string> {
-  const p = await getInvoice(id);
-  if (!p) throw new Error('Proforma introuvable');
-  if (p.kind !== 'proforma') throw new Error('Ce document n’est pas une proforma');
-  if (p.converted_to_id) return p.converted_to_id;
-  const ht = p.price_mode === 'ht';
-  const nid = await createManualInvoice({
-    kind: 'invoice', bill_to: p.bill_to, clientId: p.client_id ?? undefined, customerId: p.customer_id ?? undefined,
-    price_mode: ht ? 'ht' : 'ttc', vat_rate: p.vat_rate, intro: p.intro ?? undefined, notes: p.notes ?? undefined, fromProformaId: id,
-    lines: (p.lines ?? []).map((l: any) => ({ description: l.description, qty: l.qty, unit_price: ht ? (l.unit_price_ht ?? l.unit_price_ttc) : l.unit_price_ttc, vat_rate: l.vat_rate, book: l.book, isbn: l.isbn }))
-  });
-  await query(`UPDATE $id SET converted_to = $n, status = 'converted'`, { id: recId('invoice', id), n: recId('invoice', nid) });
-  return nid;
-}
-
 /* ————————————————————— Règlements ————————————————————— */
 
 const PAYEES = new Set(['paid', 'processing', 'sent_to_bl', 'completed']);
@@ -240,7 +224,8 @@ export async function recomputeInvoiceStatus(invoiceId: string): Promise<{ statu
   const id = recId('invoice', invoiceId);
   const inv = (await query<any>(`SELECT total_ttc, kind, status FROM ONLY $id`, { id })) as any;
   if (!inv) throw new Error('Facture introuvable');
-  if (inv.status === 'converted') return { status: 'converted', paid_total: 0 };
+  // Un brouillon, une pro forma ou un document annulé ne se règlent pas.
+  if (['draft', 'proforma', 'cancelled'].includes(inv.status)) return { status: inv.status, paid_total: 0 };
   const [som] = await query<any>(`SELECT math::sum(amount) AS total FROM invoice_payment WHERE invoice = $id GROUP ALL`, { id });
   const paid_total = r2(Number(som?.total ?? 0));
   const total = r2(Number(inv.total_ttc ?? 0));
@@ -272,8 +257,10 @@ export async function deletePayment(paymentId: string): Promise<void> {
 
 /* ————————————————————— Création manuelle (facture ou avoir) ————————————————————— */
 
+export type StatutFacture = 'draft' | 'proforma' | 'unpaid' | 'partial' | 'paid' | 'cancelled';
+
 export interface ManualInvoiceInput {
-  kind: 'invoice' | 'credit_note' | 'proforma';
+  kind: 'invoice' | 'credit_note';
   customerId?: string;
   /** Client professionnel facturé (personne morale). */
   clientId?: string;
@@ -285,11 +272,10 @@ export interface ManualInvoiceInput {
   intro?: string;
   notes?: string;
   issued_at?: Date;
-  /** Facture née d'une proforma validée. */
-  fromProformaId?: string;
 }
 
-export async function createManualInvoice(input: ManualInvoiceInput): Promise<string> {
+/** Lignes et totaux d'un document, à partir de ce qu'a saisi l'opérateur. */
+async function preparerDocument(input: ManualInvoiceInput) {
   const base = input.vat_rate != null ? input.vat_rate : (await getCompany()).vat_rate;
   const ht = input.price_mode === 'ht';
   const lines: InvoiceLine[] = input.lines
@@ -308,21 +294,78 @@ export async function createManualInvoice(input: ManualInvoiceInput): Promise<st
       };
     });
   const totals = computeTotals(lines, ht ? 'ht' : 'ttc');
-  const vat_rate = base;
-  const year = (input.issued_at ?? new Date()).getFullYear();
-  const { number, ref } = await nextInvoiceRef(year, input.kind === 'proforma' ? 'proforma' : 'invoice');
+  return {
+    kind: input.kind,
+    customer: input.customerId ? recId('user', input.customerId) : undefined,
+    client: input.clientId ? recId('client', input.clientId) : undefined,
+    bill_to: input.bill_to, lines, vat_rate: base, ...totals, price_mode: ht ? 'ht' : 'ttc',
+    intro: input.intro || undefined, notes: input.notes || undefined,
+    issued_at: input.issued_at ?? new Date()
+  };
+}
+
+/** Un document naît en BROUILLON : modifiable, sans numéro ; il s'émet ensuite. */
+export async function createManualInvoice(input: ManualInvoiceInput): Promise<string> {
+  const doc = await preparerDocument(input);
   const rows = await query<any>(`CREATE invoice CONTENT $c`, {
-    c: {
-      year, number, ref, kind: input.kind,
-      customer: input.customerId ? recId('user', input.customerId) : undefined,
-      client: input.clientId ? recId('client', input.clientId) : undefined,
-      converted_from: input.fromProformaId ? recId('invoice', input.fromProformaId) : undefined,
-      bill_to: input.bill_to, lines, vat_rate, ...totals, price_mode: ht ? 'ht' : 'ttc',
-      intro: input.intro || undefined, notes: input.notes || undefined,
-      issued_at: input.issued_at ?? undefined
-    }
+    c: { ...doc, year: doc.issued_at.getFullYear(), number: 0, ref: `BR-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, status: 'draft' }
   });
   return String(rows[0].id).replace(/^invoice:/, '');
+}
+
+/** Un brouillon se réécrit entièrement ; un document émis ne se modifie plus. */
+export async function updateDraft(id: string, input: ManualInvoiceInput): Promise<void> {
+  const inv = (await query<any>(`SELECT status FROM ONLY $id`, { id: recId('invoice', id) })) as any;
+  if (!inv) throw new Error('Document introuvable');
+  if (inv.status !== 'draft') throw new Error('Seul un brouillon se modifie.');
+  const doc = await preparerDocument(input);
+  await query(`UPDATE $id MERGE $c`, { id: recId('invoice', id), c: { ...doc, year: doc.issued_at.getFullYear() } });
+}
+
+/**
+ * Émission : le brouillon (ou la pro forma validée) reçoit son numéro dans la
+ * séquence légale et devient une facture à encaisser. Même document.
+ */
+export async function emettreFacture(id: string, date?: Date): Promise<{ ref: string }> {
+  const inv = (await query<any>(`SELECT status, ref, kind, issued_at FROM ONLY $id`, { id: recId('invoice', id) })) as any;
+  if (!inv) throw new Error('Document introuvable');
+  if (!['draft', 'proforma'].includes(inv.status)) throw new Error('Ce document est déjà émis.');
+  const quand = date ?? new Date();
+  const { number, ref } = await nextInvoiceRef(quand.getFullYear(), 'invoice');
+  await query(`UPDATE $id MERGE $c`, {
+    id: recId('invoice', id),
+    c: { year: quand.getFullYear(), number, ref, status: 'unpaid', issued_at: quand, proforma_ref: inv.status === 'proforma' ? inv.ref : undefined, validation_token: undefined }
+  });
+  await recomputeInvoiceStatus(id);
+  return { ref };
+}
+
+/** Pro forma : le brouillon reçoit un numéro PRO-…, sans valeur comptable, pour accord du client. */
+export async function passerProforma(id: string): Promise<{ ref: string }> {
+  const inv = (await query<any>(`SELECT status, kind FROM ONLY $id`, { id: recId('invoice', id) })) as any;
+  if (!inv) throw new Error('Document introuvable');
+  if (inv.status !== 'draft') throw new Error('Seul un brouillon passe en pro forma.');
+  if (inv.kind !== 'invoice') throw new Error('Un avoir ne se met pas en pro forma.');
+  const quand = new Date();
+  const { number, ref } = await nextInvoiceRef(quand.getFullYear(), 'proforma');
+  await query(`UPDATE $id MERGE $c`, { id: recId('invoice', id), c: { year: quand.getFullYear(), number, ref, status: 'proforma', issued_at: quand } });
+  return { ref };
+}
+
+/** Une pro forma pas encore validée peut redevenir brouillon, pour être corrigée. */
+export async function retourBrouillon(id: string): Promise<void> {
+  const inv = (await query<any>(`SELECT status, validated_at, ref FROM ONLY $id`, { id: recId('invoice', id) })) as any;
+  if (!inv || inv.status !== 'proforma') throw new Error('Seule une pro forma revient en brouillon.');
+  if (inv.validated_at) throw new Error('Cette pro forma a été validée par le client : émettez-la.');
+  await query(`UPDATE $id MERGE $c`, { id: recId('invoice', id), c: { status: 'draft', proforma_ref: inv.ref, ref: `BR-${Date.now().toString(36)}`, number: 0, validation_token: undefined, sent_at: undefined } });
+}
+
+/** Annulation : jamais d'un document réglé, même en partie. */
+export async function annulerFacture(id: string): Promise<void> {
+  const inv = (await query<any>(`SELECT status, paid_total FROM ONLY $id`, { id: recId('invoice', id) })) as any;
+  if (!inv) throw new Error('Document introuvable');
+  if (Number(inv.paid_total ?? 0) > 0) throw new Error('Des règlements sont enregistrés : retirez-les avant d’annuler, ou faites un avoir.');
+  await query(`UPDATE $id SET status = 'cancelled'`, { id: recId('invoice', id) });
 }
 
 /* ————————————————————— Lecture ————————————————————— */
@@ -333,9 +376,7 @@ const INV_FIELDS = `
   IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
   IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id,
   shipping_ht, imported_from, external_ref, document.key AS document_key, document.filename AS document_name,
-  sent_at, sent_to, validated_at, validation_token,
-  IF converted_to != NONE THEN meta::id(converted_to) ELSE NONE END AS converted_to_id, converted_to.ref AS converted_to_ref,
-  IF converted_from != NONE THEN meta::id(converted_from) ELSE NONE END AS converted_from_id, converted_from.ref AS converted_from_ref
+  sent_at, sent_to, validated_at, validation_token, proforma_ref
 `;
 
 export async function getInvoice(id: string) {
@@ -368,6 +409,7 @@ export async function listInvoices(opts: { q?: string; kind?: string; status?: s
   // « À encaisser » : les factures (pas les avoirs) qui ne sont pas soldées.
   if (opts.status === 'due') where.push("kind = 'invoice' AND status IN ['unpaid','partial']");
   else if (opts.status) { where.push('status = $status'); vars.status = opts.status; }
+  // Par défaut, les brouillons restent visibles : ils attendent qu'on les finisse.
   if (opts.q && opts.q.trim()) {
     vars.q = opts.q.trim().toLowerCase();
     where.push('(string::lowercase(ref) CONTAINS $q OR string::lowercase(bill_to.name ?? "") CONTAINS $q)');
@@ -427,7 +469,8 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
     page.drawLine({ start: { x: x1, y: H - yTop }, end: { x: x2, y: H - yTop }, thickness: 0.7, color: c });
 
   const isCredit = inv.kind === 'credit_note';
-  const isProforma = inv.kind === 'proforma';
+  const isProforma = inv.status === 'proforma';
+  const isDraft = inv.status === 'draft';
 
   // — En-tête société (gauche) —
   let y = M + 4;
@@ -441,8 +484,8 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   if (idBits) { text(idBits, M, y, { size: 8, color: grey }); y += 12; }
 
   // — Titre + réf (droite) —
-  text(isCredit ? 'AVOIR' : isProforma ? 'FACTURE PRO FORMA' : 'FACTURE', W - M, M + 6, { size: isProforma ? 16 : 20, bold: true, right: W - M });
-  text(`N° ${inv.ref}`, W - M, M + 26, { size: 11, bold: true, right: W - M });
+  text(isDraft ? 'BROUILLON' : isCredit ? 'AVOIR' : isProforma ? 'FACTURE PRO FORMA' : 'FACTURE', W - M, M + 6, { size: isProforma ? 16 : 20, bold: true, right: W - M });
+  text(isDraft ? 'Sans numéro — document non émis' : `N° ${inv.ref}`, W - M, M + 26, { size: isDraft ? 9 : 11, bold: !isDraft, right: W - M, color: isDraft ? grey : ink });
   text(`Date : ${fmtDate(inv.issued_at)}`, W - M, M + 42, { size: 9, color: grey, right: W - M });
   if (inv.order_number) text(`Commande n° ${inv.order_number}`, W - M, M + 55, { size: 9, color: grey, right: W - M });
 
@@ -467,9 +510,10 @@ export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   const modeHT = inv.price_mode === 'ht';
   y += 18;
   const colTot = W - M;
-  const colTva = modeHT ? W - M - 70 : 0;
-  const colPU = modeHT ? W - M - 160 : W - M - 120;
-  const colQty = modeHT ? W - M - 240 : W - M - 210;
+  // En mode HT, une colonne TVA s'intercale : les autres reculent d'autant pour que rien ne se chevauche.
+  const colTva = modeHT ? W - M - 100 : 0;
+  const colPU = modeHT ? W - M - 190 : W - M - 120;
+  const colQty = modeHT ? W - M - 270 : W - M - 210;
   text('Désignation', M, y, { size: 8, bold: true, color: grey });
   text('Qté', colQty, y, { size: 8, bold: true, color: grey, right: colQty + 30 });
   text(modeHT ? 'P.U. HT' : 'P.U. TTC', colPU, y, { size: 8, bold: true, color: grey, right: colPU + 70 });

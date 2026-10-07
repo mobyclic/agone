@@ -7,9 +7,9 @@ export const load: PageServerLoad = async ({ params }) => {
   if (!p) return { proforma: null };
   return {
     proforma: {
-      ref: p.ref, issued_at: p.issued_at, total_ttc: p.total_ttc, subtotal_ht: p.subtotal_ht, tax_total: p.tax_total,
+      ref: p.proforma_ref ?? p.ref, issued_at: p.issued_at, total_ttc: p.total_ttc, subtotal_ht: p.subtotal_ht, tax_total: p.tax_total,
       name: p.bill_to?.name, lines: (p.lines ?? []).map((l: any) => ({ description: l.description, qty: l.qty, total: l.line_total_ttc })),
-      validee: !!p.converted_to_id, facture_ref: p.converted_to_ref ?? null
+      validee: p.status !== 'proforma', facture_ref: p.status !== 'proforma' ? p.ref : null
     }
   };
 };

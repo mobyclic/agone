@@ -31,7 +31,9 @@ test('prix saisis HT : 500 exemplaires à 1,50 € HT, TVA 5,5 %', async () => {
   expect(CREE.subtotal_ht).toBe(750);
   expect(CREE.tax_total).toBe(41.25);
   expect(CREE.total_ttc).toBe(791.25);
-  expect(CREE.ref).toBe('2026-0012');
+  // Un document naît en brouillon, sans numéro légal.
+  expect(CREE.status).toBe('draft');
+  expect(CREE.ref.startsWith('BR-')).toBe(true);
 });
 
 test('prix saisis TTC : 2 × 16,00 €, TVA 5,5 %', async () => {

@@ -6,7 +6,7 @@
 import { randomBytes } from 'node:crypto';
 import { query, recId } from './surreal';
 import { sendMail, layout, button, SITE_URL } from './mail';
-import { getInvoice, renderInvoicePdf, getCompany, convertirProforma } from './invoice';
+import { getInvoice, renderInvoicePdf, getCompany, emettreFacture } from './invoice';
 import { getObject } from './storage';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -23,8 +23,10 @@ export async function envoyerFacture(id: string, opts: { to?: string; message?: 
   if (!inv) return { ok: false, error: 'Facture introuvable.' };
   const to = (opts.to || inv.bill_to?.email || '').trim();
   if (!to) return { ok: false, error: 'Aucune adresse e-mail : renseignez le destinataire.' };
+  if (inv.status === 'draft') return { ok: false, error: 'Un brouillon ne s’envoie pas : émettez la facture, ou passez-la en pro forma.' };
+  if (inv.status === 'cancelled') return { ok: false, error: 'Ce document est annulé.' };
   const company = await getCompany();
-  const proforma = inv.kind === 'proforma';
+  const proforma = inv.status === 'proforma';
   const avoir = inv.kind === 'credit_note';
   let token = inv.validation_token as string | undefined;
   if (proforma && !token) {
@@ -54,18 +56,18 @@ export async function envoyerFacture(id: string, opts: { to?: string; message?: 
 /** Proforma désignée par son jeton de validation (lien de l'e-mail). */
 export async function proformaParToken(token: string) {
   if (!token || token.length < 16) return null;
-  const rows = await query<any>(`SELECT meta::id(id) AS id FROM invoice WHERE validation_token = $t AND kind = 'proforma' LIMIT 1`, { t: token });
+  const rows = await query<any>(`SELECT meta::id(id) AS id FROM invoice WHERE validation_token = $t LIMIT 1`, { t: token });
   return rows[0] ? getInvoice(String(rows[0].id)) : null;
 }
 
-/** Le client valide : facture définitive créée, envoyée à l'adresse qui a reçu la proforma. */
+/** Le client valide : la pro forma est émise (numéro légal) et la facture lui part aussitôt. */
 export async function validerProforma(token: string): Promise<{ ok: boolean; ref?: string; dejaValidee?: boolean; error?: string }> {
   const p = await proformaParToken(token);
   if (!p) return { ok: false, error: 'Lien inconnu ou expiré.' };
-  if (p.converted_to_id) return { ok: true, ref: p.converted_to_ref, dejaValidee: true };
+  if (p.status !== 'proforma') return { ok: true, ref: p.ref, dejaValidee: true };
   await query(`UPDATE $id SET validated_at = time::now()`, { id: recId('invoice', p.id) });
-  const nid = await convertirProforma(p.id);
-  const inv = await getInvoice(nid);
-  if (p.sent_to || p.bill_to?.email) await envoyerFacture(nid, { to: p.sent_to || p.bill_to?.email, message: 'Merci pour votre validation : voici la facture définitive.' });
-  return { ok: true, ref: inv?.ref };
+  const { ref } = await emettreFacture(p.id);
+  const destinataire = p.sent_to || p.bill_to?.email;
+  if (destinataire) await envoyerFacture(p.id, { to: destinataire, message: 'Merci pour votre validation : voici la facture définitive.' });
+  return { ok: true, ref };
 }

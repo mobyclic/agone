@@ -8,11 +8,14 @@
   let { data } = $props();
   const pageCount = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-  const KINDS = [{ k: '', label: 'Tout' }, { k: 'invoice', label: 'Factures' }, { k: 'proforma', label: 'Pro forma' }, { k: 'credit_note', label: 'Avoirs' }];
+  const KINDS = [{ k: '', label: 'Tout' }, { k: 'invoice', label: 'Factures' }, { k: 'credit_note', label: 'Avoirs' }];
+  /** Les six états du cycle de vie, dans l'ordre où on les filtre. */
+  const ETATS = [{ s: '', label: 'Tous états' }, { s: 'draft', label: 'Brouillons' }, { s: 'proforma', label: 'Pro forma' }, { s: 'due', label: 'À encaisser' }, { s: 'paid', label: 'Réglées' }, { s: 'cancelled', label: 'Annulées' }];
+  const etat = (f: any) => STATUT[f.status ?? 'unpaid'] ?? STATUT.unpaid;
   const STATUT: Record<string, { texte: string; cls: string }> = {
+    draft: { texte: 'Brouillon', cls: 'bg-secondary text-muted-foreground' }, proforma: { texte: 'Pro forma', cls: 'bg-accent text-accent-foreground' },
     unpaid: { texte: 'À encaisser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partielle', cls: 'bg-warning/15 text-warning' },
-    paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' },
-    converted: { texte: 'Validée → facture', cls: 'bg-success/15 text-success' }
+    paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' }
   };
 
   let q = $state(untrack(() => data.q ?? ''));
@@ -51,10 +54,10 @@
       <button type="button" class="px-3 py-2 text-sm {(data.kind ?? '') === w.k ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ kind: w.k || undefined, page: 1 })}>{w.label}</button>
     {/each}
   </div>
-  <div class="flex overflow-hidden rounded-md border border-border">
-    <button type="button" class="px-3 py-2 text-sm {!data.status ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: undefined, page: 1 })}>Tous états</button>
-    <button type="button" class="px-3 py-2 text-sm {data.status === 'due' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: 'due', kind: undefined, page: 1 })}>À encaisser</button>
-    <button type="button" class="px-3 py-2 text-sm {data.status === 'paid' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: 'paid', page: 1 })}>Réglées</button>
+  <div class="flex flex-wrap overflow-hidden rounded-md border border-border">
+    {#each ETATS as e (e.s)}
+      <button type="button" class="px-3 py-2 text-sm {(data.status ?? '') === e.s ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ status: e.s || undefined, page: 1 })}>{e.label}</button>
+    {/each}
   </div>
 </div>
 
@@ -74,18 +77,17 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.invoices as f (f.id)}
-        <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2"><a href="/admin/factures/{f.id}" class="font-medium hover:text-link">{f.ref}</a></td>
+        <!-- Toute la ligne ouvre le document : un brouillon s'ouvre en édition. -->
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a')) goto(`/admin/factures/${f.id}`); }}>
+          <td class="px-3 py-2"><a href="/admin/factures/{f.id}" class="font-medium hover:text-link">{f.status === 'draft' ? 'brouillon' : f.ref}</a></td>
           <td class="px-3 py-2">
-            {#if f.kind === 'credit_note'}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>{:else if f.kind === 'proforma'}<span class="rounded bg-accent px-2 py-0.5 text-xs text-accent-foreground">Pro forma</span>{:else}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Facture</span>{/if}
+            {#if f.kind === 'credit_note'}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>{:else}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Facture</span>{/if}
           </td>
           <td class="px-3 py-2 text-muted-foreground">{f.name || '—'}</td>
           <td class="px-3 py-2 text-muted-foreground">{#if f.order_number}<a href="/admin/commandes/{f.order_number}" class="hover:text-link">#{f.order_number}</a>{:else}—{/if}</td>
           <td class="px-3 py-2 text-right tabular-nums">{f.kind === 'credit_note' ? '−' : ''}{euros(f.total_ttc)}</td>
           <td class="px-3 py-2">
-            {#if f.kind === 'credit_note'}<span class="text-muted-foreground">—</span>
-            {:else if f.kind === 'proforma' && f.status !== 'converted'}<span class="text-xs text-muted-foreground">en attente</span>
-            {:else}{@const st = STATUT[f.status ?? 'unpaid']}<span class="whitespace-nowrap rounded px-2 py-0.5 text-xs {st.cls}">{st.texte}{#if f.status === 'partial'} · {euros(f.paid_total)}{/if}</span>{/if}
+            <span class="whitespace-nowrap rounded px-2 py-0.5 text-xs {etat(f).cls}">{etat(f).texte}{#if f.status === 'partial'} · {euros(f.paid_total)}{/if}</span>
           </td>
           <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(f.issued_at)}</td>
           <td class="px-3 py-2 text-right"><a href="/admin/factures/{f.id}/pdf?dl=1" class="inline-flex text-muted-foreground hover:text-foreground" aria-label="Télécharger"><Download size={16} /></a></td>
