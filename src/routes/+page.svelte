@@ -38,7 +38,7 @@
         <a href="/article/{article.slug}" class="group block">
           <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
             {#if article.rubrique_name}
-              <span class="font-semibold text-link">{article.rubrique_name}</span>
+              <span class="font-semibold text-muted-foreground">{article.rubrique_name}</span>
               {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
             {/if}
             {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
@@ -59,7 +59,7 @@
             {#each secondary as a (a.slug)}
               <a href="/article/{a.slug}" class="group block py-3.5">
                 <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
-                  {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
+                  {#if a.rubrique_name}<span class="font-semibold text-muted-foreground">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
                 <h3 class="display-title mt-1 text-xl leading-tight">{a.title}</h3>
