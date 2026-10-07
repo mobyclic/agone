@@ -7,6 +7,7 @@
 import { query, recId } from './surreal';
 import { addPayment, recomputeInvoiceStatus } from './invoice';
 import { modeReglement, type FactureMeg } from '$lib/megFacture';
+import { rapprocherTitre, type TitreCatalogue } from '$lib/titreMeg';
 import { heureParisVersDate } from '$lib/dates';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -44,6 +45,49 @@ async function clientPour(f: FactureMeg): Promise<{ id: string; cree: boolean } 
   return { id: String(rows[0].id).replace(/^client:/, ''), cree: true };
 }
 
+/** Catalogue en mémoire le temps d'un import : ISBN et titres. */
+let catalogue: { parIsbn: Map<string, string>; titres: TitreCatalogue[] } | null = null;
+async function chargerCatalogue() {
+  if (catalogue) return catalogue;
+  const livres = await query<any>(`SELECT meta::id(id) AS id, title, isbn_paper, isbn_ebook FROM book`);
+  const parIsbn = new Map<string, string>();
+  for (const b of livres) { if (b.isbn_paper) parIsbn.set(String(b.isbn_paper), String(b.id)); if (b.isbn_ebook) parIsbn.set(String(b.isbn_ebook), String(b.id)); }
+  catalogue = { parIsbn, titres: livres.map((b: any) => ({ id: String(b.id), title: String(b.title) })) };
+  setTimeout(() => (catalogue = null), 60_000).unref?.();
+  return catalogue;
+}
+
+/** Pose `book` sur chaque ligne qu'on sait rattacher ; renvoie le nombre de lignes reliées. */
+export async function relierAuCatalogue(lines: { isbn?: string; book?: string }[], libelles: string[]): Promise<number> {
+  const cat = await chargerCatalogue();
+  let n = 0;
+  lines.forEach((l, i) => {
+    if (l.book) return;
+    const parIsbn = l.isbn ? cat.parIsbn.get(l.isbn) : undefined;
+    const livre = parIsbn ?? rapprocherTitre(libelles[i] ?? '', cat.titres)?.id;
+    if (livre) { l.book = livre; n++; }
+  });
+  return n;
+}
+
+/**
+ * Reprise : relie au catalogue les lignes des factures déjà importées qui n'ont
+ * pas de livre (ISBN absent ou libellé tronqué). Idempotent.
+ */
+export async function relierLignesImportees(): Promise<{ factures: number; lignes: number }> {
+  const factures = await query<any>(`SELECT meta::id(id) AS id, lines FROM invoice WHERE imported_from = 'meg'`);
+  let nf = 0, nl = 0;
+  for (const f of factures) {
+    const lines = (f.lines ?? []) as any[];
+    if (!lines.some((l) => !l.book)) continue;
+    // Le libellé importé est « ISBN – titre (auteur) » ou « titre (auteur) » : on en retire l'ISBN et l'auteur.
+    const libelles = lines.map((l) => String(l.description ?? '').replace(/^\d{13}\s*–\s*/, '').replace(/\s*\([^)]*\)\s*$/, ''));
+    const n = await relierAuCatalogue(lines, libelles);
+    if (n) { await query(`UPDATE $id SET lines = $l`, { id: recId('invoice', f.id), l: lines }); nf++; nl += n; }
+  }
+  return { factures: nf, lignes: nl };
+}
+
 export async function importerFactureMeg(f: FactureMeg, opts: { mediaId?: string; annulee?: boolean } = {}): Promise<ResultatImport> {
   const deja = await query<any>(`SELECT meta::id(id) AS id FROM invoice WHERE ref = $r LIMIT 1`, { r: f.ref });
   if (deja[0]) return { ref: f.ref, statut: 'existant', id: String(deja[0].id), client: 'aucun' };
@@ -65,13 +109,8 @@ export async function importerFactureMeg(f: FactureMeg, opts: { mediaId?: string
       isbn: l.isbn, code: l.code, unit: l.unite
     };
   });
-  // Lien vers le catalogue par ISBN.
-  const isbns = [...new Set(lines.map((l) => l.isbn).filter(Boolean))];
-  if (isbns.length) {
-    const livres = await query<any>(`SELECT meta::id(id) AS id, isbn_paper FROM book WHERE isbn_paper IN $i`, { i: isbns });
-    const parIsbn = new Map(livres.map((b: any) => [b.isbn_paper, String(b.id)]));
-    for (const l of lines) if (l.isbn && parIsbn.has(l.isbn)) (l as any).book = parIsbn.get(l.isbn);
-  }
+  // Lien vers le catalogue : par ISBN, sinon par début de titre (MEG coupe les libellés longs).
+  await relierAuCatalogue(lines, f.lignes.map((l) => l.description));
   const subtotal_ht = r2(signe * f.total_ht_net), tax_total = r2(signe * f.tva), total_ttc = r2(signe * f.total_ttc);
   const bill_to = {
     name: f.client.nom, email: f.client.email, contact_name: undefined,

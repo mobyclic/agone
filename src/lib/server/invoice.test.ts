@@ -48,3 +48,14 @@ test('prix saisis TTC : 2 × 16,00 €, TVA 5,5 %', async () => {
   expect(CREE.subtotal_ht).toBe(30.33);
   expect(CREE.total_ttc).toBe(32);
 });
+
+test('frais de port HT à 20 % en plus des livres à 5,5 %', async () => {
+  await createManualInvoice({
+    kind: 'invoice', price_mode: 'ht', bill_to: { name: 'Librairie' }, shipping: 115, shipping_vat_rate: 20,
+    lines: [{ description: 'Livres', qty: 1, unit_price: 203.32, vat_rate: 5.5 }]
+  });
+  expect(CREE.shipping_ht).toBe(115);
+  expect(CREE.subtotal_ht).toBe(318.32);
+  expect(CREE.tax_total).toBe(34.18);
+  expect(CREE.total_ttc).toBe(352.5);
+});

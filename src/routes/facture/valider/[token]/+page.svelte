@@ -26,6 +26,7 @@
         {#each p.lines as l, i (i)}
           <tr><td class="py-2 pr-3">{l.description}</td><td class="py-2 text-center text-muted-foreground">× {l.qty}</td><td class="py-2 text-right tabular-nums">{eur(l.total)}</td></tr>
         {/each}
+        {#if p.shipping_ttc}<tr><td class="py-2 pr-3 text-muted-foreground" colspan="2">Frais de port</td><td class="py-2 text-right tabular-nums">{eur(p.shipping_ttc)}</td></tr>{/if}
       </tbody>
       <tfoot class="border-t-2 border-foreground">
         <tr><td colspan="2" class="pt-2 text-right text-muted-foreground">Total HT</td><td class="pt-2 text-right tabular-nums">{eur(p.subtotal_ht)}</td></tr>

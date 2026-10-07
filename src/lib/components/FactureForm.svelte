@@ -25,6 +25,9 @@
   let mode = $state<'ht' | 'ttc'>(untrack(() => d ? (d.price_mode === 'ht' ? 'ht' : 'ttc') : initial?.pro ? 'ht' : 'ttc'));
   let issuedAt = $state(untrack(() => (d?.issued_at ? new Date(d.issued_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))));
   let intro = $state(untrack(() => d?.intro ?? ''));
+  // Frais de port : saisis dans le sens des prix du document, à leur propre TVA (transport : 20 %).
+  let shippingVat = $state<number>(untrack(() => d?.shipping_vat_rate ?? 20));
+  let shipping = $state<number>(untrack(() => (d?.shipping_ht ? (d.price_mode === 'ht' ? d.shipping_ht : Math.round(d.shipping_ht * (1 + (d.shipping_vat_rate ?? 20) / 100) * 100) / 100) : 0)));
   let notes = $state(untrack(() => d?.notes ?? ''));
 
   // ── Client : recherche mêlée (professionnels et particuliers), ou saisie libre ──
@@ -89,12 +92,14 @@
   function basculerMode(m: 'ht' | 'ttc') {
     if (m === mode) return;
     lines = lines.map((l) => ({ ...l, unit_price: Math.round((m === 'ht' ? l.unit_price / (1 + l.vat_rate / 100) : l.unit_price * (1 + l.vat_rate / 100)) * 100) / 100 }));
+    shipping = Math.round((m === 'ht' ? shipping / (1 + shippingVat / 100) : shipping * (1 + shippingVat / 100)) * 100) / 100;
     mode = m;
   }
   const ttcDe = (l: Line) => (mode === 'ht' ? l.unit_price * (1 + l.vat_rate / 100) : l.unit_price);
   const htDe = (l: Line) => (mode === 'ht' ? l.unit_price : l.unit_price / (1 + l.vat_rate / 100));
-  const totalHT = $derived(lines.reduce((s, l) => s + l.qty * htDe(l), 0));
-  const totalTTC = $derived(lines.reduce((s, l) => s + l.qty * ttcDe(l), 0));
+  const portHT = $derived(mode === 'ht' ? shipping : shipping / (1 + shippingVat / 100));
+  const totalHT = $derived(lines.reduce((s, l) => s + l.qty * htDe(l), 0) + portHT);
+  const totalTTC = $derived(lines.reduce((s, l) => s + l.qty * ttcDe(l), 0) + portHT * (1 + shippingVat / 100));
 </script>
 
 <form method="POST" action="?/brouillon" use:enhance class="max-w-3xl">
@@ -211,6 +216,15 @@
       {/each}
       {#if lines.length === 0}<p class="py-3 text-center text-sm text-muted-foreground">Aucune ligne : cherchez un titre du catalogue ou ajoutez une ligne libre.</p>{/if}
     </div>
+    <!-- Frais de port, à part des lignes : leur TVA est celle du transport. -->
+    <div class="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3 text-sm">
+      <span class="text-muted-foreground">Frais de port ({mode === 'ht' ? 'HT' : 'TTC'})</span>
+      <input type="number" min="0" step="0.01" bind:value={shipping} class="h-9 w-24 rounded border border-border bg-background px-2 text-right text-sm" />
+      <span class="text-muted-foreground">TVA</span>
+      <select bind:value={shippingVat} class="h-9 w-[84px] rounded border border-border bg-background px-1 text-center text-sm">
+        {#each vatRates as r (r)}<option value={r}>{vatLabel(r)}</option>{/each}
+      </select>
+    </div>
     <div class="mt-3 space-y-0.5 border-t border-border pt-2 text-right text-sm">
       <div class="text-muted-foreground">Total HT : {euro(totalHT)}</div>
       <div class="text-muted-foreground">TVA : {euro(totalTTC - totalHT)}</div>
@@ -240,6 +254,8 @@
   <input type="hidden" name="vat_number" value={vatNumber} />
   <input type="hidden" name="siret" value={siret} />
   <input type="hidden" name="intro" value={intro} />
+  <input type="hidden" name="shipping" value={shipping || ''} />
+  <input type="hidden" name="shipping_vat_rate" value={shippingVat} />
   <input type="hidden" name="notes" value={notes} />
   <input type="hidden" name="lines" value={JSON.stringify(lines)} />
 

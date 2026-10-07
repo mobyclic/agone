@@ -33,7 +33,9 @@ export function lireFormulaireFacture(fd: FormData): { input: ManualInvoiceInput
     vat_rate: S('vat_rate') ? Number(S('vat_rate').replace(',', '.')) : undefined,
     intro: S('intro') || undefined,
     notes: S('notes') || undefined,
-    issued_at: jour ? heureParisVersDate(`${jour}T12:00`) ?? undefined : undefined
+    issued_at: jour ? heureParisVersDate(`${jour}T12:00`) ?? undefined : undefined,
+    shipping: S('shipping') ? Math.max(0, Number(S('shipping').replace(',', '.')) || 0) : undefined,
+    shipping_vat_rate: S('shipping_vat_rate') ? Number(S('shipping_vat_rate').replace(',', '.')) : undefined
   };
   if (!lines.length) return { input, erreur: 'Ajoutez au moins une ligne.' };
   if (!input.bill_to.name) return { input, erreur: 'Le nom du client est requis.' };

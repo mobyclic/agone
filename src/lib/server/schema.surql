@@ -867,6 +867,7 @@ DEFINE FIELD OVERWRITE due_at      ON invoice TYPE option<datetime>;      -- éc
 -- Frais de port HT (TVA 20 %), à part des lignes ; et provenance d'une facture importée
 -- de l'ancien outil (MEG) : son PDF d'origine fait foi, on le garde.
 DEFINE FIELD OVERWRITE shipping_ht   ON invoice TYPE option<number>;
+DEFINE FIELD OVERWRITE shipping_vat_rate ON invoice TYPE option<number>;  -- TVA du port (20 % : transport)
 DEFINE FIELD OVERWRITE imported_from ON invoice TYPE option<string>;
 DEFINE FIELD OVERWRITE external_ref  ON invoice TYPE option<string>;      -- facture visée par un avoir, etc.
 DEFINE FIELD OVERWRITE document      ON invoice TYPE option<record<media>>;

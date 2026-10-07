@@ -273,6 +273,9 @@ export interface ManualInvoiceInput {
   intro?: string;
   notes?: string;
   issued_at?: Date;
+  /** Frais de port, saisis dans le sens des prix du document (HT ou TTC), à leur propre TVA (20 %). */
+  shipping?: number;
+  shipping_vat_rate?: number;
 }
 
 /** Lignes et totaux d'un document, à partir de ce qu'a saisi l'opérateur. */
@@ -295,8 +298,17 @@ async function preparerDocument(input: ManualInvoiceInput) {
       };
     });
   const totals = computeTotals(lines, ht ? 'ht' : 'ttc');
+  // Le port s'ajoute aux totaux, à son taux (le transport est à 20 %, pas à 5,5).
+  const portTaux = input.shipping_vat_rate ?? 20;
+  const portHT = input.shipping && input.shipping > 0 ? r2(ht ? input.shipping : input.shipping / (1 + portTaux / 100)) : 0;
+  if (portHT) {
+    totals.subtotal_ht = r2(totals.subtotal_ht + portHT);
+    totals.total_ttc = r2(totals.total_ttc + portHT * (1 + portTaux / 100));
+    totals.tax_total = r2(totals.total_ttc - totals.subtotal_ht);
+  }
   return {
     kind: input.kind,
+    shipping_ht: portHT || undefined, shipping_vat_rate: portHT ? portTaux : undefined,
     customer: input.customerId ? recId('user', input.customerId) : undefined,
     client: input.clientId ? recId('client', input.clientId) : undefined,
     bill_to: input.bill_to, lines, vat_rate: base, ...totals, price_mode: ht ? 'ht' : 'ttc',
@@ -376,7 +388,7 @@ const INV_FIELDS = `
   subtotal_ht, tax_total, total_ttc, notes, issued_at, order.number AS order_number,
   IF client != NONE THEN meta::id(client) ELSE NONE END AS client_id, client.name AS client_name,
   IF customer != NONE THEN meta::id(customer) ELSE NONE END AS customer_id,
-  shipping_ht, imported_from, external_ref, document.key AS document_key, document.filename AS document_name,
+  shipping_ht, shipping_vat_rate, imported_from, external_ref, document.key AS document_key, document.filename AS document_name,
   sent_at, sent_to, validated_at, validation_token, proforma_ref
 `;
 
@@ -387,10 +399,11 @@ export async function getInvoice(id: string) {
   const inv = rows[0];
   if (!inv) return null;
   inv.vat_breakdown = vatBreakdown(inv.lines ?? [], inv.price_mode === 'ht' ? 'ht' : 'ttc');
-  // Les frais de port (TVA 20 %) s'ajoutent à la ventilation.
+  // Les frais de port s'ajoutent à la ventilation, à leur taux (20 % sauf réglage).
   if (inv.shipping_ht) {
-    const port = { rate: 20, base_ht: r2(inv.shipping_ht), tax: r2(inv.shipping_ht * 0.2) };
-    const e = inv.vat_breakdown.find((b: any) => b.rate === 20);
+    const taux = Number(inv.shipping_vat_rate ?? 20);
+    const port = { rate: taux, base_ht: r2(inv.shipping_ht), tax: r2(inv.shipping_ht * taux / 100) };
+    const e = inv.vat_breakdown.find((b: any) => b.rate === taux);
     if (e) { e.base_ht = r2(e.base_ht + port.base_ht); e.tax = r2(e.tax + port.tax); } else inv.vat_breakdown.push(port);
   }
   return inv;
