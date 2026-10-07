@@ -33,29 +33,24 @@
         </div>
 
         <!-- Même gabarit et même taille que les articles suivants : rubrique en
-             rouge · date, le titre, l'auteur ; seul le chapeau est plus long. -->
-        <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
-          {#if article.rubrique_name}
-            <a href="/antichambre?rubrique={article.rubrique_slug}" class="font-semibold text-link hover:underline">{article.rubrique_name}</a>
-            {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
+             rouge · date, le titre, l'auteur ; seul le chapeau est plus long.
+             Tout le bloc est cliquable ; seul « Lire l'article » se souligne. -->
+        <a href="/article/{article.slug}" class="group block">
+          <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
+            {#if article.rubrique_name}
+              <span class="font-semibold text-link">{article.rubrique_name}</span>
+              {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
+            {/if}
+            {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
+          </div>
+          <h1 class="display-title mt-1 break-words text-xl leading-tight">{article.title}</h1>
+          {#if article.author}
+            <p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{article.author}</p>
           {/if}
-          {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
-        </div>
-
-        <a href="/article/{article.slug}" class="group mt-1 block">
-          <h1 class="display-title break-words text-xl leading-tight group-hover:underline group-hover:underline-offset-4">{article.title}</h1>
-        </a>
-
-        {#if article.author}
-          <p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{article.author}</p>
-        {/if}
-
-        {#if lede}
-          <p class="mt-1.5 text-sm leading-relaxed text-foreground/75">{lede}</p>
-        {/if}
-
-        <a href="/article/{article.slug}" class="link mt-3 inline-flex w-fit items-center gap-2 font-display text-xs font-semibold uppercase tracking-wider">
-          Lire l’article <span aria-hidden="true">→</span>
+          {#if lede}
+            <p class="mt-1.5 text-sm leading-relaxed text-foreground/75">{lede}</p>
+          {/if}
+          <span class="mt-3 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
         </a>
 
         <!-- 4 articles récents (thème · date, titre, auteur) -->
@@ -67,11 +62,12 @@
                   {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
-                <h3 class="display-title mt-1 text-xl leading-tight group-hover:underline group-hover:underline-offset-4">{a.title}</h3>
+                <h3 class="display-title mt-1 text-xl leading-tight">{a.title}</h3>
                 {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
                 {#if a.excerpt}
                   <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>
                 {/if}
+                <span class="mt-2 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
               </a>
             {/each}
           </div>
