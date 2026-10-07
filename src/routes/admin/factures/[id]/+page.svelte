@@ -6,7 +6,7 @@
    */
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
-  import { ArrowLeft, Download, Printer, Receipt, Trash, Plus, PaperPlaneTilt, X, Stamp, ArrowCounterClockwise, Prohibit, ClockCounterClockwise } from 'phosphor-svelte';
+  import { ArrowLeft, Download, Eye, Receipt, Trash, Plus, PaperPlaneTilt, X, Stamp, ArrowCounterClockwise, Prohibit, ClockCounterClockwise } from 'phosphor-svelte';
   import { euros, PAYMENT_LABEL } from '$lib/labels';
 
   let { data } = $props();
@@ -33,11 +33,8 @@
   const st = $derived(STATUT[f.status] ?? STATUT.unpaid);
   const aujourdhui = new Date().toISOString().slice(0, 10);
   let envoi = $state(false);
-  let frame = $state<HTMLIFrameElement | null>(null);
-  function printPdf() {
-    try { frame?.contentWindow?.focus(); frame?.contentWindow?.print(); }
-    catch { window.open(`/admin/factures/${f.id}/pdf`, '_blank'); }
-  }
+  /** Le PDF (l'original pour une facture importée) s'ouvre dans un onglet : lecture, impression. */
+  const pdfUrl = $derived(`/admin/factures/${f.id}/${f.document_key ? 'original' : 'pdf'}`);
 </script>
 
 <svelte:head><title>{f.ref} · Facturation · Admin</title></svelte:head>
@@ -67,14 +64,9 @@
     {#if !isCancelled}
       <Button type="button" variant="outline" onclick={() => (envoi = true)}><PaperPlaneTilt size={16} /> {f.sent_at ? 'Renvoyer' : 'Envoyer'} par e-mail</Button>
     {/if}
-    <Button type="button" onclick={printPdf} variant="outline"><Printer size={16} /> Imprimer</Button>
-    <Button href="/admin/factures/{f.id}/{f.document_key ? 'original' : 'pdf'}?dl=1" variant="brand"><Download size={16} /> Télécharger{#if f.document_key} l’original{/if}</Button>
+    <Button href={pdfUrl} target="_blank" rel="noopener" variant="outline"><Eye size={16} /> Aperçu PDF</Button>
+    <Button href="{pdfUrl}?dl=1" variant="brand"><Download size={16} /> Télécharger{#if f.document_key} l’original{/if}</Button>
   </div>
-</div>
-
-<!-- Aperçu : une facture importée s'affiche par son PDF d'origine, qui fait foi. -->
-<div class="mb-6 overflow-hidden rounded-lg border border-border bg-muted/30">
-  <iframe bind:this={frame} src="/admin/factures/{f.id}/{f.document_key ? 'original' : 'pdf'}#toolbar=0" title="Aperçu {f.ref}" class="h-[78vh] max-h-[900px] w-full bg-white"></iframe>
 </div>
 
 <div class="grid gap-5 lg:grid-cols-[1fr_300px]">

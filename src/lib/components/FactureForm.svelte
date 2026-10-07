@@ -20,7 +20,8 @@
   const vatLabel = (r: number) => `${String(r).replace('.', ',')} %`;
 
   let kind = $state<'invoice' | 'credit_note'>(untrack(() => (d?.kind === 'credit_note' ? 'credit_note' : 'invoice')));
-  let baseVat = $state(untrack(() => d?.vat_rate ?? defaultVat));
+  // TVA des lignes libres : le réglage de la maison (Paramètres) ; chaque ligne reste modifiable.
+  const baseVat = untrack(() => d?.vat_rate ?? defaultVat);
   let mode = $state<'ht' | 'ttc'>(untrack(() => d ? (d.price_mode === 'ht' ? 'ht' : 'ttc') : initial?.pro ? 'ht' : 'ttc'));
   let issuedAt = $state(untrack(() => (d?.issued_at ? new Date(d.issued_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))));
   let intro = $state(untrack(() => d?.intro ?? ''));
@@ -115,12 +116,6 @@
       </div>
     </div>
     <label class="flex items-center gap-2 text-sm" title="Date d'émission si vous émettez maintenant ; un brouillon la garde en mémoire."><span class="font-medium">Date</span><input type="date" bind:value={issuedAt} class="h-9 rounded-md border border-border bg-background px-2 text-sm" /></label>
-    <div class="ml-auto flex items-center gap-2">
-      <span class="text-sm text-muted-foreground">TVA des lignes libres</span>
-      <select bind:value={baseVat} class="h-9 rounded-md border border-border bg-background px-2 text-sm">
-        {#each vatRates as r (r)}<option value={r}>{vatLabel(r)}</option>{/each}
-      </select>
-    </div>
   </section>
 
   <!-- Client -->

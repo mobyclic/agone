@@ -26,7 +26,7 @@ export interface Company {
   phone?: string;
   capital?: string;
   footer?: string;
-  vat_rate: number; // taux par défaut (nouvelles lignes)
+  vat_rate: number; // taux par défaut des lignes libres (réglable dans Paramètres)
   vat_rates: number[]; // taux disponibles (sélecteur)
 }
 
@@ -35,7 +35,8 @@ export async function getCompany(): Promise<Company> {
   const rates = Array.isArray(s.vat_rates) && s.vat_rates.length
     ? s.vat_rates.map(Number).filter((n: number) => !Number.isNaN(n))
     : [5.5, 20, 10, 2.1, 0];
-  const vat_rate = s.vat_rate != null && s.vat_rate !== '' ? Number(s.vat_rate) : 5.5;
+  // Taux des lignes libres (frais, prestations…) : 20 % ; les livres portent leur propre taux.
+  const vat_rate = s.vat_rate != null && s.vat_rate !== '' ? Number(s.vat_rate) : 20;
   return {
     legal_name: s.legal_name || 'Éditions Agone',
     address: s.address || '',

@@ -79,9 +79,14 @@
           <p class="px-4 py-6 text-sm text-muted-foreground">Aucune facture pour ce client.</p>
         {/if}
       </div>
-      <form method="POST" action="?/delete" use:enhance onsubmit={(e: Event) => { if (!confirm(`Supprimer « ${c.name} » ?`)) e.preventDefault(); }}>
-        <button type="submit" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"><Trash size={13} /> Supprimer ce client</button>
-      </form>
+      <!-- Un client facturé ne se supprime pas : ses factures le portent. -->
+      {#if data.factures.length === 0}
+        <form method="POST" action="?/delete" use:enhance onsubmit={(e: Event) => { if (!confirm(`Supprimer « ${c.name} » ?`)) e.preventDefault(); }}>
+          <button type="submit" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"><Trash size={13} /> Supprimer ce client</button>
+        </form>
+      {:else}
+        <p class="text-xs text-muted-foreground">Ce client porte {data.factures.length} facture{data.factures.length > 1 ? 's' : ''} : il ne peut pas être supprimé.</p>
+      {/if}
     {/if}
   </div>
 </div>
