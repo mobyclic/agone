@@ -158,3 +158,25 @@ export function imagesPourMail(html: string): string {
     return tag.replace(/\sstyle="[^"]*"/, '').replace(/^<img/, `<img style="${style.join(';')}"`);
   });
 }
+
+/**
+ * Contenu venu de WordPress : apostrophes encodées (&#x27; / &#039;) → « ’ »,
+ * uniquement hors balises (un href les garde).
+ */
+export function apostrophesHtml(html: string): string {
+  return html.replace(/(&#x27;|&#039;|&#39;)(?![^<]*>)/g, '’');
+}
+
+/** Notes [mfn]…[/mfn] du plugin Modern Footnotes → appels de note de l'éditeur (<sup data-fn>). */
+export function convertirNotesWp(html: string): string {
+  const escAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return html.replace(/\s*\[mfn\]([\s\S]*?)\[\/mfn\]/g, (_m, note: string) => `<sup data-fn="${escAttr(note.trim())}"></sup>`);
+}
+
+/** Retire les notes [mfn] d'un texte brut (extrait). */
+export function sansNotesWp(s: string): string {
+  return s.replace(/\s*\[mfn\][\s\S]*?\[\/mfn\]/g, '');
+}
+
+/** HTML éditorial importé de WordPress : apostrophes et notes mises au propre. */
+export const htmlDepuisWp = (html: string) => convertirNotesWp(apostrophesHtml(html));

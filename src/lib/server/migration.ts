@@ -18,7 +18,7 @@ import { query, recId } from './surreal';
 import { uniqueSlug, slugify } from './slug';
 import { wpQuery, wpPrefix } from './wp-db';
 import { wpautop } from './wpautop';
-import { extraitPropre } from '$lib/text';
+import { extraitPropre, decoderEntites, htmlDepuisWp, sansNotesWp } from '$lib/text';
 import { accorderEbooksPayes } from './library';
 import { uploadOptimizedImage, bookCoverKey } from './storage';
 
@@ -503,7 +503,7 @@ export async function importAuthors(opts: ImportOpts = {}): Promise<ImportResult
 
   const posts = await wpQuery<any>(
     `SELECT ID, post_title, post_name, post_modified_gmt FROM ${p}posts
-      WHERE post_type = 'auteurs' AND post_status IN ('publish','draft')${inc.sql}
+      WHERE post_type = 'auteurs' AND post_status IN ('publish','future','draft','pending')${inc.sql}
       ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
     [...inc.params, limit]
   );
@@ -551,7 +551,7 @@ export async function importArticles(opts: ImportOpts = {}): Promise<ImportResul
 
   const posts = await wpQuery<any>(
     `SELECT ID, post_title, post_name, post_content, post_excerpt, post_status, post_date_gmt, post_modified_gmt
-       FROM ${p}posts WHERE post_type = 'post' AND post_status IN ('publish','draft')${inc.sql}
+       FROM ${p}posts WHERE post_type = 'post' AND post_status IN ('publish','future','draft','pending')${inc.sql}
       ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
     [...inc.params, limit]
   );
@@ -577,15 +577,16 @@ export async function importArticles(opts: ImportOpts = {}): Promise<ImportResul
     const rubPid = rubMap.get(catByPost.get(wpId) ?? -1);
     // Chapô rédigé s'il existe, sinon début du corps coupé SUR UN MOT (un
     // `slice` brut laissait « …qui en découlent, m'en » en fin d'extrait).
-    const excerpt = stripHtml(a.post_excerpt) || extraitPropre(stripHtml(a.post_content), 220);
+    const excerpt = decoderEntites(sansNotesWp(stripHtml(a.post_excerpt))) || extraitPropre(sansNotesWp(stripHtml(a.post_content)), 220);
     try {
       const ex = await query<any>(`SELECT meta::id(id) AS pid FROM article WHERE legacy_wp_id = $w LIMIT 1`, { w: wpId });
       if (dryRun) { ex[0]?.pid ? updated++ : created++; continue; }
       const fields = {
-        title: String(a.post_title || '').trim() || '(sans titre)',
-        body_html: wpautop(a.post_content) || undefined,
+        title: decoderEntites(String(a.post_title || '').trim()) || '(sans titre)',
+        body_html: htmlDepuisWp(wpautop(a.post_content)) || undefined,
         excerpt,
-        status: a.post_status === 'draft' ? 'draft' : 'published',
+        // Brouillon / en attente → draft ; publié ou PLANIFIÉ → published (la date future le programme).
+        status: ['draft', 'pending'].includes(String(a.post_status)) ? 'draft' : 'published',
         is_newsletter_issue: /\[\s*lettrinfo/i.test(String(a.post_title || '')),
         published_at: mysqlDate(a.post_date_gmt),
         rubrique: rubPid ? recId('rubrique', rubPid) : undefined,
@@ -640,7 +641,7 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
 
   const posts = await wpQuery<any>(
     `SELECT ID, post_title, post_name, post_content, post_status, post_modified_gmt FROM ${p}posts
-       WHERE post_type = 'livres' AND post_status IN ('publish','draft')${inc.sql}
+       WHERE post_type = 'livres' AND post_status IN ('publish','future','draft','pending')${inc.sql}
       ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
     [...inc.params, limit]
   );
@@ -675,12 +676,12 @@ export async function importBooks(opts: ImportOpts = {}): Promise<ImportResult> 
     const fields = {
       title: String(b.post_title || '').trim() || '(sans titre)',
       subtitle: (m.sous_titre || '').trim() || undefined,
-      description_html: wpautop(b.post_content) || undefined,
-      extra_info_html: wpautop((m.infos_additionnelles || '').trim()) || undefined,
+      description_html: htmlDepuisWp(wpautop(b.post_content)) || undefined,
+      extra_info_html: htmlDepuisWp(wpautop((m.infos_additionnelles || '').trim())) || undefined,
       title_original: (m.titre_originale || '').trim() || undefined,
       language_original: (m.langue_originale || '').trim() || undefined,
       // Brouillon WP → draft ; sinon published (une date de parution future le rend « à paraître »).
-      status: b.post_status === 'draft' ? 'draft' : 'published',
+      status: ['draft', 'pending'].includes(String(b.post_status)) ? 'draft' : 'published',
       isbn_paper: (m.isbn_papier || '').trim() || undefined,
       isbn_ebook: (m.isbn_digital || '').trim() || undefined,
       price_paper: num(m.prix_papier),
@@ -961,7 +962,7 @@ export async function importEvents(opts: ImportOpts = {}): Promise<ImportResult>
 
   const posts = await wpQuery<any>(
     `SELECT ID, post_title, post_name, post_content, post_modified_gmt FROM ${p}posts
-       WHERE post_type = 'rencontres' AND post_status IN ('publish','draft')${inc.sql}
+       WHERE post_type = 'rencontres' AND post_status IN ('publish','future','draft','pending')${inc.sql}
       ORDER BY post_modified_gmt ASC, ID ASC LIMIT ?`,
     [...inc.params, limit]
   );
@@ -982,7 +983,7 @@ export async function importEvents(opts: ImportOpts = {}): Promise<ImportResult>
       const venuePid = dryRun ? undefined : await ensureVenue(m.lieu, venueCache);
       const fields = {
         title: String(e.post_title || '').trim() || '(sans titre)',
-        body_html: e.post_content || undefined,
+        body_html: htmlDepuisWp(e.post_content || '') || undefined,
         start_at: mysqlDate(m.date_de_debut),
         end_at: mysqlDate(m.date_de_fin),
         venue: venuePid ? recId('venue', venuePid) : undefined,
