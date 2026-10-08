@@ -45,14 +45,12 @@
           {#each data.articles as a (a.slug)}
             <a href="/article/{a.slug}" class="group block py-3.5">
               <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
-                {#if a.rubrique_name}<span class="font-semibold text-muted-foreground">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
+                {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                 <span class="text-muted-foreground">{fmt(a.published_at)}</span>
               </div>
-              <h2 class="display-title mt-1 text-xl leading-tight">{a.title}</h2>
+              <h2 class="display-title mt-1 text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">{a.title}</h2>
               {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
               {#if a.excerpt}<p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>{/if}
-              <!-- Tout le bloc est cliquable ; seul « Lire l'article » se souligne. -->
-              <span class="mt-2 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
             </a>
           {/each}
         </div>
