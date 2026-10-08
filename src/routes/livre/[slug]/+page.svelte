@@ -88,7 +88,9 @@
 
   <!-- Deux tiers : couverture + contenu. Un tiers : colonne latérale. -->
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
-    <div class="grid gap-8 sm:grid-cols-[minmax(0,340px)_minmax(0,1fr)] sm:items-start">
+    <!-- Bloc couverture + présentation ferré au défilement : quand la colonne de droite
+         (du même auteur, collection…) est plus longue, il ne laisse pas un grand blanc. -->
+    <div use:colonneCollante class="grid gap-8 sm:grid-cols-[minmax(0,340px)_minmax(0,1fr)] sm:items-start">
     <!-- Couverture + infos annexes — ferrée au défilement comme la colonne de droite. -->
     <div use:colonneCollante class="hidden sm:block">
       {#if b.cover_url}
