@@ -3,7 +3,7 @@
 
   interface Results {
     books: { title: string; slug: string; cover_url?: string; author?: string }[];
-    authors: { full_name: string; slug: string }[];
+    authors: { full_name: string; slug: string; portrait_url?: string }[];
     articles: { title: string; slug: string; rubrique?: string }[];
     events: { title: string; slug: string; start_at?: string; venue_city?: string; upcoming: boolean }[];
   }
@@ -93,7 +93,12 @@
             <div class="border-b border-border py-1.5">
               <p class={groupLabel}>Auteurs</p>
               {#each results.authors as a (a.slug)}
-                <a href="/auteur/{a.slug}" onclick={close} class="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-muted/50"><User size={16} class="shrink-0 text-muted-foreground" /> <span class="truncate">{a.full_name}</span></a>
+                <a href="/auteur/{a.slug}" onclick={close} class="flex items-center gap-3 px-4 py-1.5 text-sm hover:bg-muted/50">
+                  <span class="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-muted text-muted-foreground">
+                    {#if a.portrait_url}<img src={a.portrait_url} alt="" class="size-full object-cover" />{:else}<User size={16} />{/if}
+                  </span>
+                  <span class="truncate">{a.full_name}</span>
+                </a>
               {/each}
             </div>
           {/if}
