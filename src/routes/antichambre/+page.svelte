@@ -17,7 +17,7 @@
 
 <svelte:head><title>Antichambre · Agone</title></svelte:head>
 
-<PageHead eyebrow={active ? 'Antichambre' : undefined} title={active?.name ?? 'Antichambre'} subtitle={active ? active.subtitle || undefined : 'Réflexions & digressions — au-delà des livres.'} />
+<PageHead eyebrow={active ? 'Antichambre' : undefined} title={active?.name ?? 'Antichambre'} subtitle={active ? active.subtitle || undefined : 'Réflexions & digressions à partir des livres et au-delà'} />
 
 <section class="py-10" style="padding-inline: var(--page-gutter)">
   <div class="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-12">
