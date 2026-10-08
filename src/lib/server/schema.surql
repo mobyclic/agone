@@ -890,7 +890,11 @@ DEFINE FIELD OVERWRITE invoice    ON invoice_payment TYPE record<invoice>;
 DEFINE FIELD OVERWRITE amount     ON invoice_payment TYPE number;
 DEFINE FIELD OVERWRITE paid_at    ON invoice_payment TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE method     ON invoice_payment TYPE string
-  ASSERT $value IN ['stripe','sumup','especes','cheque','virement','autre'] DEFAULT 'virement';
+  ASSERT $value IN ['stripe','sumup','especes','cheque','virement','autre','avoir'] DEFAULT 'virement';
+-- Règlement par avoir : la facture est réglée (en tout ou partie) par un avoir du même
+-- client, qui s'en trouve imputé d'autant. L'avoir porte le règlement miroir.
+DEFINE FIELD OVERWRITE credit_note ON invoice_payment TYPE option<record<invoice>>;
+DEFINE FIELD OVERWRITE applied_to  ON invoice_payment TYPE option<record<invoice>>;
 DEFINE FIELD OVERWRITE reference  ON invoice_payment TYPE option<string>;  -- n° de chèque, libellé du virement…
 DEFINE FIELD OVERWRITE note       ON invoice_payment TYPE option<string>;
 DEFINE FIELD OVERWRITE created_at ON invoice_payment TYPE datetime DEFAULT time::now();

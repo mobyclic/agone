@@ -42,7 +42,8 @@ export const PAYMENT_LABEL: Record<string, string> = {
   especes: 'Espèces',
   cheque: 'Chèque',
   virement: 'Virement',
-  autre: 'Autre'
+  autre: 'Autre',
+  avoir: 'Avoir imputé'
 };
 
 /** Statuts d'article/livre (libellés FR). */

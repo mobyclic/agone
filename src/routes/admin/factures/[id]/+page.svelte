@@ -25,12 +25,18 @@
     unpaid: { texte: 'À encaisser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partiellement réglée', cls: 'bg-warning/15 text-warning' },
     paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' }
   };
+  /** Un avoir ne s'encaisse pas : il s'impute sur une facture, ou se rembourse. */
+  const STATUT_AVOIR: Record<string, { texte: string; cls: string }> = {
+    unpaid: { texte: 'À imputer ou rembourser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partiellement imputé', cls: 'bg-warning/15 text-warning' },
+    paid: { texte: 'Soldé', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulé', cls: 'bg-muted text-muted-foreground' }
+  };
   const ACTION: Record<string, string> = {
     'facture.brouillon': 'Brouillon enregistré', 'facture.creee': 'Créée', 'facture.emise': 'Émise', 'facture.proforma': 'Passée en pro forma',
     'facture.envoyee': 'Envoyée au client', 'facture.reglement': 'Règlement enregistré', 'facture.reglement_retire': 'Règlement retiré',
-    'facture.annulee': 'Annulée', 'proforma.convertie': 'Émise depuis la pro forma'
+    'facture.annulee': 'Annulée', 'proforma.convertie': 'Émise depuis la pro forma', 'avoir.impute': 'Avoir imputé sur une facture'
   };
-  const st = $derived(STATUT[f.status] ?? STATUT.unpaid);
+  let imputation = $state<string>('');
+  const st = $derived((isCredit ? STATUT_AVOIR[f.status] : STATUT[f.status]) ?? STATUT.unpaid);
   const aujourdhui = new Date().toISOString().slice(0, 10);
   let envoi = $state(false);
   /** Le PDF (l'original pour une facture importée) s'ouvre dans un onglet : lecture, impression. */
@@ -45,7 +51,7 @@
   <div>
     <div class="flex flex-wrap items-center gap-2">
       <h2 class="text-xl font-bold">{isCredit ? 'Avoir' : isProforma ? 'Pro forma' : 'Facture'} n° {f.ref}</h2>
-      {#if isCredit && !isCancelled}<span class="rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">Avoir</span>{/if}
+      {#if isCredit && !isCancelled}<span class="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Avoir</span>{/if}
       <span class="rounded px-2 py-0.5 text-xs {st.cls}">
         {#if isProforma}{f.validated_at ? 'Pro forma validée' : f.sent_at ? 'Pro forma envoyée, en attente de validation' : 'Pro forma, non envoyée'}
         {:else}{st.texte}{#if f.status === 'partial'} · reste {eur(reste)}{/if}{/if}
@@ -140,6 +146,65 @@
       </div>
     </div>
 
+    {#if isCredit && !isCancelled}
+      <!-- Solde de l'avoir : imputé sur des factures du client, ou remboursé -->
+      <div class="rounded-lg border border-border bg-card p-4">
+        <h3 class="eyebrow mb-2">Solde de l’avoir</h3>
+        {#if data.payments.length}
+          <ul class="mb-3 divide-y divide-border text-sm">
+            {#each data.payments as p (p.id)}
+              <li class="flex items-start gap-2 py-1.5">
+                <div class="min-w-0 flex-1">
+                  <span class="tabular-nums font-medium">{eur(p.amount)}</span>
+                  <span class="text-muted-foreground"> · {p.applied_to_id ? 'imputé' : `remboursé · ${PAYMENT_LABEL[p.method] ?? p.method}`} · {dateCourte(p.paid_at)}</span>
+                  {#if p.applied_to_id}<a href="/admin/factures/{p.applied_to_id}" class="block text-xs text-link hover:underline">sur la facture n° {p.applied_to_ref}</a>
+                  {:else if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
+                </div>
+                <form method="POST" action="?/payment_delete" use:enhance onsubmit={(e: Event) => { if (!confirm(p.applied_to_id ? 'Retirer cette imputation (des deux côtés) ?' : 'Retirer ce remboursement ?')) e.preventDefault(); }}>
+                  <input type="hidden" name="paymentId" value={p.id} />
+                  <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Retirer"><Trash size={13} /></button>
+                </form>
+              </li>
+            {/each}
+          </ul>
+          <p class="mb-3 text-sm">Soldé <span class="tabular-nums font-medium">{eur(f.paid_total ?? 0)}</span> sur {eur(f.total_ttc)}{#if reste > 0} · reste <span class="tabular-nums font-medium">{eur(reste)}</span>{/if}</p>
+        {:else}
+          <p class="mb-3 text-sm text-muted-foreground">{eur(f.total_ttc)} à imputer sur une facture du client, ou à lui rembourser.</p>
+        {/if}
+        {#if f.status !== 'paid'}
+          {#if data.imputables.length}
+            <form method="POST" action="?/imputer" use:enhance class="space-y-2 border-t border-border pt-3">
+              <span class="block text-xs font-medium text-muted-foreground">Imputer sur une facture du client</span>
+              <select name="factureId" bind:value={imputation} required class="h-9 w-full rounded-md border border-border bg-background px-2 text-sm">
+                <option value="">— choisir —</option>
+                {#each data.imputables as i (i.id)}<option value={i.id}>{i.ref} · {dateCourte(i.issued_at)} · reste {eur(i.reste)}</option>{/each}
+              </select>
+              <div class="flex gap-2">
+                <input name="amount" type="number" step="0.01" min="0.01" placeholder="montant (vide = le maximum)" class="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm" />
+                <Button type="submit" size="sm" variant="outline" disabled={!imputation}>Imputer</Button>
+              </div>
+            </form>
+          {:else}
+            <p class="border-t border-border pt-3 text-xs text-muted-foreground">Aucune facture ouverte chez ce client : l’avoir se rembourse.</p>
+          {/if}
+          <form method="POST" action="?/payment_add" use:enhance class="mt-3 space-y-2 border-t border-border pt-3">
+            <span class="block text-xs font-medium text-muted-foreground">Ou rembourser le client</span>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="text-xs text-muted-foreground">Montant (€)<input name="amount" type="number" step="0.01" min="0.01" value={reste || ''} required class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm" /></label>
+              <label class="text-xs text-muted-foreground">Date<input name="paid_at" type="date" value={aujourdhui} class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm" /></label>
+            </div>
+            <label class="block text-xs text-muted-foreground">Mode
+              <select name="method" class="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm">
+                {#each data.methods.filter((m) => m !== 'stripe') as m (m)}<option value={m}>{PAYMENT_LABEL[m] ?? m}</option>{/each}
+              </select>
+            </label>
+            <input name="reference" placeholder="référence du remboursement" class="h-9 w-full rounded-md border border-border bg-background px-2 text-sm" />
+            <Button type="submit" size="sm" variant="outline" class="w-full"><Plus size={14} /> Enregistrer le remboursement</Button>
+          </form>
+        {/if}
+      </div>
+    {/if}
+
     {#if !isCredit && !isProforma && !isCancelled}
       <!-- Règlements -->
       <div class="rounded-lg border border-border bg-card p-4">
@@ -151,7 +216,8 @@
                 <div class="min-w-0 flex-1">
                   <span class="tabular-nums font-medium">{eur(p.amount)}</span>
                   <span class="text-muted-foreground"> · {PAYMENT_LABEL[p.method] ?? p.method} · {dateCourte(p.paid_at)}</span>
-                  {#if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
+                  {#if p.credit_note_id}<a href="/admin/factures/{p.credit_note_id}" class="block text-xs text-link hover:underline">Avoir n° {p.credit_note_ref}</a>
+                  {:else if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
                 </div>
                 <form method="POST" action="?/payment_delete" use:enhance onsubmit={(e: Event) => { if (!confirm('Retirer ce règlement ?')) e.preventDefault(); }}>
                   <input type="hidden" name="paymentId" value={p.id} />

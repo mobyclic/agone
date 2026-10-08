@@ -21,7 +21,11 @@
     unpaid: { texte: 'À encaisser', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Partielle', cls: 'bg-warning/15 text-warning' },
     paid: { texte: 'Réglée', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulée', cls: 'bg-muted text-muted-foreground' }
   };
-  const etat = (f: any) => STATUT[f.status ?? 'unpaid'] ?? STATUT.unpaid;
+  const STATUT_AVOIR: Record<string, { texte: string; cls: string }> = {
+    unpaid: { texte: 'À imputer', cls: 'bg-warning/15 text-warning' }, partial: { texte: 'Part. imputé', cls: 'bg-warning/15 text-warning' },
+    paid: { texte: 'Soldé', cls: 'bg-success/15 text-success' }, cancelled: { texte: 'Annulé', cls: 'bg-muted text-muted-foreground' }
+  };
+  const etat = (f: any) => (f.kind === 'credit_note' ? STATUT_AVOIR[f.status ?? 'unpaid'] : STATUT[f.status ?? 'unpaid']) ?? STATUT.unpaid;
   const ETATS = [{ s: '', label: 'Tous' }, { s: 'draft', label: 'Brouillons' }, { s: 'proforma', label: 'Pro forma' }, { s: 'due', label: 'À encaisser' }, { s: 'partial', label: 'Partielles' }, { s: 'paid', label: 'Réglées' }, { s: 'cancelled', label: 'Annulées' }];
   const TRIS = [{ v: 'date_desc', label: 'Date, la plus récente d’abord' }, { v: 'date_asc', label: 'Date, la plus ancienne d’abord' }, { v: 'total_desc', label: 'Montant décroissant' }, { v: 'total_asc', label: 'Montant croissant' }, { v: 'ref', label: 'Numéro' }, { v: 'client', label: 'Client' }];
 

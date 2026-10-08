@@ -215,9 +215,51 @@ export const PAYMENT_METHODS = ['stripe', 'sumup', 'especes', 'cheque', 'viremen
 
 export async function listPayments(invoiceId: string) {
   return query<any>(
-    `SELECT meta::id(id) AS id, amount, paid_at, method, reference, note FROM invoice_payment WHERE invoice = $i ORDER BY paid_at ASC`,
+    `SELECT meta::id(id) AS id, amount, paid_at, method, reference, note,
+            IF credit_note != NONE THEN meta::id(credit_note) ELSE NONE END AS credit_note_id, credit_note.ref AS credit_note_ref,
+            IF applied_to != NONE THEN meta::id(applied_to) ELSE NONE END AS applied_to_id, applied_to.ref AS applied_to_ref
+       FROM invoice_payment WHERE invoice = $i ORDER BY paid_at ASC`,
     { i: recId('invoice', invoiceId) }
   );
+}
+
+/** Les factures ouvertes (à encaisser, partielles) du même client qu'un avoir : celles où l'imputer. */
+export async function facturesImputables(avoirId: string) {
+  const a = (await query<any>(`SELECT client, customer, bill_to FROM ONLY $id`, { id: recId('invoice', avoirId) })) as any;
+  if (!a) return [];
+  const cond = a.client ? 'client = $c' : a.customer ? 'customer = $c' : 'string::lowercase(bill_to.name ?? "") = $n';
+  const vars: Record<string, unknown> = { c: a.client ?? a.customer, n: String(a.bill_to?.name ?? '').toLowerCase() };
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, ref, issued_at, total_ttc, paid_total, status FROM invoice
+      WHERE kind = 'invoice' AND status IN ['unpaid','partial'] AND ${cond} ORDER BY issued_at ASC`, vars
+  );
+  return rows.map((r: any) => ({ ...r, reste: r2(Number(r.total_ttc ?? 0) - Number(r.paid_total ?? 0)) }));
+}
+
+/**
+ * Imputation d'un avoir sur une facture du même client : la facture reçoit un
+ * règlement « avoir » et l'avoir le règlement miroir, chacun du même montant
+ * (au plus ce qui reste des deux côtés). Les deux états suivent.
+ */
+export async function imputerAvoir(avoirId: string, factureId: string, montant?: number): Promise<{ montant: number }> {
+  const [a, f] = await Promise.all([getInvoice(avoirId), getInvoice(factureId)]);
+  if (!a || a.kind !== 'credit_note') throw new Error('Avoir introuvable.');
+  if (!f || f.kind !== 'invoice') throw new Error('Facture introuvable.');
+  if (!['unpaid', 'partial'].includes(a.status)) throw new Error('Cet avoir est déjà soldé.');
+  if (!['unpaid', 'partial'].includes(f.status)) throw new Error('Cette facture n’a rien à régler.');
+  const memeClient = (a.client_id && a.client_id === f.client_id) || (a.customer_id && a.customer_id === f.customer_id)
+    || String(a.bill_to?.name ?? '').toLowerCase() === String(f.bill_to?.name ?? '').toLowerCase();
+  if (!memeClient) throw new Error('L’avoir et la facture ne sont pas au même client.');
+  const resteAvoir = r2(Number(a.total_ttc) - Number(a.paid_total ?? 0));
+  const resteFacture = r2(Number(f.total_ttc) - Number(f.paid_total ?? 0));
+  const m = r2(Math.min(resteAvoir, resteFacture, montant && montant > 0 ? montant : Infinity));
+  if (!(m > 0)) throw new Error('Rien à imputer.');
+  const quand = new Date();
+  await query(`CREATE invoice_payment CONTENT $c`, { c: { invoice: recId('invoice', factureId), amount: m, paid_at: quand, method: 'avoir', credit_note: recId('invoice', avoirId), note: `Avoir n° ${a.ref}` } });
+  await query(`CREATE invoice_payment CONTENT $c`, { c: { invoice: recId('invoice', avoirId), amount: m, paid_at: quand, method: 'avoir', applied_to: recId('invoice', factureId), note: `Imputé sur la facture n° ${f.ref}` } });
+  await recomputeInvoiceStatus(factureId);
+  await recomputeInvoiceStatus(avoirId);
+  return { montant: m };
 }
 
 /** Recalcule le réglé et l'état d'une facture à partir de ses règlements. */
@@ -250,10 +292,20 @@ export async function addPayment(invoiceId: string, p: { amount: number; paid_at
 }
 
 export async function deletePayment(paymentId: string): Promise<void> {
-  const p = (await query<any>(`SELECT invoice FROM ONLY $id`, { id: recId('invoice_payment', paymentId) })) as any;
+  const p = (await query<any>(`SELECT invoice, amount, credit_note, applied_to FROM ONLY $id`, { id: recId('invoice_payment', paymentId) })) as any;
   if (!p) return;
   await query(`DELETE $id`, { id: recId('invoice_payment', paymentId) });
   await recomputeInvoiceStatus(String(p.invoice).replace(/^invoice:/, ''));
+  // Une imputation d'avoir se retire des deux côtés.
+  const miroir = p.credit_note ?? p.applied_to;
+  if (miroir) {
+    const autre = String(miroir).replace(/^invoice:/, '');
+    const cible = p.credit_note ? 'applied_to' : 'credit_note';
+    // query() rend les identifiants en « invoice:id » : on repasse par recId pour comparer à un record.
+    const ici = recId('invoice', String(p.invoice).replace(/^invoice:/, ''));
+    await query(`DELETE invoice_payment WHERE invoice = $m AND ${cible} = $i AND amount = $a`, { m: recId('invoice', autre), i: ici, a: p.amount });
+    await recomputeInvoiceStatus(autre);
+  }
 }
 
 /* ————————————————————— Création manuelle (facture ou avoir) ————————————————————— */
