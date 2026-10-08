@@ -66,8 +66,19 @@ export const typographieFr = (s: string) =>
 /** Replie les suites d'espaces ordinaires et de sauts de ligne — sans toucher aux insécables. */
 const replierEspaces = (s: string) => s.replace(/[ \t\r\n]+/g, ' ').trim();
 
+/** Entités HTML qu'un texte brut migré peut encore traîner (titre, extrait) : décodées à l'affichage. */
+const ENTITES: Record<string, string> = { amp: '&', quot: '"', apos: '’', nbsp: '\u00a0', lt: '<', gt: '>', laquo: '«', raquo: '»', hellip: '…', rsquo: '’', lsquo: '‘', ndash: '–', mdash: '—' };
+export function decoderEntites(s: string): string {
+  if (!s.includes('&')) return s;
+  return s
+    .replace(/&#x27;|&#039;|&#39;/g, '’')
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
+    .replace(/&([a-zA-Z]+);/g, (m, n) => ENTITES[n] ?? m);
+}
+
 export function extraitPropre(texte?: string | null, max?: number): string | undefined {
-  const s = typographieFr(replierEspaces(texte ?? ''));
+  const s = typographieFr(replierEspaces(decoderEntites(texte ?? '')));
   if (!s) return undefined;
   const coupe = max != null && s.length > max ? s.slice(0, max) : s;
   const tronque = coupe.length < s.length;
@@ -108,10 +119,16 @@ export function notesDeBasDePage(html?: string | null): string | undefined {
     s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
       .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const echappe = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Les notes migrées de WordPress gardent un peu de HTML en ligne (italiques, gras, liens) :
+  // on le rétablit après échappement, et rien d'autre.
+  const htmlEnLigne = (s: string) =>
+    s.replace(/&lt;(\/?)(em|i|strong|b)&gt;/g, '<$1$2>')
+      .replace(/&lt;a\s[^"]*?href="(https?:\/\/[^"]*)"[^<]*?&gt;/g, '<a href="$1" rel="noopener">')
+      .replace(/&lt;\/a&gt;/g, '</a>');
   const liens = (s: string) =>
-    s.replace(/\bhttps?:\/\/[^\s<]+[^\s<.,;:!?»)\]]/g, (u) => `<a href="${u.replace(/"/g, '&quot;')}" rel="noopener">${u}</a>`);
+    s.replace(/(^|[^"=])(\bhttps?:\/\/[^\s<]+[^\s<.,;:!?»)\]])/g, (_m, avant, u) => `${avant}<a href="${u.replace(/"/g, '&quot;')}" rel="noopener">${u}</a>`);
   const corps = html.replace(/<sup\b[^>]*\bdata-fn="([^"]*)"[^>]*>[\s\S]*?<\/sup>/gi, (_m, brut: string) => {
-    notes.push(liens(echappe(decode(brut).trim())));
+    notes.push(liens(htmlEnLigne(echappe(decode(brut).trim()))));
     const n = notes.length;
     return `<sup class="appel-note" id="appel-${n}"><a href="#note-${n}" aria-describedby="titre-notes">${n}</a></sup>`;
   });
