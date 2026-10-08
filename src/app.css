@@ -92,7 +92,12 @@
   --radius: 0;
 }
 
+/* Marge supplémentaire à gauche du logo : modeste sur les écrans moyens (le menu doit
+   tenir sur une ligne à 1024-1439 px), ample sur les grands. */
 @media (min-width: 1024px) {
+  :root { --logo-extra: 2.5rem; }
+}
+@media (min-width: 1440px) {
   :root { --logo-extra: 7.5rem; }
 }
 
@@ -236,6 +241,10 @@
 .prose-agone img[data-border="1"], .rich-content .ProseMirror img[data-border="1"] {
   border: 1px solid var(--border); padding: 0.25rem; background: var(--background);
 }
+/* Publications de réseaux sociaux (figure.reseau-social, montées par $lib/client/embeds.ts). */
+.prose-agone figure.reseau-social { clear: both; margin: 1.5rem 0; max-width: 540px; }
+.prose-agone figure.reseau-social iframe { display: block; max-width: 100%; }
+
 @media (max-width: 640px) {
   /* Sur mobile, une image flottante prendrait trop de place : on la remet dans le flux. */
   .prose-agone img[data-align="left"], .prose-agone img[data-align="right"], .prose-agone img.alignleft, .prose-agone img.alignright {

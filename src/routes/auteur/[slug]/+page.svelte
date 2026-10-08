@@ -8,6 +8,7 @@
   import { Button } from '$lib/components/ui/button';
   import CouverturesGrille from '$lib/components/CouverturesGrille.svelte';
   import RencontresAVenir from '$lib/components/RencontresAVenir.svelte';
+  import ArticlesAuteur from '$lib/components/ArticlesAuteur.svelte';
   import { PencilSimple, ArrowSquareOut } from 'phosphor-svelte';
 
   let { data } = $props();
@@ -30,7 +31,7 @@
 <div class="py-8" style="padding-inline: var(--page-gutter)">
   <div class="grid gap-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-12">
     <!-- Sans rencontre à venir, la colonne de droite serait vide : le contenu prend toute la largeur. -->
-    <div class="grid gap-8 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)] sm:items-start {data.rencontres.length ? '' : 'lg:col-span-2'}">
+    <div class="grid gap-8 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)] sm:items-start {data.rencontres.length || data.articles.length ? '' : 'lg:col-span-2'}">
       <!-- Portrait + repères. Sans photo, la colonne reste (le texte garde sa
            mesure et son alignement d'une fiche à l'autre) mais aucun cadre de
            remplacement n'y est posé. Sur téléphone, vide, elle ne prend pas de place. -->
@@ -90,10 +91,11 @@
       </div>
     </div>
 
-    <!-- Colonne latérale : rencontres à venir -->
-    {#if data.rencontres.length}
+    <!-- Colonne latérale : rencontres à venir, puis ses textes dans l'Antichambre -->
+    {#if data.rencontres.length || data.articles.length}
       <aside use:colonneCollante class="space-y-8">
         <RencontresAVenir rencontres={data.rencontres} />
+        <ArticlesAuteur articles={data.articles} nom={a.full_name} />
       </aside>
     {/if}
   </div>

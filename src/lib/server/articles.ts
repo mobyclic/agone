@@ -517,3 +517,42 @@ export async function setArticleStatus(id: string, status: 'published' | 'draft'
     { id: recId('article', id), s: status }
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Fiche auteur : ses textes dans l'Antichambre
+// ─────────────────────────────────────────────────────────────
+
+export interface ArticleAuteur {
+  id: string;
+  title: string;
+  slug: string;
+  published_at?: string;
+  rubrique_name?: string;
+  /** true : l'auteur a signé le texte ; false : il y est cité (un de ses livres est associé, ou son nom apparaît). */
+  ecrit: boolean;
+}
+
+/**
+ * Articles en ligne qu'un auteur a écrits, ou dans lesquels il est cité : un de
+ * ses livres est associé à l'article, ou son nom figure dans le titre ou le corps.
+ * Les numéros de LettrInfo sont exclus (ils citent tout le monde).
+ */
+export async function articlesPourAuteur(authorId: string, fullName: string, limit = 20): Promise<ArticleAuteur[]> {
+  const a = recId('author', authorId);
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, title, slug, published_at, rubrique.name AS rubrique_name,
+            (authors ?? []) CONTAINS $a AS ecrit
+       FROM article
+      WHERE ${ARTICLE_EN_LIGNE} AND is_newsletter_issue = false
+        AND ((authors ?? []) CONTAINS $a
+          OR (books ?? []) CONTAINSANY (SELECT VALUE in FROM contributed_by WHERE out = $a)
+          OR string::contains(title, $nom)
+          OR string::contains(body_html ?? '', $nom))
+      ORDER BY published_at DESC LIMIT $limit`,
+    { a, nom: fullName, limit }
+  );
+  return rows.map((r: any) => ({
+    id: String(r.id), title: r.title, slug: r.slug, published_at: r.published_at ?? undefined,
+    rubrique_name: r.rubrique_name ?? undefined, ecrit: r.ecrit === true
+  }));
+}

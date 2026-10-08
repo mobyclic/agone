@@ -294,7 +294,8 @@
         {#if pubLabel}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Parution</dt><dd class="text-right font-medium capitalize">{pubLabel}</dd></div>{/if}
         {#if b.page_count}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Pages</dt><dd class="font-medium">{b.page_count}</dd></div>{/if}
         {#if dims}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">Format</dt><dd class="font-medium">{dims}</dd></div>{/if}
-        {#if b.isbn_paper}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
+        {#if b.isbn_paper}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN{#if b.isbn_ebook}&nbsp;papier{/if}</dt><dd class="font-mono text-xs font-medium">{b.isbn_paper}</dd></div>{/if}
+        {#if b.isbn_ebook}<div class="flex justify-between gap-3"><dt class="text-muted-foreground">ISBN ePub</dt><dd class="font-mono text-xs font-medium">{b.isbn_ebook}</dd></div>{/if}
         {#if b.title_original}<div><dt class="text-muted-foreground">Titre original</dt><dd class="mt-0.5 font-medium">{b.title_original}{b.language_original ? ` (${b.language_original})` : ''}</dd></div>{/if}
       </dl>
 {/snippet}
