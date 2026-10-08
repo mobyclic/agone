@@ -27,7 +27,13 @@
     <label class={label}>Slug (URL) <input name="slug" value={r?.slug ?? ''} placeholder="auto depuis le nom" class={input} /></label>
     <label class={label}>Sous-titre <input name="subtitle" value={r?.subtitle ?? ''} placeholder="affiché sous le nom sur la page publique" class={input} /></label>
   </div>
-  {#if !data.isNew}<p class="mt-2 text-xs text-muted-foreground">{r?.article_count ?? 0} article{(r?.article_count ?? 0) > 1 ? 's' : ''} dans cette catégorie.</p>{/if}
+  {#if !data.isNew}
+    <p class="mt-2 text-xs text-muted-foreground">
+      {#if (r?.article_count ?? 0) > 0}
+        <a href="/admin/articles?rubrique={r?.slug}" class="text-link underline-offset-4 hover:underline">{r?.article_count} article{(r?.article_count ?? 0) > 1 ? 's' : ''}</a> dans cette catégorie.
+      {:else}Aucun article dans cette catégorie.{/if}
+    </p>
+  {/if}
 
   <div class="fixed bottom-6 right-6 z-40">
     {#if saving}
