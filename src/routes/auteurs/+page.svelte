@@ -33,7 +33,7 @@
   const metaText = $derived(
     q.trim()
       ? `${filtered.length} résultat${filtered.length > 1 ? 's' : ''} pour « ${q.trim()} »`
-      : `${data.authors.length} autrices & auteurs au catalogue`
+      : undefined // pas de compte global : la phrase « N autrices & auteurs au catalogue » n'apporte rien
   );
 </script>
 
