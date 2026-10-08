@@ -38,7 +38,8 @@ export const PALETTE = ['#26425b', '#5b8fbf', '#2e8b57', '#8fbf5b', '#b5a642', '
 const DEFAUTS: Omit<Canal, 'id' | 'fixe'>[] = [
   { code: 'web', name: 'Vente par correspondance', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'web', enabled: true, color: '#26425b', notes: 'Commandes du site (Stripe) et commandes reçues par courrier ou mail, saisies à la main. Le papier est expédié par Les Belles Lettres, mais ces ventes ne figurent pas sur leur extranet.' },
   { code: 'comptoir', name: 'Comptoir & rencontres', family: 'direct', mode: 'api', connector: 'orders', order_channel: 'comptoir', enabled: true, color: '#2e8b57', notes: 'Ventes sur place, saisies à la main ou importées ; les encaissements SumUp s’y rapprochent.' },
-  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c' }
+  { code: 'bldd', name: 'Les Belles Lettres (distribution)', family: 'indirect', mode: 'api', connector: 'bldd', enabled: true, color: '#d4211c' },
+  { code: 'depots', name: 'Dépôts & salons', family: 'indirect', mode: 'manuel', enabled: true, color: '#e07a1f', notes: 'Exemplaires confiés à des dépositaires (salonneurs, associations, librairies amies) qui les vendent pour Agone. Les carnets de vente importés depuis « Dépôts » créent ici les relevés, avec la facture au dépositaire et le stock du dépôt.' }
 ];
 const FIXES = new Set(DEFAUTS.map((d) => d.code));
 /** Anciens canaux de la maison : s'ils réapparaissent sans relevé, on les écarte. */

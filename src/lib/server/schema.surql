@@ -945,3 +945,42 @@ DEFINE FIELD OVERWRITE marketing  ON consent_event TYPE bool DEFAULT false;
 DEFINE FIELD OVERWRITE analytics  ON consent_event TYPE bool DEFAULT false;
 DEFINE FIELD OVERWRITE decision   ON consent_event TYPE string DEFAULT 'custom';
 DEFINE FIELD OVERWRITE created_at ON consent_event TYPE datetime DEFAULT time::now();
+
+-- ─────────────────────────────────────────────────────────────
+-- Dépôts : exemplaires confiés à des dépositaires (salonneurs, associations,
+-- librairies amies) qui les vendent pour le compte d'Agone. Le stock d'un dépôt
+-- est la somme de ses mouvements ; un carnet de vente importé crée en une fois
+-- les ventes (relevé sur le canal « depots »), la facture au dépositaire et les
+-- mouvements de sortie.
+-- ─────────────────────────────────────────────────────────────
+DEFINE FIELD OVERWRITE depositaire  ON client TYPE bool DEFAULT false VALUE $value ?? false;
+DEFINE FIELD OVERWRITE remise_depot ON client TYPE option<number>;   -- % ; NONE = remise par défaut (Paramètres › Dépôts)
+
+DEFINE TABLE OVERWRITE depot_movement SCHEMAFULL;
+DEFINE FIELD OVERWRITE client     ON depot_movement TYPE record<client>;
+DEFINE FIELD OVERWRITE book       ON depot_movement TYPE record<book>;
+-- inventaire (écart constaté), reassort (+), vente (−), sp (− service de presse), retour (− renvoyé à Agone/BLDD), ecart (− ou +, carnet)
+DEFINE FIELD OVERWRITE kind       ON depot_movement TYPE string
+  ASSERT $value IN ['inventaire','reassort','vente','sp','retour','ecart'];
+DEFINE FIELD OVERWRITE qty        ON depot_movement TYPE int;          -- signé : + entre au dépôt, − en sort
+DEFINE FIELD OVERWRITE at         ON depot_movement TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE carnet     ON depot_movement TYPE option<record<carnet>>;
+DEFINE FIELD OVERWRITE note       ON depot_movement TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at ON depot_movement TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_depmov_client ON depot_movement FIELDS client;
+DEFINE INDEX OVERWRITE idx_depmov_cb     ON depot_movement FIELDS client, book;
+
+DEFINE TABLE OVERWRITE carnet SCHEMAFULL;
+DEFINE FIELD OVERWRITE client       ON carnet TYPE record<client>;
+DEFINE FIELD OVERWRITE label        ON carnet TYPE string;                  -- « Acrimed 30 ans », « Fête de l'Huma »…
+DEFINE FIELD OVERWRITE sold_at      ON carnet TYPE datetime;                -- date des ventes
+DEFINE FIELD OVERWRITE status       ON carnet TYPE string ASSERT $value IN ['validated','cancelled'] DEFAULT 'validated';
+DEFINE FIELD OVERWRITE source_file  ON carnet TYPE option<record<media>>;
+DEFINE FIELD OVERWRITE lines        ON carnet TYPE option<array>;
+DEFINE FIELD OVERWRITE lines[*]     ON carnet TYPE object FLEXIBLE;
+DEFINE FIELD OVERWRITE totals       ON carnet TYPE option<object> FLEXIBLE;
+DEFINE FIELD OVERWRITE remise       ON carnet TYPE number DEFAULT 0;        -- % appliqué sur la facture
+DEFINE FIELD OVERWRITE report       ON carnet TYPE option<record<sales_report>>;
+DEFINE FIELD OVERWRITE invoice      ON carnet TYPE option<record<invoice>>;
+DEFINE FIELD OVERWRITE created_at   ON carnet TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_carnet_client ON carnet FIELDS client;

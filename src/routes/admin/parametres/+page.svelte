@@ -121,6 +121,18 @@
     <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
   </form>
 
+  <form method="POST" action="?/depots" use:enhance class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Dépôts</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Remise appliquée par défaut sur les factures aux dépositaires (salonneurs, associations, librairies amies),
+      calculée sur le prix public TTC. Chaque fiche client peut la remplacer.
+    </p>
+    <label class={label}>Remise par défaut (%)
+      <input name="remise" type="number" min="0" max="100" step="0.5" value={data.depots.remise} class="{input} w-32" />
+    </label>
+    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
+  </form>
+
   <form method="POST" action="?/tracking" use:enhance class="rounded-lg border border-border bg-card p-5 lg:col-span-2">
     <h3 class="mb-1 text-base font-semibold">Traceurs & mesure d'audience</h3>
     <p class="mb-4 text-sm text-muted-foreground">Renseignez l'ID Google Tag Manager (recommandé — configurez GA4 et le Pixel Meta/Instagram dans GTM). Les traceurs ne se déclenchent qu'après consentement (CMP + Consent Mode v2). Les événements <span class="font-mono text-xs">add_to_cart</span>, <span class="font-mono text-xs">begin_checkout</span> et <span class="font-mono text-xs">purchase</span> sont poussés automatiquement dans le dataLayer.</p>

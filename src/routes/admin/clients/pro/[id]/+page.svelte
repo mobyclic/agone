@@ -52,6 +52,12 @@
     <section class="rounded-lg border border-border bg-card p-4">
       <span class={label}>Notes internes</span>
       <textarea name="notes" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary">{c?.notes ?? ''}</textarea>
+      <!-- Dépôt : ce client vend des exemplaires qu'on lui confie (salonneur, association, librairie amie). -->
+      <div class="mt-4 rounded-md border border-border bg-muted/30 p-3">
+        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="depositaire" checked={c?.depositaire === true} class="size-4 accent-foreground" /> Dépositaire</label>
+        <p class="mt-1 text-xs text-muted-foreground">On lui confie des exemplaires qu'il vend pour Agone ; son stock, ses inventaires et ses carnets de vente se gèrent dans <a href="/admin/depots" class="text-link underline-offset-4 hover:underline">Dépôts</a>.</p>
+        <label class="mt-3 block max-w-xs"><span class={label}>Remise sur ses factures de dépôt (%)</span><input name="remise_depot" type="number" step="0.5" min="0" max="100" value={c?.remise_depot ?? ''} placeholder="par défaut : {data.remiseDefaut} %" class={input} /></label>
+      </div>
     </section>
     <div class="flex items-center gap-3">
       <Button type="submit" variant="brand"><FloppyDisk size={16} /> Enregistrer</Button>

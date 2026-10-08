@@ -55,6 +55,7 @@ export const ADMIN_NAV: NavSection[] = [
     items: [
       { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt', adminOnly: true },
       { label: 'Clients', href: '/admin/clients', icon: 'Users', adminOnly: true },
+      { label: 'Dépôts', href: '/admin/depots', icon: 'Package', adminOnly: true },
       { label: 'Codes promo', href: '/admin/promos', icon: 'Percent', adminOnly: true },
       { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
       { label: 'Facturation', href: '/admin/factures', icon: 'Invoice', adminOnly: true }

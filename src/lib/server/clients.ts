@@ -18,14 +18,19 @@ export interface ClientPro {
   id: string; name: string; kind: string; siret?: string; vat_number?: string; contact_name?: string;
   email?: string; phone?: string; address_1?: string; address_2?: string; postcode?: string; city?: string; country: string;
   notes?: string; user?: string; created_at?: string;
+  /** Dépositaire : on lui confie des exemplaires qu'il vend pour Agone (voir Dépôts). */
+  depositaire?: boolean;
+  /** Remise en % sur ses factures de dépôt ; vide = remise par défaut (Paramètres › Dépôts). */
+  remise_depot?: number;
 }
 
-const CHAMPS = `meta::id(id) AS id, name, kind, siret, vat_number, contact_name, email, phone, address_1, address_2, postcode, city, country, notes, user, created_at`;
+const CHAMPS = `meta::id(id) AS id, name, kind, siret, vat_number, contact_name, email, phone, address_1, address_2, postcode, city, country, notes, user, created_at, depositaire, remise_depot`;
 const normaliser = (r: any): ClientPro => ({
   id: String(r.id), name: r.name, kind: r.kind ?? 'autre', siret: r.siret ?? undefined, vat_number: r.vat_number ?? undefined,
   contact_name: r.contact_name ?? undefined, email: r.email ?? undefined, phone: r.phone ?? undefined,
   address_1: r.address_1 ?? undefined, address_2: r.address_2 ?? undefined, postcode: r.postcode ?? undefined, city: r.city ?? undefined,
-  country: r.country ?? 'France', notes: r.notes ?? undefined, user: r.user ? String(r.user).replace(/^user:/, '') : undefined, created_at: r.created_at ?? undefined
+  country: r.country ?? 'France', notes: r.notes ?? undefined, user: r.user ? String(r.user).replace(/^user:/, '') : undefined, created_at: r.created_at ?? undefined,
+  depositaire: r.depositaire === true, remise_depot: r.remise_depot != null ? Number(r.remise_depot) : undefined
 });
 
 export async function listClientsPro(opts: { q?: string; kind?: string; limit?: number; offset?: number } = {}) {
@@ -65,7 +70,9 @@ export async function upsertClientPro(d: ClientProInput, id?: string): Promise<s
     contact_name: d.contact_name?.trim() || undefined, email: d.email?.trim().toLowerCase() || undefined, phone: d.phone?.trim() || undefined,
     address_1: d.address_1?.trim() || undefined, address_2: d.address_2?.trim() || undefined, postcode: d.postcode?.trim() || undefined,
     city: d.city?.trim() || undefined, country: d.country?.trim() || 'France', notes: d.notes?.trim() || undefined,
-    user: d.user ? recId('user', d.user.replace(/^user:/, '')) : undefined
+    user: d.user ? recId('user', d.user.replace(/^user:/, '')) : undefined,
+    depositaire: d.depositaire === true,
+    remise_depot: d.remise_depot != null && Number.isFinite(d.remise_depot) ? Math.min(100, Math.max(0, d.remise_depot)) : undefined
   };
   if (id) { await query(`UPDATE $id MERGE $c`, { id: recId('client', id), c: champs }); return id; }
   const rows = await query<any>(`CREATE client CONTENT $c`, { c: champs });

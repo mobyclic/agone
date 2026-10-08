@@ -64,6 +64,9 @@ Notes : `FROM ONLY` renvoie un objet (ne pas déstructurer `const [x]=`). `time:
 - **`query()` renvoie les RecordId en `table:id`** : comparer/indexer avec un identifiant nu échoue
   silencieusement (retirer le préfixe, ou passer par `recId()`).
 
+**Tableurs (SheetJS)** : un `.xls` peut déclarer une plage `A1:IV1048576` ; `sheet_to_json` ne rend alors
+jamais la main. Toujours passer par `resserrerPlage()` (`carnetLecture.ts`) avant de lire une feuille.
+
 ## Modèle de données — `src/lib/server/schema.surql`
 Cœur auth (`media`, `user`, `session`, `magic_link`, `email_otp`, `password_reset`, `site_setting`).
 Catalogue & contenu (Phase 1, **migrés depuis WordPress**) : `collection`, `rubrique`, `book`,

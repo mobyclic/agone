@@ -7,6 +7,7 @@
  * jeton — trente minutes, puis il est oublié.
  */
 import * as XLSX from 'xlsx';
+import { resserrerPlage } from './carnetLecture';
 
 export type Champ = 'isbn' | 'units_sold' | 'units_returned' | 'gross_price' | 'gross_ht' | 'net_receipt' | 'format' | 'title' | 'ignore';
 
@@ -69,6 +70,7 @@ export function lireTableur(buffer: Buffer, nomFichier: string, feuilleVoulue?: 
   const feuilles = wb.SheetNames;
   const feuille = feuilleVoulue && feuilles.includes(feuilleVoulue) ? feuilleVoulue : feuilles[0];
   const ws = wb.Sheets[feuille];
+  resserrerPlage(ws); // plage déclarée parfois démesurée (.xls) : voir carnetLecture
   const brut: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
   // La ligne d'en-tête est la première qui compte au moins deux cellules textuelles.
   let iEntete = brut.findIndex((r) => r.filter((c) => typeof c === 'string' && c.trim()).length >= 2);

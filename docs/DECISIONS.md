@@ -25,6 +25,37 @@ Module back-office de gestion des **droits d'auteur / redevances**. **Rien n'exi
 
 À concevoir en détail (design pass dédié après la découverte). Voir aussi HOBO/exporthobo (ERP historique lié aux ventes) dans la découverte.
 
+## Ventes : un seul lieu de naissance par exemplaire (décidé le 8 octobre 2026)
+Objectif : des chiffres de vente quasi exacts pour les droits d'auteur, les écarts se limitant au service
+de presse et au pilon. Chaque circuit physique produit ses lignes de vente **une seule fois**, sans ressaisie ;
+la facture est la face « argent » de la même ligne, jamais une seconde saisie.
+
+| Circuit | Source de vérité | Canal |
+|---|---|---|
+| Librairies via Belles Lettres | relevé de l'extranet BLDD (ventes, retours ; stock mensuel : sorties, entrées = réimpressions, inventaire) | `bldd` |
+| Site, VPC, comptoir, rencontres | commandes (Stripe, saisie, import, SumUp) | `web`, `comptoir` |
+| Dépositaires et salons | **carnet de vente** importé (→ relevé + facture + stock du dépôt) | `depots` |
+| Clients pro facturés en direct | la facture émise (à venir) | à créer |
+
+**Dépôts** (`/admin/depots`, module `depots.ts`) : un client pro coché « dépositaire » reçoit des exemplaires
+(mouvements `reassort`), les compte (`inventaire` : l'écart devient un mouvement, refaisable à volonté), et rend
+un carnet (xlsx : ISBN, titre, PPTTC, stock début, CB, chèque, espèces, SP, stock fin ; gabarit pré-rempli
+téléchargeable). La validation du carnet crée en une fois le relevé sur le canal « Dépôts & salons » (SP en
+exemplaires gratuits, net = prix public HT − remise), le brouillon de facture au dépositaire (PPTTC − remise,
+TVA du livre) et les mouvements du dépôt ; le stock début du carnet peut servir d'inventaire (premier carnet).
+Annuler un carnet retire relevé, mouvements et facture brouillon.
+
+Réglages : remise par défaut (Paramètres › Dépôts), remplaçable sur la fiche client. Droits sur ventes directes
+facturées : **au prix net facturé** (à confirmer par Thierry avant la première reddition).
+
+Vérifié chez Belles Lettres : un réassort vers un dépôt apparaît dans la colonne « sorties » de l'état mensuel,
+sans destinataire ; une réimpression dans « entrées » ; leur correction dans « inventaire ». D'où le rapprochement
+à construire : stock BLDD début + entrées − sorties − ventes nettes + inventaire = stock fin, et nos sorties
+vers les dépôts doivent égaler leurs « sorties ».
+
+Reste à faire : réassort expédié par l'EDI BLDD vers le dépôt ; factures directes qui créent leurs lignes de
+vente ; écran de rapprochement mensuel (écarts à qualifier : SP, pilon, perte).
+
 ## Bibliothèque ebook
 - Un acheteur d'ebook doit disposer d'une **bibliothèque en ligne** pour re-télécharger ses livres achetés (entitlements liés au compte, fichiers sur R2).
 
