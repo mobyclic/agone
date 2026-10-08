@@ -63,7 +63,7 @@
         <p class="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{form.error}</p>
       {/if}
       {#key data.page.slug}
-        <RichEditor name="body_html" value={data.page.body_html ?? ''} minHeight="26rem" onchange={() => (dirty = true)} />
+        <RichEditor name="body_html" value={data.page.body_html ?? ''} minHeight="26rem" stickyTop="5rem" onchange={() => (dirty = true)} />
       {/key}
     </div>
 

@@ -4,10 +4,19 @@
   import StarterKit from '@tiptap/starter-kit';
   import {
     TextB, TextItalic, TextUnderline, ListBullets, ListNumbers, Quotes,
-    LinkSimple, ArrowUUpLeft, ArrowUUpRight, Trash
+    LinkSimple, ArrowUUpLeft, ArrowUUpRight, Trash, Image as ImageIcon
   } from 'phosphor-svelte';
+  import { toast } from 'svelte-sonner';
+  import { ImageAgone, ALIGNEMENTS_IMAGE, TAILLES_IMAGE } from '$lib/editeurImage';
 
-  let { name, value = '', minHeight = '12rem', onchange }: { name: string; value?: string; minHeight?: string; onchange?: () => void } = $props();
+  let { name, value = '', minHeight = '12rem', stickyTop = '4rem', dossierImages = 'media/editeur', onchange }: {
+    name: string; value?: string; minHeight?: string;
+    /** Hauteur de la barre haute sous laquelle la barre d'outils reste collée (4rem back-office, 5rem front). */
+    stickyTop?: string;
+    /** Dossier R2 où ranger les images insérées (sous `media/`, visible dans l'explorateur de médias). */
+    dossierImages?: string;
+    onchange?: () => void;
+  } = $props();
 
   /**
    * L'éditeur n'accepte que H2/H3 : sans ce recalage, un H1 hérité de WordPress
@@ -93,6 +102,48 @@
   });
   const insererInsecable = () => editor?.chain().focus().insertContent('\u00a0').run();
 
+  // ── Images : envoi sur R2 (via /api/upload) puis insertion ; bouton, glisser-déposer ou collage.
+  let fileInput = $state<HTMLInputElement>();
+  let envoiEnCours = $state(false);
+  async function televerser(file: File): Promise<string | null> {
+    if (!file.type.startsWith('image/')) { toast.error(`« ${file.name} » n'est pas une image.`); return null; }
+    if (file.size > 15 * 1024 * 1024) { toast.error(`« ${file.name} » dépasse 15 Mo.`); return null; }
+    envoiEnCours = true;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', dossierImages);
+      fd.append('kind', 'image');
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d?.message ?? "Envoi de l'image impossible.");
+        return null;
+      }
+      return String((await res.json()).url);
+    } catch {
+      toast.error("Envoi de l'image impossible.");
+      return null;
+    } finally {
+      envoiEnCours = false;
+    }
+  }
+  async function insererImages(files: File[], pos?: number) {
+    if (!editor) return;
+    for (const f of files) {
+      const url = await televerser(f);
+      if (!url) continue;
+      const alt = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+      // Insérée APRÈS la sélection (jamais à sa place : une image déjà sélectionnée ne doit pas être remplacée).
+      const noeud = { type: 'image', attrs: { src: url, alt } };
+      editor.chain().focus().insertContentAt(pos ?? editor.state.selection.to, noeud).run();
+    }
+  }
+  const imagesDe = (dt: DataTransfer | null) => Array.from(dt?.files ?? []).filter((f) => f.type.startsWith('image/'));
+  const attrImage = (k: string) => (void tick, editor?.getAttributes('image')?.[k]);
+  /** Modifie l'image sélectionnée sans voler le focus (on peut être en train de taper le texte alternatif). */
+  const majImage = (attrs: Record<string, unknown>) => editor?.chain().updateAttributes('image', attrs).run();
+
   onMount(() => {
     if (!element) return;
     editor = new Editor({
@@ -100,9 +151,24 @@
       extensions: [
         StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, HTMLAttributes: { rel: 'noopener' } } }),
         NoteDeBasDePage,
-        EspaceInsecable
+        EspaceInsecable,
+        ImageAgone.configure({ inline: false, allowBase64: false })
       ],
       editorProps: {
+        // Images déposées ou collées : envoyées puis insérées à l'endroit du dépôt / du curseur.
+        handleDrop: (view, event, _slice, moved) => {
+          const files = moved ? [] : imagesDe(event.dataTransfer);
+          if (!files.length) return false;
+          const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+          insererImages(files, pos);
+          return true;
+        },
+        handlePaste: (_view, event) => {
+          const files = imagesDe(event.clipboardData);
+          if (!files.length) return false;
+          insererImages(files);
+          return true;
+        },
         // Clic sur un appel de note → on saute à son texte dans le panneau des notes.
         handleClickOn: (_view, _pos, node, nodePos) => {
           if (node.type.name !== 'footnote') return false;
@@ -148,10 +214,11 @@
 {/snippet}
 
 <div class="border border-border bg-background">
-  <!-- Barre d'outils COLLANTE : elle suit le défilement sous la barre haute (h-16)
-       du back-office comme du front. Pas d'overflow-hidden sur le conteneur : il
-       casserait le sticky. -->
-  <div class="sticky top-16 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-muted p-1">
+  <!-- Barre d'outils COLLANTE : elle suit le défilement sous la barre haute (stickyTop :
+       4rem au back-office, 5rem sur le front). Pas d'overflow-hidden sur le conteneur :
+       il casserait le sticky. -->
+  <div class="sticky z-10 border-b border-border bg-muted" style="top:{stickyTop}">
+  <div class="flex flex-wrap items-center gap-0.5 p-1">
     {@render tb(TextB, () => run((c) => c.toggleBold()), active('bold'))}
     {@render tb(TextItalic, () => run((c) => c.toggleItalic()), active('italic'))}
     {@render tb(TextUnderline, () => run((c) => c.toggleUnderline()), active('underline'))}
@@ -162,6 +229,13 @@
     {@render tb(ListNumbers, () => run((c) => c.toggleOrderedList()), active('orderedList'))}
     {@render tb(Quotes, () => run((c) => c.toggleBlockquote()), active('blockquote'))}
     {@render tb(LinkSimple, toggleLink, active('link'))}
+    <button type="button" onclick={() => fileInput?.click()} tabindex="-1" disabled={envoiEnCours}
+      title="Insérer une image (ou glisser-déposer / coller une image dans le texte)"
+      class="grid size-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50 {active('image') ? 'bg-foreground text-background hover:bg-foreground' : ''}">
+      <ImageIcon size={16} />
+    </button>
+    <input bind:this={fileInput} type="file" accept="image/*" multiple class="hidden"
+      onchange={(e) => { const files = Array.from(e.currentTarget.files ?? []); e.currentTarget.value = ''; insererImages(files); }} />
     <span class="mx-0.5 h-5 w-px bg-border"></span>
     <button type="button" onclick={ajouterNote} tabindex="-1" title="Insérer une note de bas de page à la position du curseur"
       class="inline-flex h-8 items-center gap-1 rounded px-2 font-display text-xs font-bold text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
@@ -174,6 +248,41 @@
     <span class="mx-0.5 h-5 w-px bg-border"></span>
     {@render tb(ArrowUUpLeft, () => run((c) => c.undo()))}
     {@render tb(ArrowUUpRight, () => run((c) => c.redo()))}
+    {#if envoiEnCours}<span class="ml-2 text-xs text-muted-foreground">Envoi de l'image…</span>{/if}
+  </div>
+  <!-- Réglages de l'image sélectionnée : texte alternatif, taille, alignement, bordure. -->
+  {#if ready && active('image')}
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border bg-background px-2 py-1.5 text-xs">
+      <span class="font-display text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Image</span>
+      <label class="flex items-center gap-1.5">
+        <span class="text-muted-foreground">Texte alternatif</span>
+        <input value={attrImage('alt') ?? ''} oninput={(e) => majImage({ alt: e.currentTarget.value })} placeholder="Description de l'image"
+          class="h-7 w-52 rounded border border-border bg-background px-2 outline-none focus:border-primary" />
+      </label>
+      <label class="flex items-center gap-1.5">
+        <span class="text-muted-foreground">Taille</span>
+        <select value={attrImage('taille') ?? ''} onchange={(e) => majImage({ taille: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
+          class="h-7 rounded border border-border bg-background px-1.5 outline-none focus:border-primary">
+          <option value="">Naturelle</option>
+          {#each TAILLES_IMAGE as t (t)}<option value={t}>{t} %</option>{/each}
+        </select>
+      </label>
+      <span class="flex items-center gap-0.5" role="group" aria-label="Alignement">
+        {#each ALIGNEMENTS_IMAGE as a (a.v)}
+          <button type="button" onclick={() => majImage({ align: a.v })} title={a.titre} tabindex="-1"
+            class="h-7 rounded px-2 font-medium transition-colors hover:bg-muted {(attrImage('align') ?? 'none') === a.v ? 'bg-foreground text-background hover:bg-foreground' : 'text-muted-foreground'}">{a.label}</button>
+        {/each}
+      </span>
+      <label class="flex items-center gap-1.5">
+        <input type="checkbox" checked={!!attrImage('border')} onchange={(e) => majImage({ border: e.currentTarget.checked })} class="accent-foreground" />
+        <span>Bordure</span>
+      </label>
+      <button type="button" onclick={() => run((c) => c.deleteSelection())} tabindex="-1"
+        class="ml-auto inline-flex h-7 items-center gap-1 rounded px-2 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive">
+        <Trash size={14} /> Retirer
+      </button>
+    </div>
+  {/if}
   </div>
 
   <div bind:this={element} class="rich-content" style="--min:{minHeight}"></div>
@@ -217,6 +326,9 @@
   :global(.rich-content .ProseMirror blockquote) { border-left: 3px solid var(--border); padding-left: 0.75rem; color: var(--muted-foreground); font-style: italic; }
   :global(.rich-content .ProseMirror a) { color: var(--link); text-decoration: underline; }
   :global(.rich-content .ProseMirror:focus) { outline: none; }
+  /* Images : l'alignement, la taille et la bordure sont stylés dans app.css (règles partagées avec le site). */
+  :global(.rich-content .ProseMirror img) { cursor: pointer; }
+  :global(.rich-content .ProseMirror img.ProseMirror-selectednode) { outline: 3px solid var(--link); outline-offset: 2px; }
   /* Appels de note : numérotés à l'affichage par un compteur (rien n'est stocké). */
   :global(.rich-content .ProseMirror) { counter-reset: fn; }
   :global(.rich-content .ProseMirror sup.fn-mark) { cursor: pointer; font-weight: 700; color: var(--link); padding: 0 0.15em; border-radius: 3px; }

@@ -121,3 +121,23 @@ export function notesDeBasDePage(html?: string | null): string | undefined {
     .join('');
   return `${corps}<section class="notes-bas-de-page"><h2 id="titre-notes" class="sr-only">Notes</h2><ol>${liste}</ol></section>`;
 }
+
+/**
+ * Newsletter : les clients mail ignorent nos feuilles de style : on traduit les réglages
+ * d'image de l'éditeur (`data-align`, `data-taille`, `data-border`) en styles
+ * inlinés sur chaque `<img>` d'un bloc de texte.
+ */
+export function imagesPourMail(html: string): string {
+  return html.replace(/<img\b[^>]*>/g, (tag) => {
+    const align = tag.match(/data-align="(\w+)"/)?.[1];
+    const taille = tag.match(/data-taille="(\d+)"/)?.[1];
+    const style = ['max-width:100%', 'height:auto'];
+    if (taille) style.push(`width:${taille}%`);
+    if (align === 'left') style.push('float:left', 'margin:4px 20px 12px 0');
+    else if (align === 'right') style.push('float:right', 'margin:4px 0 12px 20px');
+    else if (align === 'center') style.push('display:block', 'margin:16px auto');
+    else style.push('display:block', 'margin:16px 0');
+    if (/data-border="1"/.test(tag)) style.push('border:1px solid #d9d9d9', 'padding:4px');
+    return tag.replace(/\sstyle="[^"]*"/, '').replace(/^<img/, `<img style="${style.join(';')}"`);
+  });
+}

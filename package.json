@@ -53,6 +53,7 @@
     "@aws-sdk/lib-storage": "^3.1147.0",
     "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@tiptap/core": "^3.31.4",
+    "@tiptap/extension-image": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
     "bits-ui": "^2.19.5",
     "clsx": "^2.1.1",

@@ -213,6 +213,37 @@
 }
 
 /* ============================================================
+   Images insérées depuis l'éditeur (RichEditor) : alignement, taille et
+   bordure sont portés par des data-attributs dans le HTML stocké. Mêmes
+   règles sur le site (.prose-agone) et dans l'éditeur (.ProseMirror). Les classes
+   WordPress alignleft/aligncenter/alignright des textes migrés (non resauvés) sont
+   traitées pareil.
+   ============================================================ */
+.prose-agone, .rich-content .ProseMirror { display: flow-root; }
+.prose-agone img, .rich-content .ProseMirror img {
+  display: block; max-width: 100%; height: auto; margin: 1.25rem 0;
+}
+/* Flottantes : au plus la moitié de la colonne, pour laisser au texte de quoi s'écouler à côté. */
+.prose-agone img[data-align="left"], .prose-agone img.alignleft, .rich-content .ProseMirror img[data-align="left"] {
+  float: left; max-width: 50%; margin: 0.3rem 1.5rem 1rem 0;
+}
+.prose-agone img[data-align="right"], .prose-agone img.alignright, .rich-content .ProseMirror img[data-align="right"] {
+  float: right; max-width: 50%; margin: 0.3rem 0 1rem 1.5rem;
+}
+.prose-agone img[data-align="center"], .prose-agone img.aligncenter, .rich-content .ProseMirror img[data-align="center"] {
+  margin-inline: auto;
+}
+.prose-agone img[data-border="1"], .rich-content .ProseMirror img[data-border="1"] {
+  border: 1px solid var(--border); padding: 0.25rem; background: var(--background);
+}
+@media (max-width: 640px) {
+  /* Sur mobile, une image flottante prendrait trop de place : on la remet dans le flux. */
+  .prose-agone img[data-align="left"], .prose-agone img[data-align="right"], .prose-agone img.alignleft, .prose-agone img.alignright {
+    float: none; max-width: 100%; margin: 1.25rem auto;
+  }
+}
+
+/* ============================================================
    Taille de police du contenu : +2px sur tout le site, SAUF la nav.
    Tailwind v4 : les utilitaires text-* pointent sur var(--text-*),
    donc on redéfinit ces tokens sur le conteneur du front ; la nav

@@ -2,6 +2,7 @@
  * Génération de l'email d'un numéro de LettrInfo à partir de ses BLOCS.
  * Template table-based (compatible clients mail), inspiré des LettrInfos Agone.
  */
+import { imagesPourMail } from '$lib/text';
 import { query, recId } from './surreal';
 import { listUpcoming } from './events';
 import { getCompany } from './invoice';
@@ -68,6 +69,7 @@ async function resolveBooks(blocks: NlBlock[]): Promise<Map<string, { title: str
   return map;
 }
 
+
 export async function renderIssueEmail(articleId: string): Promise<string | null> {
   const rows = await query<any>(
     `SELECT title, newsletter_blocks AS blocks, body_html FROM article WHERE id = $id LIMIT 1`,
@@ -89,7 +91,7 @@ export async function renderIssueEmail(articleId: string): Promise<string | null
     if (b.type === 'heading' && b.text) {
       body.push(`<tr><td style="padding:18px 32px 4px;font-family:Verdana,Geneva,sans-serif;"><h2 style="margin:0;color:#5f5e5e;font-size:20px;">${esc(String(b.text))}</h2></td></tr>`);
     } else if (b.type === 'text' && b.html) {
-      body.push(`<tr><td style="padding:10px 32px;font-family:Verdana,Geneva,sans-serif;font-size:16px;line-height:1.6;color:${TEXT};">${String(b.html)}</td></tr>`);
+      body.push(`<tr><td style="padding:10px 32px;font-family:Verdana,Geneva,sans-serif;font-size:16px;line-height:1.6;color:${TEXT};">${imagesPourMail(String(b.html))}</td></tr>`);
     } else if (b.type === 'books' && Array.isArray(b.books)) {
       const resolved = b.books.map((x: any) => bookMap.get(String(x.id))).filter(Boolean) as { title: string; slug: string; cover_url?: string }[];
       body.push(booksBlock(resolved));
