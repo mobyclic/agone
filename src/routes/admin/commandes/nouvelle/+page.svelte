@@ -56,7 +56,13 @@
   }
 
   // — Lignes —
-  type Line = { bookId: string; title: string; isbn?: string; format: string; qty: number; unit_price: number; base_price: number };
+  type Line = { bookId: string; title: string; isbn?: string; format: string; qty: number; unit_price: number; base_price: number; price_paper?: number; price_ebook?: number };
+  /** Changer de format reprend le prix du catalogue de ce format (sauf si la ligne est offerte). */
+  function changerFormat(l: Line) {
+    const prix = l.format === 'epub' ? (l.price_ebook ?? l.price_paper ?? 0) : (l.price_paper ?? 0);
+    l.base_price = prix;
+    if (l.unit_price !== 0) l.unit_price = prix;
+  }
   let lines = $state<Line[]>([]);
   let bq = $state('');
   let bhits = $state<{ id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string }[]>([]);
@@ -71,11 +77,13 @@
       bhits = r.ok ? (await r.json()).results : [];
     }, 200);
   }
-  function addBook(b: { id: string; title: string; price_paper?: number; isbn_paper?: string }) {
+  function addBook(b: { id: string; title: string; price_paper?: number; price_ebook?: number; isbn_paper?: string }) {
     const price = b.price_paper ?? 0;
-    lines = [...lines, { bookId: b.id, title: b.title, isbn: b.isbn_paper, format: 'papier', qty: 1, unit_price: price, base_price: price }];
+    lines = [...lines, { bookId: b.id, title: b.title, isbn: b.isbn_paper, format: 'papier', qty: 1, unit_price: price, base_price: price, price_paper: b.price_paper, price_ebook: b.price_ebook }];
     bq = ''; bhits = [];
   }
+  /** Un ePub offert est remis tout de suite dans la bibliothèque du client — s'il a un compte. */
+  const ebooksOfferts = $derived(lines.filter((l) => l.format === 'epub' && l.unit_price === 0).length);
   // Bascule gratuit ⇄ payant : mémorise le prix courant pour pouvoir le rétablir.
   function toggleFree(l: Line) {
     if (l.unit_price === 0) {
@@ -239,7 +247,7 @@
               <tr>
                 <td class="py-2 pr-2"><span class="font-medium">{l.title}</span>{#if l.isbn}<span class="block text-[11px] text-muted-foreground">{l.isbn}</span>{/if}</td>
                 <td class="py-2 pr-2">
-                  <select bind:value={l.format} class="h-8 rounded border border-border bg-background px-2 text-xs">
+                  <select bind:value={l.format} onchange={() => changerFormat(l)} class="h-8 rounded border border-border bg-background px-2 text-xs">
                     <option value="papier">Papier</option>
                     <option value="epub">ePub</option>
                     <option value="souscription">Souscription</option>
@@ -266,6 +274,12 @@
           </tfoot>
         </table>
       </div>
+      {#if ebooksOfferts}
+        <p class="mt-2 rounded-md px-3 py-2 text-xs {mode === 'none' ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}">
+          {#if mode === 'none'}Un ePub offert ne peut être remis qu’à un compte client : choisissez ou créez le client, il le trouvera dans sa bibliothèque.
+          {:else}{ebooksOfferts > 1 ? `${ebooksOfferts} ePub offerts seront` : 'L’ePub offert sera'} disponible{ebooksOfferts > 1 ? 's' : ''} immédiatement dans la bibliothèque du client, dès la commande créée (statut « Payée »).{/if}
+        </p>
+      {/if}
     {:else}
       <p class="mt-3 text-sm text-muted-foreground">Aucun livre pour l’instant. Utilisez la recherche ci-dessus.</p>
     {/if}

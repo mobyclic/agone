@@ -7,6 +7,13 @@
   import ContributorsEditor from '$lib/components/ContributorsEditor.svelte';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Eye, Spinner, Lock, LockOpen, Warning, FileArrowUp, FileText, Info } from 'phosphor-svelte';
+  import { onMount } from 'svelte';
+
+  // « ← Catalogue » ramène à la liste telle qu'on l'a quittée (filtres, page, défilement).
+  let retour = $state('/admin/catalogue');
+  onMount(() => {
+    try { const m = JSON.parse(sessionStorage.getItem('agone:catalogue:retour') ?? 'null'); if (m?.url?.startsWith('/admin/catalogue')) retour = m.url; } catch { /* rien */ }
+  });
   import VentesExercices from '$lib/components/VentesExercices.svelte';
 
   let { data, form } = $props();
@@ -70,7 +77,7 @@
 
 <svelte:head><title>{data.isNew ? 'Nouveau livre' : b?.title} · Admin</title></svelte:head>
 
-<a href="/admin/catalogue" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+<a href={retour} class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
   <ArrowLeft size={16} /> Catalogue
 </a>
 

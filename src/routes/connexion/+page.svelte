@@ -32,7 +32,7 @@
 
 <svelte:head><title>Connexion · Agone</title></svelte:head>
 
-<div class="grid min-h-[calc(100svh-4rem)] lg:grid-cols-2">
+<div class="grid min-h-[calc(100svh-5rem)] lg:grid-cols-2">
   <!-- Panneau marque -->
   <div class="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
     <div class="bg-grid-fade absolute inset-0 opacity-[0.15]"></div>

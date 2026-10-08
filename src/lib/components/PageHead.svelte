@@ -57,7 +57,7 @@
 <!-- Bande de rappel : glisse depuis sous la nav quand on a dépassé le header.
      Noire (même encre que la barre du haut) pour prolonger la nav au scroll. -->
 <div
-  class="fixed inset-x-0 top-16 z-40 border-b border-white/10 bg-foreground text-background transition-[transform,opacity] duration-200 {stuck
+  class="fixed inset-x-0 top-20 z-40 border-b border-white/10 bg-foreground text-background transition-[transform,opacity] duration-200 {stuck
     ? 'translate-y-0 opacity-100'
     : 'pointer-events-none -translate-y-full opacity-0'}"
 >

@@ -34,23 +34,22 @@
 
         <!-- Même gabarit et même taille que les articles suivants : rubrique en
              rouge · date, le titre, l'auteur ; seul le chapeau est plus long.
-             Tout le bloc est cliquable ; seul « Lire l'article » se souligne. -->
+             Tout le bloc est cliquable ; le titre se souligne d'un trait fin au survol. -->
         <a href="/article/{article.slug}" class="group block">
           <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
             {#if article.rubrique_name}
-              <span class="font-semibold text-muted-foreground">{article.rubrique_name}</span>
+              <span class="font-semibold text-link">{article.rubrique_name}</span>
               {#if article.published_at}<span class="text-muted-foreground">·</span>{/if}
             {/if}
             {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
           </div>
-          <h1 class="display-title mt-1 break-words text-xl leading-tight">{article.title}</h1>
+          <h1 class="display-title mt-1 break-words text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">{article.title}</h1>
           {#if article.author}
             <p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{article.author}</p>
           {/if}
           {#if lede}
             <p class="mt-1.5 text-sm leading-relaxed text-foreground/75">{lede}</p>
           {/if}
-          <span class="mt-3 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
         </a>
 
         <!-- 4 articles récents (thème · date, titre, auteur) -->
@@ -59,15 +58,14 @@
             {#each secondary as a (a.slug)}
               <a href="/article/{a.slug}" class="group block py-3.5">
                 <div class="flex flex-wrap items-center gap-x-2 font-display text-xs uppercase tracking-wide">
-                  {#if a.rubrique_name}<span class="font-semibold text-muted-foreground">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
+                  {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
-                <h3 class="display-title mt-1 text-xl leading-tight">{a.title}</h3>
+                <h3 class="display-title mt-1 text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">{a.title}</h3>
                 {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
                 {#if a.excerpt}
                   <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>
                 {/if}
-                <span class="mt-2 inline-block font-display text-xs font-semibold uppercase tracking-wider text-link group-hover:underline group-hover:underline-offset-4">Lire l’article</span>
               </a>
             {/each}
           </div>

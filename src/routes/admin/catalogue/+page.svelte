@@ -3,6 +3,21 @@
   import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import Pagination from '$lib/components/Pagination.svelte';
+  import { onMount } from 'svelte';
+  import { page } from '$app/state';
+
+  // Revenir où l'on en était : avant d'ouvrir un livre, on note l'adresse de la
+  // liste (filtres, page) et le défilement ; la fiche y renvoie, la liste y retourne.
+  const CLE = 'agone:catalogue:retour';
+  function memoriserPosition() {
+    try { sessionStorage.setItem(CLE, JSON.stringify({ url: page.url.pathname + page.url.search, y: window.scrollY })); } catch { /* stockage indisponible */ }
+  }
+  onMount(() => {
+    try {
+      const m = JSON.parse(sessionStorage.getItem(CLE) ?? 'null');
+      if (m && m.url === page.url.pathname + page.url.search && m.y > 0) requestAnimationFrame(() => window.scrollTo({ top: m.y }));
+    } catch { /* rien à restaurer */ }
+  });
   import { Plus, MagnifyingGlass, CaretUp, CaretDown } from 'phosphor-svelte';
   import { BOOK_STATUS_LABEL, bookDerivedState } from '$lib/labels';
 
@@ -97,9 +112,9 @@
     <tbody class="divide-y divide-border">
       {#each data.books as b (b.id)}
         {@const etat = bookDerivedState(b)}
-        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/catalogue/${b.slug || nu(b.id)}`); }}>
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) { memoriserPosition(); goto(`/admin/catalogue/${b.slug || nu(b.id)}`); } }}>
           <td class="px-3 py-2.5">
-            <a href="/admin/catalogue/{b.slug || nu(b.id)}" class="flex items-center gap-3">
+            <a href="/admin/catalogue/{b.slug || nu(b.id)}" class="flex items-center gap-3" onclick={memoriserPosition}>
               <span class="h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-muted">
                 {#if b.cover_url}<img src={b.cover_url} alt="" class="size-full object-cover" />{/if}
               </span>

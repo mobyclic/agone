@@ -23,10 +23,10 @@
 </script>
 
 <header class="nav-base-size sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85" style="--gutter: var(--page-gutter)">
-  <div class="flex h-16 items-stretch">
+  <div class="flex h-20 items-stretch">
     <!-- Logo : bande noire pleine du bord gauche, englobant le logo (aligné au contenu) -->
-    <a href={logoHref} class="flex shrink-0 items-center bg-foreground pr-6 text-background" style="padding-left: calc(var(--gutter) + var(--logo-extra, 0px))" aria-label="Agone — accueil">
-      <Wordmark />
+    <a href={logoHref} class="flex shrink-0 items-center bg-foreground pr-10 text-background" style="padding-left: calc(var(--gutter) + var(--logo-extra, 0px))" aria-label="Agone — accueil">
+      <Wordmark class="text-[2.75rem]" />
     </a>
 
     <!-- Reste de la barre (aligné au contenu à droite). relative = repère du menu Antichambre. -->

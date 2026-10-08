@@ -21,7 +21,7 @@
       <div class="lg:col-span-2">
         <a href="/" class="inline-flex text-foreground" aria-label="Agone — accueil"><Wordmark /></a>
         <p class="mt-4 max-w-xs text-sm text-muted-foreground">
-          Agone — Éditeur indépendant. Critique politique, sciences sociales & humaines.
+          Éditeur indépendant. Actualité &amp; histoire politiques, sciences sociales &amp; humaines.
         </p>
         <div class="mt-5 flex items-center gap-1">
           {#each socials as s (s.name)}

@@ -105,8 +105,7 @@
       <!-- Échelle : l'article courant au milieu de ses voisins chronologiques,
            plus récents au-dessus, plus anciens en dessous (ordre de l'Antichambre). -->
       <nav aria-label="Articles voisins dans l’Antichambre">
-        <h2 class="eyebrow mb-4">Au fil de l’Antichambre</h2>
-        <p class="mb-2 pl-5 font-display text-[11px] uppercase tracking-wide text-muted-foreground">Plus récents ↑</p>
+        <h2 class="eyebrow mb-4">Au fil d’Antichambre</h2>
         <ol>
           {#each data.ladder as r (r.slug)}
             <li>
@@ -125,7 +124,6 @@
             </li>
           {/each}
         </ol>
-        <p class="mt-2 pl-5 font-display text-[11px] uppercase tracking-wide text-muted-foreground">Plus anciens ↓</p>
       </nav>
     {/if}
     </aside>
