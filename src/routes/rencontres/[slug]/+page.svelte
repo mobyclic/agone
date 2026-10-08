@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { embedsSociaux } from '$lib/client/embeds';
   import { colonneCollante } from '$lib/client/sticky';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
@@ -60,7 +61,7 @@
   {/if}
 
   {#if e.body_html}
-    <div class="prose-agone mt-6 max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
+    <div use:embedsSociaux class="prose-agone mt-6 max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_p]:mb-3">
       {@html e.body_html}
     </div>
   {/if}

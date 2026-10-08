@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { embedsSociaux } from '$lib/client/embeds';
   import PageHead from './PageHead.svelte';
   let {
     title,
@@ -12,7 +13,7 @@
 
 <div class="max-w-3xl pb-12 pt-10" style="padding-inline: var(--page-gutter)">
   {#if html}
-    <div class="prose-agone max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-4 [&_ul]:my-4">
+    <div use:embedsSociaux class="prose-agone max-w-none text-[17px] leading-relaxed [&_a]:text-link [&_a:hover]:underline [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:font-bold [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-4 [&_ul]:my-4">
       {@html html}
     </div>
   {/if}

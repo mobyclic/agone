@@ -4,10 +4,12 @@
   import StarterKit from '@tiptap/starter-kit';
   import {
     TextB, TextItalic, TextUnderline, ListBullets, ListNumbers, Quotes,
-    LinkSimple, ArrowUUpLeft, ArrowUUpRight, Trash, Image as ImageIcon
+    LinkSimple, ArrowUUpLeft, ArrowUUpRight, Trash, Image as ImageIcon, ShareNetwork
   } from 'phosphor-svelte';
   import { toast } from 'svelte-sonner';
   import { ImageAgone, ALIGNEMENTS_IMAGE, TAILLES_IMAGE } from '$lib/editeurImage';
+  import { ReseauSocial } from '$lib/editeurReseau';
+  import { RESEAUX, RESEAUX_LISTE, detecterReseau, nettoyerUrl } from '$lib/reseauxSociaux';
 
   let { name, value = '', minHeight = '12rem', stickyTop = '4rem', dossierImages = 'media/editeur', onchange }: {
     name: string; value?: string; minHeight?: string;
@@ -141,6 +143,22 @@
   }
   const imagesDe = (dt: DataTransfer | null) => Array.from(dt?.files ?? []).filter((f) => f.type.startsWith('image/'));
   const attrImage = (k: string) => (void tick, editor?.getAttributes('image')?.[k]);
+
+  // ── Publications de réseaux sociaux : une adresse suffit, le réseau est reconnu.
+  const RESEAUX_AIDE = RESEAUX_LISTE.map((r) => RESEAUX[r].label).join(', ');
+  function insererReseau() {
+    if (!editor) return;
+    const saisie = window.prompt(`Adresse de la publication (${RESEAUX_AIDE}) :`, '');
+    if (saisie === null || !saisie.trim()) return;
+    const reseau = detecterReseau(saisie);
+    if (!reseau) { toast.error(`Adresse non reconnue. Réseaux pris en charge : ${RESEAUX_AIDE}.`); return; }
+    editor.chain().focus().insertContentAt(editor.state.selection.to, { type: 'reseauSocial', attrs: { reseau, url: nettoyerUrl(saisie, reseau) } }).run();
+  }
+  const attrReseau = (k: string) => (void tick, editor?.getAttributes('reseauSocial')?.[k]);
+  function majUrlReseau(url: string) {
+    const reseau = detecterReseau(url);
+    editor?.chain().updateAttributes('reseauSocial', { url: reseau ? nettoyerUrl(url, reseau) : url, reseau }).run();
+  }
   /** Modifie l'image sélectionnée sans voler le focus (on peut être en train de taper le texte alternatif). */
   const majImage = (attrs: Record<string, unknown>) => editor?.chain().updateAttributes('image', attrs).run();
 
@@ -152,7 +170,8 @@
         StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, HTMLAttributes: { rel: 'noopener' } } }),
         NoteDeBasDePage,
         EspaceInsecable,
-        ImageAgone.configure({ inline: false, allowBase64: false })
+        ImageAgone.configure({ inline: false, allowBase64: false }),
+        ReseauSocial
       ],
       editorProps: {
         // Images déposées ou collées : envoyées puis insérées à l'endroit du dépôt / du curseur.
@@ -236,6 +255,10 @@
     </button>
     <input bind:this={fileInput} type="file" accept="image/*" multiple class="hidden"
       onchange={(e) => { const files = Array.from(e.currentTarget.files ?? []); e.currentTarget.value = ''; insererImages(files); }} />
+    <button type="button" onclick={insererReseau} tabindex="-1" title="Insérer une publication de réseau social ({RESEAUX_AIDE})"
+      class="grid size-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted {active('reseauSocial') ? 'bg-foreground text-background hover:bg-foreground' : ''}">
+      <ShareNetwork size={16} />
+    </button>
     <span class="mx-0.5 h-5 w-px bg-border"></span>
     <button type="button" onclick={ajouterNote} tabindex="-1" title="Insérer une note de bas de page à la position du curseur"
       class="inline-flex h-8 items-center gap-1 rounded px-2 font-display text-xs font-bold text-muted-foreground transition-colors hover:bg-background hover:text-foreground">
@@ -250,6 +273,22 @@
     {@render tb(ArrowUUpRight, () => run((c) => c.redo()))}
     {#if envoiEnCours}<span class="ml-2 text-xs text-muted-foreground">Envoi de l'image…</span>{/if}
   </div>
+  <!-- Réglages de la publication sélectionnée : réseau reconnu et adresse. -->
+  {#if ready && active('reseauSocial')}
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border bg-background px-2 py-1.5 text-xs">
+      <span class="font-display text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{attrReseau('reseau') ? RESEAUX[attrReseau('reseau') as keyof typeof RESEAUX].label : 'Réseau non reconnu'}</span>
+      <label class="flex flex-1 items-center gap-1.5">
+        <span class="text-muted-foreground">Adresse</span>
+        <input value={attrReseau('url') ?? ''} onchange={(e) => majUrlReseau(e.currentTarget.value)} placeholder="https://…"
+          class="h-7 min-w-64 flex-1 rounded border border-border bg-background px-2 font-mono outline-none focus:border-primary {attrReseau('reseau') ? '' : 'border-destructive'}" />
+      </label>
+      <span class="text-muted-foreground">Le lecteur s'affiche sur le site, pas ici.</span>
+      <button type="button" onclick={() => run((c) => c.deleteSelection())} tabindex="-1"
+        class="ml-auto inline-flex h-7 items-center gap-1 rounded px-2 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive">
+        <Trash size={14} /> Retirer
+      </button>
+    </div>
+  {/if}
   <!-- Réglages de l'image sélectionnée : texte alternatif, taille, alignement, bordure. -->
   {#if ready && active('image')}
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border bg-background px-2 py-1.5 text-xs">
@@ -329,6 +368,11 @@
   /* Images : l'alignement, la taille et la bordure sont stylés dans app.css (règles partagées avec le site). */
   :global(.rich-content .ProseMirror img) { cursor: pointer; }
   :global(.rich-content .ProseMirror img.ProseMirror-selectednode) { outline: 3px solid var(--link); outline-offset: 2px; }
+  /* Publication de réseau social : une carte (réseau + adresse), le lecteur n'est monté que sur le site. */
+  :global(.rich-content .ProseMirror figure.reseau-social) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; margin: 1rem 0; padding: 0.6rem 0.85rem; border: 1px dashed var(--border); background: color-mix(in oklch, var(--muted) 60%, transparent); cursor: pointer; }
+  :global(.rich-content .ProseMirror figure.reseau-social.ProseMirror-selectednode) { outline: 3px solid var(--link); outline-offset: 2px; }
+  :global(.rich-content .ProseMirror .reseau-social__label) { font-family: var(--font-display); font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--link); }
+  :global(.rich-content .ProseMirror .reseau-social__url) { font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--muted-foreground); word-break: break-all; }
   /* Appels de note : numérotés à l'affichage par un compteur (rien n'est stocké). */
   :global(.rich-content .ProseMirror) { counter-reset: fn; }
   :global(.rich-content .ProseMirror sup.fn-mark) { cursor: pointer; font-weight: 700; color: var(--link); padding: 0 0.15em; border-radius: 3px; }

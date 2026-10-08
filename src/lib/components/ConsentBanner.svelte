@@ -91,7 +91,7 @@
             <label class="flex cursor-pointer items-start justify-between gap-4 border-t border-border/60 py-2">
               <div class="flex-1">
                 <p class="text-sm font-medium">Publicité & marketing</p>
-                <p class="text-xs text-muted-foreground">Suivi des conversions et reciblage (Meta / Instagram, Google Ads).</p>
+                <p class="text-xs text-muted-foreground">Suivi des conversions et reciblage (Meta, Google Ads) et affichage des publications intégrées des réseaux sociaux (Instagram, Facebook, X, TikTok, YouTube, Vimeo, Bluesky).</p>
               </div>
               <input type="checkbox" bind:checked={marketing} class="mt-1 size-4 accent-foreground" />
             </label>
