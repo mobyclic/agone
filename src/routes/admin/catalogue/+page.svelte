@@ -39,7 +39,7 @@
 
   function nav(params: Record<string, string | number | undefined>) {
     const merged: Record<string, string | number | undefined> = {
-      q, status: data.status, sort: data.sort, dir: data.dir, page: data.page, ...params
+      q, status: data.status, collection: data.collection, ebook: data.ebook, year: data.year, sort: data.sort, dir: data.dir, page: data.page, ...params
     };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
@@ -54,6 +54,10 @@
     clearTimeout(timer);
     timer = setTimeout(() => nav({ q, page: 1 }), 220);
   }
+  const EBOOK: Record<string, string> = { avec: 'Avec ePub', sans: 'Sans ePub', sans_prix: 'ePub sans prix' };
+  const filtresActifs = $derived(!!(data.status || data.collection || data.ebook || data.year));
+  const reinitialiser = () => { q = ''; nav({ q: '', status: undefined, collection: undefined, ebook: undefined, year: undefined, page: 1 }); };
+  const select = 'h-10 max-w-[220px] rounded-md border border-border bg-background px-3 text-sm';
   function sortBy(col: string) {
     const dir = data.sort === col && data.dir === 'asc' ? 'desc' : 'asc';
     nav({ sort: col, dir, page: 1 });
@@ -73,14 +77,28 @@
 <div class="mb-4 flex flex-wrap gap-2">
   <div class="relative min-w-[240px] flex-1">
     <MagnifyingGlass size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-    <input bind:value={q} oninput={onSearch} placeholder="Rechercher un titre…" autocomplete="off"
+    <input bind:value={q} oninput={onSearch} placeholder="Titre, ISBN ou auteur…" autocomplete="off"
       class="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary" />
   </div>
-  <select value={data.status ?? ''} onchange={(e) => nav({ status: e.currentTarget.value || undefined, page: 1 })}
-    class="h-10 rounded-md border border-border bg-background px-3 text-sm">
+  <select value={data.status ?? ''} onchange={(e) => nav({ status: e.currentTarget.value || undefined, page: 1 })} class={select} aria-label="Statut">
     <option value="">Tous les statuts</option>
     {#each Object.entries(STATUS) as [k, v] (k)}<option value={k}>{v}</option>{/each}
   </select>
+  <select value={data.collection ?? ''} onchange={(e) => nav({ collection: e.currentTarget.value || undefined, page: 1 })} class={select} aria-label="Collection">
+    <option value="">Toutes les collections</option>
+    {#each data.collections as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+  </select>
+  <select value={data.ebook ?? ''} onchange={(e) => nav({ ebook: e.currentTarget.value || undefined, page: 1 })} class={select} aria-label="Ebook">
+    <option value="">Papier & ePub</option>
+    {#each Object.entries(EBOOK) as [k, v] (k)}<option value={k}>{v}</option>{/each}
+  </select>
+  <select value={data.year ?? ''} onchange={(e) => nav({ year: e.currentTarget.value || undefined, page: 1 })} class={select} aria-label="Année de parution">
+    <option value="">Toutes les années</option>
+    {#each data.years as y (y)}<option value={y}>{y}</option>{/each}
+  </select>
+  {#if filtresActifs || q}
+    <button type="button" onclick={reinitialiser} class="h-10 rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">Réinitialiser</button>
+  {/if}
 </div>
 
 {#snippet sortable(label: string, col: string, align = 'left')}

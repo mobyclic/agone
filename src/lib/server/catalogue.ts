@@ -377,7 +377,15 @@ export async function seuilAlerteStock(): Promise<number> {
   return Number.isFinite(n) && n >= 0 ? n : 10;
 }
 
-export async function listBooksAdmin(opts: { q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number } = {}) {
+export async function listBooksAdmin(opts: {
+  q?: string; status?: string; sort?: string; dir?: string; limit?: number; offset?: number;
+  /** Identifiant nu d'une collection (principale ou secondaire). */
+  collection?: string;
+  /** 'avec' : fichier ePub disponible · 'sans' : aucun fichier · 'sans_prix' : fichier mais pas de prix. */
+  ebook?: string;
+  /** Année de parution. */
+  year?: number;
+} = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
   if (opts.status === 'forthcoming') {
@@ -394,7 +402,16 @@ export async function listBooksAdmin(opts: { q?: string; status?: string; sort?:
   } else if (opts.status) {
     where.push('status = $status'); vars.status = opts.status;
   }
-  if (opts.q && opts.q.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push('string::lowercase(title) CONTAINS $q'); }
+  if (opts.q && opts.q.trim()) {
+    vars.q = opts.q.trim().toLowerCase();
+    // Titre, ISBN ou nom d'un contributeur.
+    where.push("(string::lowercase(title) CONTAINS $q OR (isbn_paper ?? '') CONTAINS $q OR string::lowercase(string::join(' ', ->contributed_by->author.full_name)) CONTAINS $q)");
+  }
+  if (opts.collection) { vars.coll = recId('collection', opts.collection); where.push('(primary_collection = $coll OR (collections ?? []) CONTAINS $coll)'); }
+  if (opts.ebook === 'avec') where.push("id IN (SELECT VALUE book FROM ebook_asset WHERE status = 'available')");
+  else if (opts.ebook === 'sans') where.push("id NOT IN (SELECT VALUE book FROM ebook_asset WHERE status = 'available')");
+  else if (opts.ebook === 'sans_prix') where.push("price_ebook = NONE AND id IN (SELECT VALUE book FROM ebook_asset WHERE status = 'available')");
+  if (opts.year) { vars.year = opts.year; where.push('published_at != NONE AND time::year(published_at) = $year'); }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const field = ADMIN_SORT[opts.sort ?? 'recent'] ?? 'updated_at';
   const dir = opts.dir === 'asc' ? 'ASC' : 'DESC';
@@ -739,4 +756,16 @@ export async function supprimerEbookAsset(assetId: string): Promise<void> {
   await query(`DELETE owns WHERE out = $id`, { id: recId('ebook_asset', assetId) });
   await query(`DELETE $id`, { id: recId('ebook_asset', assetId) });
   if (key) await deleteFile(String(key)).catch(() => {});
+}
+
+/** Années de parution présentes au catalogue (filtre de la liste admin), la plus récente d'abord. */
+export async function anneesParution(): Promise<number[]> {
+  const rows = await query<any>(`SELECT time::year(published_at) AS y, count() AS n FROM book WHERE published_at != NONE GROUP BY y ORDER BY y DESC`);
+  return rows.map((r: any) => Number(r.y)).filter((y: number) => Number.isFinite(y) && y > 1900);
+}
+
+/** Toutes les collections (filtre de la liste admin), dans l'ordre d'affichage. */
+export async function collectionsPourFiltre(): Promise<{ id: string; name: string }[]> {
+  const rows = await query<any>(`SELECT meta::id(id) AS id, name, sort FROM collection ORDER BY sort ASC, name ASC`);
+  return rows.map((r: any) => ({ id: String(r.id), name: r.name }));
 }
