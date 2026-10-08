@@ -132,7 +132,7 @@
 
       <div class={carte}>
         <span class={label}>Auteur(s)</span>
-        {#key a?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" initial={a?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
+        {#key a?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" lienBase="/admin/auteurs/" initial={a?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
       </div>
 
       <div class={carte}>

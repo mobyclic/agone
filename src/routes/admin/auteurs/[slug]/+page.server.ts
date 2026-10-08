@@ -2,14 +2,19 @@ import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireStaff } from '$lib/server/access';
 import { isAdmin } from '$lib/roles';
-import { getAuthorAdminBySlug, upsertAuthor, deleteAuthor, booksForAuthorAdmin, setLegendePortrait, type AuthorInput } from '$lib/server/authors';
+import { getAuthorAdminBySlug, getAuthorAdmin, upsertAuthor, deleteAuthor, booksForAuthorAdmin, setLegendePortrait, type AuthorInput } from '$lib/server/authors';
 import { statementsForAuthor, ventesParExerciceAuteur } from '$lib/server/droits';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   if (params.slug === 'nouveau') return { isNew: true, author: null, statements: [], books: [], ventes: [], canSeeRoyalties: isAdmin(locals.user?.role) };
   const author = await getAuthorAdminBySlug(params.slug);
-  if (!author) throw error(404, { message: 'Auteur introuvable' });
+  if (!author) {
+    // Appelé avec l'identifiant (liens depuis les sélecteurs d'auteurs) : on renvoie vers le slug.
+    const parId = await getAuthorAdmin(params.slug);
+    if (parId?.slug) throw redirect(302, `/admin/auteurs/${parId.slug}`);
+    throw error(404, { message: 'Auteur introuvable' });
+  }
   // Droits d'auteur : réservés aux administrateurs. `canSeeRoyalties` permet à la
   // page de distinguer « aucun relevé » de « relevés masqués ».
   const canSeeRoyalties = isAdmin(locals.user?.role);

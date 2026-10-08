@@ -217,7 +217,7 @@
     <div class="space-y-5">
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-3">Auteurs</h3>
-        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
+        {#key ev?.id}<EntityPicker name="authorIds" searchUrl="/api/authors/search" labelField="full_name" visuel="avatar" lienBase="/admin/auteurs/" initial={ev?.authors ?? []} placeholder="Ajouter un auteur…" onchange={() => (dirty = true)} />{/key}
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="eyebrow mb-1">Livres associés</h3>
