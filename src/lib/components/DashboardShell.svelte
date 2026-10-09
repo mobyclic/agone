@@ -24,9 +24,15 @@
   const navSections = $derived<NavSection[]>(sections ?? (items ? [{ items }] : []));
 
   let open = $state(false);
-  const correspond = (href: string) =>
-    page.url.pathname === href ||
-    (href !== '/admin' && href !== '/compte' && page.url.pathname.startsWith(href + '/'));
+  // Un lien peut porter une requête (« /admin/clients?type=pro ») : il ne s'allume que si
+  // chacun de ses paramètres est présent dans l'adresse courante.
+  const correspond = (href: string) => {
+    const [chemin, requete] = href.split('?');
+    const memeChemin = page.url.pathname === chemin || (chemin !== '/admin' && chemin !== '/compte' && page.url.pathname.startsWith(chemin + '/'));
+    if (!memeChemin) return false;
+    if (!requete) return true;
+    return [...new URLSearchParams(requete)].every(([k, v]) => page.url.searchParams.get(k) === v);
+  };
   // Une seule entrée active : la plus précise de celles qui correspondent
   // (« Vue d'ensemble » /admin/droits ne s'allume pas avec « Contrats »).
   const hrefActif = $derived(

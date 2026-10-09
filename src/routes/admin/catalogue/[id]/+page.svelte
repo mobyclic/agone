@@ -90,6 +90,30 @@
   <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start 2xl:grid-cols-[minmax(0,1fr)_28rem]">
     <!-- Colonne principale -->
     <div class="min-w-0 space-y-5">
+      <!-- Fiche technique en tête : ISBN, prix, TVA, dates, stock — ce qu'on vérifie d'abord. -->
+      <div class="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-4">
+        <h3 class="eyebrow col-span-2">Fiche technique</h3>
+        <label class="{label} col-span-2 sm:col-span-1">ISBN papier <input name="isbn_paper" value={b?.isbn_paper ?? ''} class={input} /></label>
+        <label class="{label} col-span-2 sm:col-span-1">ISBN ebook <input name="isbn_ebook" value={b?.isbn_ebook ?? ''} class={input} /></label>
+        <label class={label}>Prix papier (€) <input name="price_paper" type="number" step="0.01" value={b?.price_paper ?? ''} class={input} /></label>
+        <label class={label}>Prix ebook (€) <input name="price_ebook" type="number" step="0.01" value={b?.price_ebook ?? ''} class={input} /></label>
+        <label class={label} title="5,5 % pour un livre ; 20 % pour ce qui n'en est pas un (carte, affiche, objet).">TVA
+          <select name="vat_rate" class={input}>
+            {#each [5.5, 20, 10, 2.1, 0] as t (t)}<option value={t} selected={(b?.vat_rate ?? 5.5) === t}>{String(t).replace('.', ',')} %</option>{/each}
+          </select>
+        </label>
+        <label class={label}>Prix souscription (€) <input name="subscription_price" type="number" step="0.01" value={b?.subscription_price ?? ''} class={input} /></label>
+        <label class={label}>Souscription jusqu'au <input name="subscription_end" type="date" value={subEndDate} class={input} /></label>
+        <label class={label}>Parution <input name="published_at" type="date" value={pubDate} class={input} /></label>
+        <label class={label}>Pages <input name="page_count" type="number" value={b?.page_count ?? ''} class={input} /></label>
+        <label class={label}>Stock <input name="stock_qty" type="number" value={b?.stock_qty ?? 0} class={input} /></label>
+        <label class={label}>Poids (g) <input name="weight_grams" type="number" step="1" min="0" value={b?.weight_grams ?? ''} placeholder="frais de port" class={input} /></label>
+        <label class={label}>Largeur (cm) <input name="width_cm" type="number" step="0.1" value={b?.width_cm ?? ''} class={input} /></label>
+        <label class={label}>Hauteur (cm) <input name="height_cm" type="number" step="0.1" value={b?.height_cm ?? ''} class={input} /></label>
+        <label class={label}>Titre original <input name="title_original" value={b?.title_original ?? ''} class={input} /></label>
+        <label class={label}>Langue originale <input name="language_original" value={b?.language_original ?? ''} class={input} /></label>
+      </div>
+
       <div class="rounded-lg border border-border bg-card p-4">
         <label class={label}>Titre *
           <input name="title" required value={b?.title ?? ''} class="{input} h-12 font-display text-xl font-semibold" />
@@ -191,28 +215,6 @@
         </select>
       </div>
 
-      <div class="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-4">
-        <h3 class="eyebrow col-span-2">Fiche technique</h3>
-        <label class="{label} col-span-2 sm:col-span-1">ISBN papier <input name="isbn_paper" value={b?.isbn_paper ?? ''} class={input} /></label>
-        <label class="{label} col-span-2 sm:col-span-1">ISBN ebook <input name="isbn_ebook" value={b?.isbn_ebook ?? ''} class={input} /></label>
-        <label class={label}>Prix papier (€) <input name="price_paper" type="number" step="0.01" value={b?.price_paper ?? ''} class={input} /></label>
-        <label class={label}>Prix ebook (€) <input name="price_ebook" type="number" step="0.01" value={b?.price_ebook ?? ''} class={input} /></label>
-        <label class={label} title="5,5 % pour un livre ; 20 % pour ce qui n'en est pas un (carte, affiche, objet).">TVA
-          <select name="vat_rate" class={input}>
-            {#each [5.5, 20, 10, 2.1, 0] as t (t)}<option value={t} selected={(b?.vat_rate ?? 5.5) === t}>{String(t).replace('.', ',')} %</option>{/each}
-          </select>
-        </label>
-        <label class={label}>Prix souscription (€) <input name="subscription_price" type="number" step="0.01" value={b?.subscription_price ?? ''} class={input} /></label>
-        <label class={label}>Souscription jusqu'au <input name="subscription_end" type="date" value={subEndDate} class={input} /></label>
-        <label class={label}>Parution <input name="published_at" type="date" value={pubDate} class={input} /></label>
-        <label class={label}>Pages <input name="page_count" type="number" value={b?.page_count ?? ''} class={input} /></label>
-        <label class={label}>Stock <input name="stock_qty" type="number" value={b?.stock_qty ?? 0} class={input} /></label>
-        <label class={label}>Poids (g) <input name="weight_grams" type="number" step="1" min="0" value={b?.weight_grams ?? ''} placeholder="frais de port" class={input} /></label>
-        <label class={label}>Largeur (cm) <input name="width_cm" type="number" step="0.1" value={b?.width_cm ?? ''} class={input} /></label>
-        <label class={label}>Hauteur (cm) <input name="height_cm" type="number" step="0.1" value={b?.height_cm ?? ''} class={input} /></label>
-        <label class={label}>Titre original <input name="title_original" value={b?.title_original ?? ''} class={input} /></label>
-        <label class={label}>Langue originale <input name="language_original" value={b?.language_original ?? ''} class={input} /></label>
-      </div>
 
       {#if !data.isNew}
         <!-- Fichier ebook, juste sous le prix numérique auquel il conditionne la vente.

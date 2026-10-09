@@ -123,7 +123,7 @@
       </ul>
       <div class="mt-4 space-y-1 border-t border-border pt-3 text-sm">
         <div class="flex justify-between text-muted-foreground"><span>Sous-total</span><span>{eur(data.cart.subtotal)}</span></div>
-        {#if data.promo && data.promo.ok}<div class="flex justify-between text-success"><span>Code {data.promo.code}</span><span>−{eur(data.promo.discount)}</span></div>{/if}
+        {#if data.promo && data.promo.ok}<div class="flex justify-between text-success"><span>{data.promo.auto ? (data.promo.description || 'Promotion') : `Code ${data.promo.code}`}</span><span>−{eur(data.promo.discount)}</span></div>{/if}
         {#if data.cart.has_physical}
           <div class="flex justify-between text-muted-foreground"><span>Livraison</span><span>{shipQuote.ok ? (shipping > 0 ? eur(shipping) : 'Offerte') : '—'}</span></div>
           {#if !shipQuote.ok}<p class="text-xs text-destructive">{shipQuote.error}</p>{/if}

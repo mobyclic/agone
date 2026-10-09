@@ -39,7 +39,20 @@
       if (input) input.value = '';
     }
   }
-  const remove = (i: number) => (items = items.filter((_, j) => j !== i));
+  /** Retire l'image de la liste ET la supprime vraiment (fichier et fiche média), après confirmation. */
+  async function remove(i: number) {
+    const it = items[i];
+    if (!it || !confirm('Supprimer cette image définitivement ? Le fichier est effacé du stockage.')) return;
+    try {
+      const res = await fetch(`/api/upload?id=${encodeURIComponent(it.id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      items = items.filter((_, j) => j !== i);
+      toast.success('Image supprimée.');
+    } catch (err) {
+      toast.error('Suppression impossible.');
+      console.error(err);
+    }
+  }
   const idsJson = $derived(JSON.stringify(items.map((x) => x.id)));
 </script>
 

@@ -3,7 +3,7 @@
     SquaresFour, BookOpen, Books, Users, User, UserGear, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
-    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent, ClockCounterClockwise, FileText, Warehouse
+    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent, ClockCounterClockwise, FileText, Warehouse, Megaphone, Buildings, ClipboardText, ArrowUUpLeft, Images
  } from 'phosphor-svelte';
 
   // Registre nom → composant (icônes utilisées dans la navigation & les listes).
@@ -11,7 +11,7 @@
     SquaresFour, BookOpen, Books, Users, User, UserGear, Receipt, ShoppingBag, ShoppingCart,
     Package, Truck, Coins, Article, Newspaper, CalendarDots, GearSix, Info,
     Storefront, Tag, Star, MagnifyingGlass, EnvelopeSimple, MapPin, Gauge,
-    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent, ClockCounterClockwise, FileText, Warehouse
+    ArrowRight, Check, Plus, PencilSimple, Trash, Warning, Globe, Download, ChartBar, PenNib, Invoice, Percent, ClockCounterClockwise, FileText, Warehouse, Megaphone, Buildings, ClipboardText, ArrowUUpLeft, Images
  };
 </script>
 

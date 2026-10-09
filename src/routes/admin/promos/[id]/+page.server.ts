@@ -36,7 +36,8 @@ export const actions: Actions = {
         max_uses: I('max_uses'), scope: S('scope') || 'all',
         collectionIds: fd.getAll('collections').map(String),
         bookIds: J('bookIds'), userIds: J('userIds'),
-        active: fd.get('active') === 'on'
+        active: fd.get('active') === 'on',
+        automatic: fd.get('automatic') === 'on'
       });
     } catch {
       return fail(400, { error: 'Enregistrement impossible — ce code existe peut-être déjà.' });

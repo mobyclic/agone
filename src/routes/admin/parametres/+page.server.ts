@@ -73,16 +73,6 @@ export const actions: Actions = {
     throw redirect(303, withFlash('/admin/parametres', 'Traceurs enregistrés.', 'success'));
   },
 
-  banner: async ({ request, locals }) => {
-    requireAdmin(locals);
-    const fd = await request.formData();
-    await setSetting('banner', {
-      active: fd.get('active') === 'on',
-      message: String(fd.get('message') ?? '').trim(),
-      variant: String(fd.get('variant') ?? 'info')
-    });
-    throw redirect(303, withFlash('/admin/parametres', 'Bannière enregistrée.', 'success'));
-  },
 
   billing: async ({ request, locals }) => {
     requireAdmin(locals);

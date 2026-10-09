@@ -36,6 +36,10 @@
       <label class="mt-3 flex items-center gap-2 text-sm">
         <input type="checkbox" name="active" checked={data.isNew ? true : p?.active} class="size-4 rounded border-border" /> Actif
       </label>
+      <label class="mt-2 flex items-start gap-2 text-sm">
+        <input type="checkbox" name="automatic" checked={p?.automatic === true} class="mt-0.5 size-4 rounded border-border" />
+        <span>Réduction automatique sur le site<span class="block text-xs text-muted-foreground">Appliquée d'office au panier, sans code à saisir ; le code sert alors d'identifiant. Si plusieurs s'appliquent, la plus avantageuse l'emporte.</span></span>
+      </label>
       {#if !data.isNew}<p class="mt-2 text-xs text-muted-foreground">Utilisé {p?.used_count ?? 0} fois.</p>{/if}
     </div>
 
@@ -66,6 +70,7 @@
           <option value="all">Tout le catalogue</option>
           <option value="collection">Certaines collections</option>
           <option value="book">Certains livres</option>
+          <option value="fond">Le fond : livres parus depuis plus de deux ans</option>
         </select>
       </label>
       {#if scope === 'collection'}

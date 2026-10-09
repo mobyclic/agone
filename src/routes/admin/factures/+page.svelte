@@ -122,7 +122,7 @@
 
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">Facturation</h2>
+    <h2 class="text-xl font-bold">{data.kind === 'credit_note' ? 'Avoirs' : data.kind === 'invoice' ? 'Factures' : 'Facturation'}</h2>
     <p class="text-sm text-muted-foreground">{data.total} document{data.total > 1 ? 's' : ''}{filtresActifs.length ? ' pour ce filtre' : ''}</p>
   </div>
   <Button href="/admin/factures/nouvelle"><Plus size={16} /> Nouvelle facture</Button>

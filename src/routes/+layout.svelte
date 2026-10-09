@@ -4,6 +4,8 @@
   import PublicHeader from '$lib/components/PublicHeader.svelte';
   import PublicFooter from '$lib/components/PublicFooter.svelte';
   import ConsentBanner from '$lib/components/ConsentBanner.svelte';
+  import SiteBanner from '$lib/components/SiteBanner.svelte';
+  import PromoPopup from '$lib/components/PromoPopup.svelte';
   import { Toaster } from 'svelte-sonner';
   import { consumeUrlFlash } from '$lib/toasts';
 
@@ -48,7 +50,9 @@ gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personali
   {@render children?.()}
 {:else}
   <div class="flex min-h-svh flex-col text-plus">
+    <SiteBanner banner={data.bandeau} />
     <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} nav={data.nav} />
+    <PromoPopup popup={data.fenetre} />
     <main class="flex-1 border-t-[5px] border-t-white">
       {@render children?.()}
     </main>

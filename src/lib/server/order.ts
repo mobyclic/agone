@@ -179,6 +179,9 @@ export async function listOrdersAdmin(opts: { q?: string; status?: string; type?
   // Invité = commande sans compte client rattaché.
   if (opts.type === 'invites') where.push('customer = NONE');
   else if (opts.type === 'clients') where.push('customer != NONE');
+  // En ligne = payée par Stripe sur le site ; bon de commande = saisie au back-office (comptoir, VPC, import, dépôt).
+  else if (opts.type === 'en_ligne') where.push('stripe_session != NONE');
+  else if (opts.type === 'bons') where.push('stripe_session = NONE');
   if (opts.q && opts.q.trim()) {
     const q = opts.q.trim();
     if (/^\d+$/.test(q)) { where.push('number = $num'); vars.num = Number(q); }

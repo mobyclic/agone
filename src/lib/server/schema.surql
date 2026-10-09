@@ -914,12 +914,14 @@ DEFINE FIELD OVERWRITE max_uses    ON promo_code TYPE option<int>;      -- quant
 DEFINE FIELD OVERWRITE used_count  ON promo_code TYPE int DEFAULT 0;
 -- Périmètre : tout le catalogue, une/des collection(s), ou des livres précis
 DEFINE FIELD OVERWRITE scope       ON promo_code TYPE string
-  ASSERT $value IN ['all','collection','book'] DEFAULT 'all';
+  ASSERT $value IN ['all','collection','book','fond'] DEFAULT 'all';   -- fond : livres parus depuis plus de deux ans
 DEFINE FIELD OVERWRITE collections ON promo_code TYPE option<array<record<collection>>>;
 DEFINE FIELD OVERWRITE books       ON promo_code TYPE option<array<record<book>>>;
 -- Réservé à certains clients (vide = tout le monde)
 DEFINE FIELD OVERWRITE users       ON promo_code TYPE option<array<record<user>>>;
 DEFINE FIELD OVERWRITE active      ON promo_code TYPE bool DEFAULT true;
+-- Réduction appliquée d'office sur le site (sans code à saisir) : la meilleure l'emporte au panier.
+DEFINE FIELD OVERWRITE automatic   ON promo_code TYPE bool DEFAULT false VALUE $value ?? false;
 DEFINE FIELD OVERWRITE created_at  ON promo_code TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at  ON promo_code TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_promo_code ON promo_code FIELDS code UNIQUE;

@@ -2,7 +2,7 @@ import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/access';
 import { cartDetails, clearCart, getPromoCode, clearPromoCode } from '$lib/server/cart';
-import { validatePromo } from '$lib/server/promo';
+import { validatePromo, promoAutomatique } from '$lib/server/promo';
 import { activeShipZones } from '$lib/server/shipping';
 import { quoteShippingFor } from '$lib/shipping-calc';
 import { COUNTRIES } from '$lib/countries';
@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
     { id: recId('user', user.id) }
   ))[0];
   const code = getPromoCode(cookies);
-  const promo = code ? await validatePromo(code, cart, user.id) : null;
+  const promo = code ? await validatePromo(code, cart, user.id) : await promoAutomatique(cart, user.id);
   const shipZones = await activeShipZones();
   const shipCountries = shipZones.some((z) => z.rest_of_world)
     ? COUNTRIES
@@ -70,7 +70,7 @@ export const actions: Actions = {
       : undefined;
     // Code promo : re-validé au moment de la commande (le panier a pu changer).
     const code = getPromoCode(cookies);
-    const promoRes = code ? await validatePromo(code, cart, user.id) : null;
+    const promoRes = code ? await validatePromo(code, cart, user.id) : await promoAutomatique(cart, user.id);
     const discount = promoRes && promoRes.ok ? promoRes.discount : 0;
     const promoCode = promoRes && promoRes.ok ? promoRes.code : undefined;
 

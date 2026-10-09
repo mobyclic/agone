@@ -5,7 +5,7 @@
   let { data } = $props();
   const eur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR') : null);
-  const SCOPE: Record<string, string> = { all: 'Tout le catalogue', collection: 'Collections', book: 'Livres' };
+  const SCOPE: Record<string, string> = { all: 'Tout le catalogue', collection: 'Collections', book: 'Livres', fond: 'Le fond (+ de 2 ans)' };
   const valueLabel = (p: { type: string; value: number }) => (p.type === 'percent' ? `−${p.value} %` : `−${eur(p.value)}`);
 
   function windowLabel(p: { starts_at?: string; ends_at?: string }) {
@@ -21,7 +21,7 @@
 
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">Codes promo</h2>
+    <h2 class="text-xl font-bold">Promotions</h2>
     <p class="text-sm text-muted-foreground">{data.promos.length} code{data.promos.length > 1 ? 's' : ''}</p>
   </div>
   <Button href="/admin/promos/nouveau"><Plus size={16} /> Nouveau code</Button>
@@ -42,7 +42,7 @@
     <tbody class="divide-y divide-border">
       {#each data.promos as p (p.id)}
         <tr class="hover:bg-muted/30">
-          <td class="px-3 py-2"><a href="/admin/promos/{p.id}" class="font-mono font-semibold hover:text-link">{p.code}</a></td>
+          <td class="px-3 py-2"><a href="/admin/promos/{p.id}" class="font-mono font-semibold hover:text-link">{p.code}</a>{#if p.automatic}<span class="ml-2 rounded bg-success/15 px-1.5 py-0.5 text-[11px] font-medium text-success" title="Appliquée d'office au panier, sans code">automatique</span>{/if}</td>
           <td class="px-3 py-2 font-medium">{valueLabel(p)}</td>
           <td class="px-3 py-2 text-muted-foreground">{SCOPE[p.scope] ?? p.scope}</td>
           <td class="px-3 py-2 text-muted-foreground">{windowLabel(p)}</td>

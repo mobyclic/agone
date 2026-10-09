@@ -35,6 +35,9 @@ export const load: PageServerLoad = async ({ url }) => {
 
   const where: string[] = ["role IN ['customer','pending']"];
   const vars: Record<string, unknown> = { limit: LIMIT, start: (page - 1) * LIMIT, payees: PAYEES };
+  // « Clients web » : par défaut, ceux qui ont acheté sur le site (commande web payée) ; ?tous=1 montre tous les comptes.
+  const tous = url.searchParams.get('tous') === '1';
+  if (!tous) where.push("id IN (SELECT VALUE customer FROM order WHERE customer != NONE AND channel = 'web' AND status IN $payees)");
   if (!sansNom) where.push("full_name != ''");
   if (q) { where.push('(string::lowercase(email ?? "") CONTAINS $q OR string::lowercase(full_name) CONTAINS $q)'); vars.q = q; }
 
@@ -117,6 +120,7 @@ export const load: PageServerLoad = async ({ url }) => {
   }));
 
   return {
+    tous,
     type, clients: [], kind: undefined, kinds: KINDS_CLIENT,
     users, total: count[0]?.n ?? 0, byRole, anonymes: anonymes[0]?.n ?? 0, sansNom, filtreAchat,
     q, role, page, limit: LIMIT, min,

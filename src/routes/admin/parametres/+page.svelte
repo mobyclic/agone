@@ -83,30 +83,7 @@
     <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
   </form>
 
-  <!-- Bannière -->
-  <form method="POST" action="?/banner" use:enhance class="rounded-lg border border-border bg-card p-5">
-    <h3 class="mb-4 text-base font-semibold">Bandeau d'information</h3>
-    <div class="space-y-4">
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="active" checked={data.banner.active} class="size-4 rounded border-border" />
-        Afficher le bandeau en haut du site
-      </label>
-      <div>
-        <label class={label} for="message">Message</label>
-        <textarea id="message" name="message" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary">{data.banner.message}</textarea>
-      </div>
-      <div>
-        <label class={label} for="variant">Style</label>
-        <select id="variant" name="variant" value={data.banner.variant} class={input}>
-          <option value="info">Information</option>
-          <option value="brand">Marque (rouge)</option>
-          <option value="warning">Avertissement</option>
-          <option value="success">Succès</option>
-        </select>
-      </div>
-    </div>
-    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
-  </form>
+  <!-- Le bandeau d'information et la fenêtre promotionnelle se règlent dans Boutique en ligne › Réclames. -->
 
   <!-- Traceurs & consentement -->
   <form method="POST" action="?/stock" use:enhance class="rounded-lg border border-border bg-card p-5">

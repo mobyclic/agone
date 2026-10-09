@@ -66,7 +66,7 @@
           <div class="space-y-2 text-sm">
             <div class="flex justify-between"><span class="text-muted-foreground">Sous-total</span><span class="font-semibold tabular-nums">{eur(data.cart.subtotal)}</span></div>
             {#if data.promo && data.promo.ok}
-              <div class="flex justify-between text-success"><span>Code {data.promo.code}</span><span class="tabular-nums">−{eur(data.promo.discount)}</span></div>
+              <div class="flex justify-between text-success"><span>{data.promo.auto ? (data.promo.description || 'Promotion') : `Code ${data.promo.code}`}</span><span class="tabular-nums">−{eur(data.promo.discount)}</span></div>
             {/if}
             {#if data.cart.has_physical}
               <div class="flex justify-between"><span class="text-muted-foreground">Livraison</span><span class="text-muted-foreground">calculée au paiement</span></div>
@@ -77,12 +77,15 @@
           </div>
 
           <!-- Code promo -->
-          {#if data.promo && data.promo.ok}
+          {#if data.promo && data.promo.ok && !data.promo.auto}
             <div class="mt-3 flex items-center justify-between rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm">
               <span class="font-medium text-success">✓ {data.promo.code}</span>
               <form method="POST" action="?/removePromo" use:enhance><button type="submit" class="text-xs text-muted-foreground hover:text-destructive">Retirer</button></form>
             </div>
           {:else}
+            {#if data.promo && data.promo.ok && data.promo.auto}
+              <div class="mt-3 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">✓ {data.promo.description || 'Promotion en cours'} — appliquée automatiquement</div>
+            {/if}
             <form method="POST" action="?/applyPromo" use:enhance class="mt-3 flex gap-2">
               <input name="code" placeholder="Code promo" autocomplete="off" class="h-9 w-full min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm uppercase outline-none focus:border-primary" />
               <button type="submit" class="shrink-0 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted">Appliquer</button>

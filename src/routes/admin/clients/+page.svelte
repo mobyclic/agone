@@ -23,7 +23,7 @@
     const merged: Record<string, string | number | undefined> = {
       type: data.type === 'pro' ? 'pro' : undefined, kind: data.kind,
       q, page: data.page, livre: data.livre?.id, auteur: data.auteur?.id,
-      min: data.min || undefined, sansnom: data.sansNom ? '1' : undefined, ...params
+      min: data.min || undefined, sansnom: data.sansNom ? '1' : undefined, tous: data.tous ? '1' : undefined, ...params
     };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
@@ -40,14 +40,18 @@
 
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">Clients</h2>
+    <h2 class="text-xl font-bold">{data.type === 'pro' ? 'Clients pro' : 'Clients web'}</h2>
     <p class="text-sm text-muted-foreground">
       {#if data.type === 'pro'}
         {data.total} professionnel{data.total > 1 ? 's' : ''} — personnes morales que l’on facture.
       {:else if data.filtreAchat || data.q}
         {data.total} client{data.total > 1 ? 's' : ''} correspondant{data.total > 1 ? 's' : ''}
+      {:else if !data.tous}
+        {data.total} particulier{data.total > 1 ? 's' : ''} ayant acheté sur le site
+        · <button type="button" onclick={() => nav({ tous: '1', page: 1 })} class="underline hover:text-foreground">voir tous les comptes inscrits</button>
       {:else}
         {data.total} particulier{data.total > 1 ? 's' : ''} inscrits sur le site
+        · <button type="button" onclick={() => nav({ tous: undefined, page: 1 })} class="underline hover:text-foreground">acheteurs seulement</button>
         {#if data.anonymes && !data.sansNom}
           · <button type="button" onclick={() => nav({ sansnom: '1', page: 1 })} class="underline hover:text-foreground">{data.anonymes} comptes sans nom masqués</button>
         {:else if data.sansNom}
