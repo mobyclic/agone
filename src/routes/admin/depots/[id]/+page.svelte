@@ -4,6 +4,7 @@
    * réassort, l'import d'un carnet de vente (aperçu puis validation : relevé de
    * ventes, facture brouillon, mouvements) et l'historique.
    */
+  import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
   import { toast } from 'svelte-sonner';
   import { Button } from '$lib/components/ui/button';
@@ -36,6 +37,7 @@
   // ── Réassort ──
   let modeReassort = $state(false);
   let reassort = $state<{ bookId: string; title: string; qty: number }[]>([]);
+  let expedier = $state(untrack(() => !!(data.client.address_1 && data.client.postcode && data.client.city)));
   let qRea = $state(''); let resRea = $state<Livre[]>([]);
   async function chercherRea() { resRea = (await chercher(qRea)).filter((b) => !reassort.some((r) => r.bookId === nu(b.id))); }
   const ajouterRea = (b: Livre) => { reassort = [...reassort, { bookId: nu(b.id), title: b.title, qty: 10 }]; qRea = ''; resRea = []; };
@@ -79,7 +81,7 @@
 
       {#if modeReassort}
         <form method="POST" action="?/reassort" use:enhance class="mb-4 rounded-md border border-border bg-muted/30 p-3">
-          <p class="mb-2 text-xs text-muted-foreground">Exemplaires qui entrent au dépôt (depuis Belles Lettres ou le bureau). Une quantité négative enregistre un retour.</p>
+          <p class="mb-2 text-xs text-muted-foreground">Exemplaires qui entrent au dépôt. Une quantité négative enregistre un retour (remis de la main à la main).</p>
           <div class="relative">
             <MagnifyingGlass size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input bind:value={qRea} oninput={chercherRea} placeholder="Ajouter un titre (titre ou ISBN)…" class="{input} w-full pl-8" />
@@ -101,10 +103,15 @@
             </ul>
           {/if}
           <input type="hidden" name="lignes" value={JSON.stringify(reassort)} />
+          <label class="mt-3 flex items-start gap-2 text-sm">
+            <input type="checkbox" name="expedier" bind:checked={expedier} class="mt-0.5 size-4 accent-foreground" />
+            <span><span class="font-medium">Faire expédier par Les Belles Lettres</span>
+              <span class="block text-xs text-muted-foreground">Crée une commande « sortie dépôt » à 0 € à l'adresse du dépositaire, envoyée au distributeur avec les commandes du site (EDI). Décochez pour des exemplaires remis depuis le bureau.</span></span>
+          </label>
           <div class="mt-3 flex flex-wrap items-end gap-3">
             <label class="text-xs text-muted-foreground">Date<br /><input type="date" name="at" value={aujourdhui} class={input} /></label>
-            <label class="min-w-48 flex-1 text-xs text-muted-foreground">Note<br /><input name="note" placeholder="ex. réassort BLDD du 26/06" class="{input} w-full" /></label>
-            <Button type="submit" size="sm" disabled={!reassort.length}><Check size={14} /> Enregistrer le réassort</Button>
+            <label class="min-w-48 flex-1 text-xs text-muted-foreground">Note<br /><input name="note" placeholder="ex. pour la Fête de l'Huma" class="{input} w-full" /></label>
+            <Button type="submit" size="sm" disabled={!reassort.length}><Check size={14} /> {expedier ? 'Commander le réassort' : 'Enregistrer le réassort'}</Button>
           </div>
         </form>
       {/if}
@@ -320,7 +327,7 @@
             <span class="w-14 shrink-0 text-right font-medium {m.qty < 0 ? 'text-destructive' : 'text-success'}">{m.qty > 0 ? '+' : ''}{m.qty}</span>
             <span class="min-w-0 flex-1">
               <span class="block truncate">{m.title}</span>
-              <span class="block text-xs text-muted-foreground">{data.kinds[m.kind] ?? m.kind} · {dateFr(m.at)}{#if m.carnet_label} · {m.carnet_label}{/if}{#if m.note} · {m.note}{/if}</span>
+              <span class="block text-xs text-muted-foreground">{data.kinds[m.kind] ?? m.kind} · {dateFr(m.at)}{#if m.carnet_label} · {m.carnet_label}{/if}{#if m.order_id} · <a href="/admin/commandes/{m.order_id}" class="text-link hover:underline">commande n° {m.order_number}</a>{:else if m.note} · {m.note}{/if}</span>
             </span>
           </li>
         {/each}

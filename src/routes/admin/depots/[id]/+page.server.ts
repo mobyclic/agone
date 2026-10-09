@@ -6,7 +6,7 @@ import { saveMedia } from '$lib/server/media';
 import { journaliser } from '$lib/server/journal';
 import { withFlash } from '$lib/toasts';
 import {
-  stockDepot, mouvementsDepot, listCarnets, remisePour, poserInventaire, poserReassort,
+  stockDepot, mouvementsDepot, listCarnets, remisePour, poserInventaire, poserReassort, commanderReassort,
   lireCarnet, relireCarnet, lectureCarnet, apercuCarnet, validerCarnet, annulerCarnet, KIND_MOUVEMENT
 } from '$lib/server/depots';
 
@@ -48,6 +48,17 @@ export const actions: Actions = {
     try { lignes = JSON.parse(S(fd, 'lignes') || '[]'); } catch { /* vide */ }
     lignes = lignes.filter((l) => l?.bookId && Number.isFinite(Number(l.qty)) && Number(l.qty) !== 0).map((l) => ({ bookId: String(l.bookId), qty: Number(l.qty) }));
     if (!lignes.length) return fail(400, { error: 'Aucun titre ni quantité.' });
+    if (fd.get('expedier') === 'on') {
+      // Expédié par Les Belles Lettres : une commande « depot » à 0 € que l'export EDI enverra.
+      try {
+        const r = await commanderReassort(params.id, lignes, { at: dateOu(S(fd, 'at')), note: S(fd, 'note') });
+        await journaliser(locals, { action: 'depot.reassort_edi', cible: { type: 'client', id: params.id }, details: { commande: r.number, lignes: r.lignes } });
+        throw redirect(303, withFlash(`/admin/depots/${params.id}`, `Réassort à expédier : commande n° ${r.number} créée pour Les Belles Lettres (${r.lignes} titre${r.lignes > 1 ? 's' : ''}).`, 'success'));
+      } catch (e) {
+        if ((e as any)?.status === 303) throw e;
+        return fail(400, { error: e instanceof Error ? e.message : 'Commande impossible.' });
+      }
+    }
     const n = await poserReassort(params.id, lignes, { at: dateOu(S(fd, 'at')), note: S(fd, 'note') });
     await journaliser(locals, { action: 'depot.reassort', cible: { type: 'client', id: params.id }, details: { lignes: n } });
     throw redirect(303, withFlash(`/admin/depots/${params.id}`, `Réassort enregistré : ${n} titre${n > 1 ? 's' : ''}.`, 'success'));

@@ -662,7 +662,7 @@ DEFINE FIELD OVERWRITE status       ON order TYPE string
 -- Canal / type de commande : web (site), comptoir (back-office), vpc (→ Belles Lettres),
 -- sortie_editeur (expédition directe Agone → bon de livraison PDF).
 DEFINE FIELD OVERWRITE channel      ON order TYPE string
-  ASSERT $value IN ['web','comptoir','vpc','sortie_editeur'] DEFAULT 'web';
+  ASSERT $value IN ['web','comptoir','vpc','sortie_editeur','depot'] DEFAULT 'web';  -- depot : réassort d'un dépôt expédié par BLDD, à 0 €, hors ventes
 DEFINE FIELD OVERWRITE currency     ON order TYPE string DEFAULT 'EUR' VALUE $value ?? 'EUR';
 -- Comment la commande a été réglée (stripe pour le site ; sumup, espèces, chèque, virement
 -- pour les ventes saisies à la main) et, le cas échéant, la rencontre où elle a été faite.
@@ -965,6 +965,7 @@ DEFINE FIELD OVERWRITE kind       ON depot_movement TYPE string
 DEFINE FIELD OVERWRITE qty        ON depot_movement TYPE int;          -- signé : + entre au dépôt, − en sort
 DEFINE FIELD OVERWRITE at         ON depot_movement TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE carnet     ON depot_movement TYPE option<record<carnet>>;
+DEFINE FIELD OVERWRITE order      ON depot_movement TYPE option<record<order>>;   -- réassort expédié par Belles Lettres (commande EDI)
 DEFINE FIELD OVERWRITE note       ON depot_movement TYPE option<string>;
 DEFINE FIELD OVERWRITE created_at ON depot_movement TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_depmov_client ON depot_movement FIELDS client;

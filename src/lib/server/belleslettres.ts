@@ -102,7 +102,7 @@ async function fetchExportableOrders(): Promise<EdiOrder[]> {
   const orders = await query<any>(
     `SELECT id, number, billing, shipping, created_at FROM order
        WHERE status = 'paid' AND has_physical = true AND bl_exported_at = NONE
-         AND channel IN ['web', 'vpc']
+         AND channel IN ['web', 'vpc', 'depot']  -- depot : réassort d'un dépôt (0 €), expédié comme une commande
        ORDER BY number`
   );
   const out: EdiOrder[] = [];

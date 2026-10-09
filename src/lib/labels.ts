@@ -30,6 +30,7 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
 export const CHANNEL_LABEL: Record<string, string> = {
   web: 'Vente par correspondance',
   comptoir: 'Comptoir & rencontres',
+  depot: 'Sortie dépôt (réassort expédié par Belles Lettres)',
   // Anciens types, gardés pour relire les commandes qui les portent encore.
   vpc: 'Vente par correspondance (ancien)',
   sortie_editeur: 'Sortie éditeur (ancien)'

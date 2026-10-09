@@ -23,6 +23,7 @@ import { getSetting } from './site';
 import { getClientPro, type ClientPro } from './clients';
 import { getCanal } from './canaux';
 import { createManualInvoice } from './invoice';
+import { createOrder } from './order';
 
 // ── Réglages ─────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ export async function stockDepot(clientId: string): Promise<LigneStock[]> {
 }
 
 export interface Mouvement {
-  id: string; kind: string; qty: number; at: string; note?: string; title: string; book_id: string; carnet_label?: string;
+  id: string; kind: string; qty: number; at: string; note?: string; title: string; book_id: string; carnet_label?: string; order_number?: number; order_id?: string;
 }
 
 export const KIND_MOUVEMENT: Record<string, string> = {
@@ -102,13 +103,14 @@ export const KIND_MOUVEMENT: Record<string, string> = {
 
 export async function mouvementsDepot(clientId: string, limit = 60): Promise<Mouvement[]> {
   const rows = await query<any>(
-    `SELECT meta::id(id) AS id, kind, qty, at, created_at, note, book, book.title AS title, carnet.label AS carnet_label
+    `SELECT meta::id(id) AS id, kind, qty, at, created_at, note, book, book.title AS title, carnet.label AS carnet_label, order.number AS order_number, order AS order_ref
        FROM depot_movement WHERE client = $c ORDER BY at DESC, created_at DESC LIMIT $l`,
     { c: recId('client', clientId), l: limit }
   );
   return rows.map((r: any) => ({
     id: String(r.id), kind: r.kind, qty: Number(r.qty), at: r.at, note: r.note ?? undefined, title: r.title ?? '(titre inconnu)',
-    book_id: String(r.book).replace(/^book:/, ''), carnet_label: r.carnet_label ?? undefined
+    book_id: String(r.book).replace(/^book:/, ''), carnet_label: r.carnet_label ?? undefined,
+    order_number: r.order_number != null ? Number(r.order_number) : undefined, order_id: r.order_ref ? String(r.order_ref).replace(/^order:/, '') : undefined
   }));
 }
 
@@ -152,6 +154,41 @@ export async function poserReassort(clientId: string, lignes: { bookId: string; 
     n++;
   }
   return n;
+}
+
+/**
+ * Réassort expédié par Les Belles Lettres : une commande « depot » à 0 €, au nom
+ * du dépositaire, que l'export EDI envoie au distributeur comme n'importe quelle
+ * commande du site ; les exemplaires entrent au dépôt dès la commande (mouvements
+ * liés à la commande). Hors ventes : le canal « depot » n'alimente aucun relevé.
+ */
+export async function commanderReassort(clientId: string, lignes: { bookId: string; qty: number }[], opts: { at?: Date; note?: string } = {}) {
+  const client = await getClientPro(clientId);
+  if (!client) throw new Error('Dépositaire introuvable.');
+  if (!client.address_1 || !client.postcode || !client.city) throw new Error('Adresse du dépositaire incomplète (adresse, code postal, ville) : complétez sa fiche client.');
+  const utiles = lignes.map((l) => ({ bookId: l.bookId, qty: Math.round(l.qty) })).filter((l) => l.qty > 0);
+  if (!utiles.length) throw new Error('Aucun exemplaire à expédier.');
+  const livres = await query<any>(`SELECT meta::id(id) AS id, title, slug FROM book WHERE id IN $ids`, { ids: utiles.map((l) => recId('book', l.bookId)) });
+  const fiche = new Map<string, { title: string; slug: string }>(livres.map((b: any) => [String(b.id), { title: b.title, slug: b.slug ?? '' }]));
+  const [prenom, ...reste] = (client.contact_name ?? '').trim().split(/\s+/);
+  const adresse = {
+    first_name: prenom || '', last_name: reste.join(' ') || (prenom ? '' : client.name), company: client.name,
+    address_1: client.address_1, address_2: client.address_2 ?? '', postcode: client.postcode, city: client.city, country: client.country || 'France',
+    email: client.email ?? '', phone: client.phone ?? ''
+  };
+  const { id: orderId, number } = await createOrder({
+    channel: 'depot', email: client.email, billing: adresse, shipping: adresse, paymentMethod: 'autre', placedAt: opts.at,
+    lines: utiles.map((l) => ({ id: l.bookId, slug: fiche.get(l.bookId)?.slug ?? '', title: fiche.get(l.bookId)?.title ?? '', format: 'papier', qty: l.qty, unit_price: 0, line_total: 0 }))
+  });
+  // Pas de passage par markOrderPaid (pas de facture, pas d'ebook) : la commande est simplement prête à partir.
+  await query(`UPDATE $o SET status = 'paid', notes = $n`, { o: recId('order', orderId), n: `Réassort du dépôt « ${client.name} »${opts.note?.trim() ? ` — ${opts.note.trim()}` : ''}` });
+  await query(`INSERT INTO depot_movement $d`, {
+    d: utiles.map((l) => ({
+      client: recId('client', clientId), book: recId('book', l.bookId), kind: 'reassort', qty: l.qty, at: opts.at ?? new Date(),
+      order: recId('order', orderId), note: [`commande n° ${number} (expédition Belles Lettres)`, opts.note?.trim()].filter(Boolean).join(' — ')
+    }))
+  });
+  return { orderId, number, lignes: utiles.length };
 }
 
 // ── Carnets de vente : lecture → ./carnetLecture.ts ──────────
