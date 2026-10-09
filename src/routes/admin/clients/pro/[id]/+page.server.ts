@@ -25,6 +25,7 @@ export const actions: Actions = {
         name: S('name'), kind: S('kind'), siret: S('siret'), vat_number: S('vat_number'), contact_name: S('contact_name'),
         email: S('email'), phone: S('phone'), address_1: S('address_1'), address_2: S('address_2'), postcode: S('postcode'),
         city: S('city'), country: S('country') || 'France', notes: S('notes'), user: S('userId') || undefined,
+        personne: S('personne') === 'physique' ? 'physique' : 'morale', web: fd.get('web') === 'on', pro: fd.get('pro') === 'on',
         depositaire: fd.get('depositaire') === 'on',
         remise_depot: S('remise_depot') ? Number(S('remise_depot').replace(',', '.')) : undefined
       }, params.id === 'nouveau' ? undefined : params.id);

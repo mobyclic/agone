@@ -18,28 +18,36 @@ export interface ClientPro {
   id: string; name: string; kind: string; siret?: string; vat_number?: string; contact_name?: string;
   email?: string; phone?: string; address_1?: string; address_2?: string; postcode?: string; city?: string; country: string;
   notes?: string; user?: string; created_at?: string;
+  /** Personne physique ou morale. */
+  personne: 'physique' | 'morale';
+  /** Visible dans « Clients web » (acheteur du site) et/ou « Clients pro » (facturé). */
+  web: boolean; pro: boolean;
   /** Dépositaire : on lui confie des exemplaires qu'il vend pour Agone (voir Dépôts). */
   depositaire?: boolean;
   /** Remise en % sur ses factures de dépôt ; vide = remise par défaut (Paramètres › Dépôts). */
   remise_depot?: number;
 }
 
-const CHAMPS = `meta::id(id) AS id, name, kind, siret, vat_number, contact_name, email, phone, address_1, address_2, postcode, city, country, notes, user, created_at, depositaire, remise_depot`;
+const CHAMPS = `meta::id(id) AS id, name, kind, siret, vat_number, contact_name, email, phone, address_1, address_2, postcode, city, country, notes, user, created_at, depositaire, remise_depot, personne, web, pro`;
 const normaliser = (r: any): ClientPro => ({
   id: String(r.id), name: r.name, kind: r.kind ?? 'autre', siret: r.siret ?? undefined, vat_number: r.vat_number ?? undefined,
   contact_name: r.contact_name ?? undefined, email: r.email ?? undefined, phone: r.phone ?? undefined,
   address_1: r.address_1 ?? undefined, address_2: r.address_2 ?? undefined, postcode: r.postcode ?? undefined, city: r.city ?? undefined,
   country: r.country ?? 'France', notes: r.notes ?? undefined, user: r.user ? String(r.user).replace(/^user:/, '') : undefined, created_at: r.created_at ?? undefined,
-  depositaire: r.depositaire === true, remise_depot: r.remise_depot != null ? Number(r.remise_depot) : undefined
+  depositaire: r.depositaire === true, remise_depot: r.remise_depot != null ? Number(r.remise_depot) : undefined,
+  personne: r.personne === 'physique' ? 'physique' : 'morale', web: r.web === true, pro: r.pro !== false
 });
 
-export async function listClientsPro(opts: { q?: string; kind?: string; limit?: number; offset?: number } = {}) {
+export async function listClientsPro(opts: { q?: string; kind?: string; limit?: number; offset?: number; liste?: 'web' | 'pro'; userIds?: string[] } = {}) {
   const where: string[] = [];
   const vars: Record<string, unknown> = { limit: opts.limit ?? 50, start: opts.offset ?? 0 };
+  if (opts.liste === 'web') where.push('web = true');
+  else if (opts.liste === 'pro') where.push('pro = true');
+  if (opts.userIds) { where.push('user IN $users'); vars.users = opts.userIds.map((u) => recId('user', u.replace(/^user:/, ''))); }
   if (opts.kind) { where.push('kind = $kind'); vars.kind = opts.kind; }
   if (opts.q?.trim()) { vars.q = opts.q.trim().toLowerCase(); where.push(`(string::lowercase(name) CONTAINS $q OR string::lowercase(city ?? '') CONTAINS $q OR string::lowercase(email ?? '') CONTAINS $q OR string::lowercase(contact_name ?? '') CONTAINS $q)`); }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const rows = await query<any>(`SELECT ${CHAMPS} FROM client ${w} ORDER BY name ASC LIMIT $limit START $start`, vars);
+  const rows = await query<any>(`SELECT ${CHAMPS} FROM client ${w} ORDER BY name COLLATE ASC LIMIT $limit START $start`, vars);
   const count = await query<any>(`SELECT count() AS n FROM client ${w} GROUP ALL`, vars);
   // Nombre et montant des factures par client affiché.
   const ids = rows.map((r: any) => recId('client', String(r.id)));
@@ -48,10 +56,44 @@ export async function listClientsPro(opts: { q?: string; kind?: string; limit?: 
     : [];
   const parClient = new Map<string, { n: number; total: number }>();
   for (const f of factures) parClient.set(String(f.client).replace(/^client:/, ''), { n: Number(f.n ?? 0), total: Number(f.total ?? 0) });
+  // Commandes payées du compte lié (liste web) : nombre, montant, dernière.
+  // query() rend les liens en « user:id » : on repasse par recId() pour la comparaison.
+  const users = rows.filter((r: any) => r.user).map((r: any) => recId('user', String(r.user).replace(/^user:/, '')));
+  const parUser = new Map<string, { n: number; total: number; derniere?: string }>();
+  if (users.length) {
+    const cmd = await query<any>(
+      `SELECT customer, count() AS n, math::sum(total) AS total, math::max(created_at) AS derniere FROM order
+        WHERE customer IN $users AND status IN ['completed','paid','processing','sent_to_bl'] GROUP BY customer`, { users }
+    );
+    for (const c of cmd) parUser.set(String(c.customer).replace(/^user:/, ''), { n: Number(c.n ?? 0), total: Number(c.total ?? 0), derniere: c.derniere ?? undefined });
+  }
   return {
-    clients: rows.map((r: any) => ({ ...normaliser(r), factures: parClient.get(String(r.id))?.n ?? 0, facture_total: parClient.get(String(r.id))?.total ?? 0 })),
+    clients: rows.map((r: any) => {
+      const u = r.user ? parUser.get(String(r.user).replace(/^user:/, '')) : undefined;
+      return { ...normaliser(r), factures: parClient.get(String(r.id))?.n ?? 0, facture_total: parClient.get(String(r.id))?.total ?? 0, commandes: u?.n ?? 0, commandes_total: u?.total ?? 0, derniere_commande: u?.derniere };
+    }),
     total: count[0]?.n ?? 0
   };
+}
+
+/**
+ * Un acheteur du site entre au registre des clients (visible dans « Clients web ») :
+ * à sa première commande payée, ou à la main. Idempotent ; un client pro déjà lié
+ * au compte est simplement marqué « web » aussi.
+ */
+export async function ensureClientWeb(userId: string): Promise<string | null> {
+  const uid = recId('user', userId.replace(/^user:/, ''));
+  const existant = await query<any>(`SELECT meta::id(id) AS id, web FROM client WHERE user = $u LIMIT 1`, { u: uid });
+  if (existant[0]) {
+    if (existant[0].web !== true) await query(`UPDATE $id SET web = true`, { id: recId('client', existant[0].id) });
+    return String(existant[0].id);
+  }
+  const u = (await query<any>(`SELECT full_name, first_name, last_name, email FROM user WHERE id = $u LIMIT 1`, { u: uid }))[0];
+  if (!u) return null;
+  const name = (u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || '').trim();
+  if (!name) return null;
+  const rows = await query<any>(`CREATE client CONTENT $c`, { c: { name, kind: 'autre', personne: 'physique', web: true, pro: false, email: u.email ?? undefined, country: 'France', user: uid } });
+  return String(rows[0].id).replace(/^client:/, '');
 }
 
 export async function getClientPro(id: string): Promise<ClientPro | null> {
@@ -71,6 +113,7 @@ export async function upsertClientPro(d: ClientProInput, id?: string): Promise<s
     address_1: d.address_1?.trim() || undefined, address_2: d.address_2?.trim() || undefined, postcode: d.postcode?.trim() || undefined,
     city: d.city?.trim() || undefined, country: d.country?.trim() || 'France', notes: d.notes?.trim() || undefined,
     user: d.user ? recId('user', d.user.replace(/^user:/, '')) : undefined,
+    personne: d.personne === 'physique' ? 'physique' : 'morale', web: d.web === true, pro: d.pro !== false,
     depositaire: d.depositaire === true,
     remise_depot: d.remise_depot != null && Number.isFinite(d.remise_depot) ? Math.min(100, Math.max(0, d.remise_depot)) : undefined
   };

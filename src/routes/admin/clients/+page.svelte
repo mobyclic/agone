@@ -23,7 +23,7 @@
     const merged: Record<string, string | number | undefined> = {
       type: data.type === 'pro' ? 'pro' : undefined, kind: data.kind,
       q, page: data.page, livre: data.livre?.id, auteur: data.auteur?.id,
-      min: data.min || undefined, sansnom: data.sansNom ? '1' : undefined, tous: data.tous ? '1' : undefined, ...params
+      min: data.min || undefined, ...params
     };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) {
@@ -38,32 +38,18 @@
 
 <svelte:head><title>Clients · Admin Agone</title></svelte:head>
 
-<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
-  <div>
-    <h2 class="text-xl font-bold">{data.type === 'pro' ? 'Clients pro' : 'Clients web'}</h2>
-    <p class="text-sm text-muted-foreground">
-      {#if data.type === 'pro'}
-        {data.total} professionnel{data.total > 1 ? 's' : ''} — personnes morales que l’on facture.
-      {:else if data.filtreAchat || data.q}
-        {data.total} client{data.total > 1 ? 's' : ''} correspondant{data.total > 1 ? 's' : ''}
-      {:else if !data.tous}
-        {data.total} particulier{data.total > 1 ? 's' : ''} ayant acheté sur le site
-        · <button type="button" onclick={() => nav({ tous: '1', page: 1 })} class="underline hover:text-foreground">voir tous les comptes inscrits</button>
-      {:else}
-        {data.total} particulier{data.total > 1 ? 's' : ''} inscrits sur le site
-        · <button type="button" onclick={() => nav({ tous: undefined, page: 1 })} class="underline hover:text-foreground">acheteurs seulement</button>
-        {#if data.anonymes && !data.sansNom}
-          · <button type="button" onclick={() => nav({ sansnom: '1', page: 1 })} class="underline hover:text-foreground">{data.anonymes} comptes sans nom masqués</button>
-        {:else if data.sansNom}
-          · <button type="button" onclick={() => nav({ sansnom: undefined, page: 1 })} class="underline hover:text-foreground">masquer les comptes sans nom</button>
-        {/if}
-      {/if}
-    </p>
-  </div>
-  <div class="flex overflow-hidden rounded-md border border-border text-sm">
-    <button type="button" class="px-3 py-2 {data.type !== 'pro' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ type: undefined, kind: undefined, q: undefined, page: 1 })}>Particuliers</button>
-    <button type="button" class="px-3 py-2 {data.type === 'pro' ? 'bg-foreground text-background' : 'hover:bg-muted'}" onclick={() => nav({ type: 'pro', livre: undefined, auteur: undefined, min: undefined, q: undefined, page: 1 })}>Professionnels</button>
-  </div>
+<div class="mb-5">
+  <h2 class="text-xl font-bold">{data.type === 'pro' ? 'Clients pro' : 'Clients web'}</h2>
+  <p class="text-sm text-muted-foreground">
+    {#if data.type === 'pro'}
+      {data.total} client{data.total > 1 ? 's' : ''} pro — personnes physiques ou morales que l’on facture.
+    {:else if data.filtreAchat || data.q}
+      {data.total} client{data.total > 1 ? 's' : ''} web correspondant{data.total > 1 ? 's' : ''}
+    {:else}
+      {data.total} client{data.total > 1 ? 's' : ''} web — acheteurs du site, entrés au registre à leur première commande payée.
+    {/if}
+    Un même client peut figurer dans les deux listes (fiche pro : « Visible dans »).
+  </p>
 </div>
 
 {#if data.type === 'pro'}
@@ -140,30 +126,30 @@
     <thead class="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
       <tr>
         <th class="px-3 py-2 font-medium">Nom</th>
+        <th class="px-3 py-2 font-medium">Personne</th>
         <th class="px-3 py-2 font-medium">E-mail</th>
         <th class="px-3 py-2 text-right font-medium">Commandes</th>
-        <th class="px-3 py-2 text-right font-medium">Inscrit le</th>
+        <th class="px-3 py-2 text-right font-medium">Dernière</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-border">
-      {#each data.users as u (u.id)}
-        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(`/admin/utilisateurs/${u.id}`); }}>
+      {#each data.clients as c (c.id)}
+        {@const href = c.user ? `/admin/utilisateurs/${c.user}` : `/admin/clients/pro/${c.id}`}
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) goto(href); }}>
           <td class="px-3 py-2">
-            <a href="/admin/utilisateurs/{u.id}" class="font-medium hover:text-link">{u.full_name}</a>
-            {#if u.legacy}<span class="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">Importé</span>{/if}
+            <a {href} class="inline-flex items-center gap-1.5 font-medium hover:text-link">{#if c.personne === 'morale'}<Buildings size={15} class="text-muted-foreground" />{/if}{c.name}</a>
+            {#if c.pro}<a href="/admin/clients/pro/{c.id}" class="ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground hover:text-foreground" title="Aussi dans Clients pro">pro</a>{/if}
           </td>
-          <td class="px-3 py-2 text-muted-foreground">
-            {u.email || '—'}
-            {#if u.email && !u.email_verified}<span class="ml-1 text-[10px] text-warning">non vérifié</span>{/if}
-          </td>
+          <td class="px-3 py-2 text-muted-foreground">{c.personne === 'morale' ? 'Morale' : 'Physique'}</td>
+          <td class="px-3 py-2 text-muted-foreground">{c.email || '—'}</td>
           <td class="px-3 py-2 text-right tabular-nums">
-            {#if u.orders > 0}<a href="/admin/commandes?q={encodeURIComponent(u.email)}" class="hover:text-link">{u.orders}</a>{:else}<span class="text-muted-foreground">0</span>{/if}
+            {#if c.commandes > 0}<a href="/admin/commandes?q={encodeURIComponent(c.email ?? '')}" class="hover:text-link">{c.commandes} · {euros(c.commandes_total)}</a>{:else}<span class="text-muted-foreground">0</span>{/if}
           </td>
-          <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(u.created_at)}</td>
+          <td class="px-3 py-2 text-right text-muted-foreground">{dateFr(c.derniere_commande)}</td>
         </tr>
       {/each}
-      {#if data.users.length === 0}
-        <tr><td colspan="4" class="px-3 py-10 text-center text-muted-foreground">Aucun client.</td></tr>
+      {#if data.clients.length === 0}
+        <tr><td colspan="5" class="px-3 py-10 text-center text-muted-foreground">Aucun client.</td></tr>
       {/if}
     </tbody>
   </table>

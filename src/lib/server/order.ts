@@ -2,6 +2,7 @@
  * Commandes — création, numérotation, paiement, bibliothèque ebook.
  */
 import { query, recId } from './surreal';
+import { ensureClientWeb } from './clients';
 import type { CartLine } from './cart';
 import { findUserByEmail, createUser } from './account';
 import { createInvoiceForOrder } from './invoice';
@@ -74,11 +75,13 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
 
 /** Marque une commande payée + accorde les ebooks (bibliothèque) + numéro de facture. */
 export async function markOrderPaid(orderId: string, opts: { silencieux?: boolean } = {}): Promise<void> {
-  const rows = await query<any>(`SELECT id, status, customer, has_ebook, promo_code FROM order WHERE id = $id LIMIT 1`, { id: recId('order', orderId) });
+  const rows = await query<any>(`SELECT id, status, customer, has_ebook, promo_code, channel FROM order WHERE id = $id LIMIT 1`, { id: recId('order', orderId) });
   const order = rows[0];
   if (!order || order.status === 'paid' || order.status === 'completed') return;
   const invoice = await nextCounter('invoice_number', 0);
   await query(`UPDATE $id SET status = 'paid', paid_at = time::now(), invoice_number = $inv`, { id: recId('order', orderId), inv: invoice });
+  // Acheteur du site : il entre au registre des clients (« Clients web »).
+  if (order.customer && order.channel === 'web') { try { await ensureClientWeb(String(order.customer)); } catch (e) { console.error('[clients] registre web', e); } }
   if (order.promo_code) await recordPromoUse(order.promo_code);
 
   if (order.customer && order.has_ebook) {

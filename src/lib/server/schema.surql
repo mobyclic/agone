@@ -1008,3 +1008,13 @@ DEFINE FIELD OVERWRITE created_at ON bldd_ecart TYPE datetime DEFAULT time::now(
 DEFINE FIELD OVERWRITE updated_at ON bldd_ecart TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_bldd_ecart_mois ON bldd_ecart FIELDS year, month;
 DEFINE INDEX OVERWRITE idx_bldd_ecart_cle  ON bldd_ecart FIELDS year, month, book, kind UNIQUE;
+
+-- Registre des clients : personnes physiques ou morales, visibles dans « Clients web »
+-- (acheteurs du site, créés automatiquement à la première commande payée) et/ou
+-- dans « Clients pro » (facturés). Un même client peut être dans les deux.
+DEFINE FIELD OVERWRITE personne ON client TYPE string ASSERT $value IN ['physique','morale'] DEFAULT 'morale' VALUE $value ?? 'morale';
+DEFINE FIELD OVERWRITE web      ON client TYPE bool DEFAULT false VALUE $value ?? false;
+DEFINE FIELD OVERWRITE pro      ON client TYPE bool DEFAULT true VALUE $value ?? true;
+DEFINE INDEX OVERWRITE idx_client_web  ON client FIELDS web;
+DEFINE INDEX OVERWRITE idx_client_pro  ON client FIELDS pro;
+DEFINE INDEX OVERWRITE idx_client_user ON client FIELDS user;

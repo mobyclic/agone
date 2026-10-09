@@ -32,7 +32,17 @@
         <label><span class={label}>Type</span>
           <select name="kind" class={input}>{#each Object.entries(data.kinds) as [k, nom] (k)}<option value={k} selected={(c?.kind ?? 'librairie') === k}>{nom}</option>{/each}</select>
         </label>
-        <label><span class={label}>SIRET</span><input name="siret" value={c?.siret ?? ''} class="{input} font-mono" /></label>
+        <div class="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+          <span class="inline-flex items-center gap-3"><span class="text-muted-foreground">Personne</span>
+            <label class="inline-flex items-center gap-1.5"><input type="radio" name="personne" value="morale" checked={(c?.personne ?? 'morale') === 'morale'} class="accent-foreground" /> morale</label>
+            <label class="inline-flex items-center gap-1.5"><input type="radio" name="personne" value="physique" checked={c?.personne === 'physique'} class="accent-foreground" /> physique</label>
+          </span>
+          <span class="inline-flex items-center gap-3"><span class="text-muted-foreground">Visible dans</span>
+            <label class="inline-flex items-center gap-1.5"><input type="checkbox" name="web" checked={c?.web === true} class="size-4 accent-foreground" /> Clients web</label>
+            <label class="inline-flex items-center gap-1.5"><input type="checkbox" name="pro" checked={c ? c.pro !== false : true} class="size-4 accent-foreground" /> Clients pro</label>
+          </span>
+        </div>
+                <label><span class={label}>SIRET</span><input name="siret" value={c?.siret ?? ''} class="{input} font-mono" /></label>
         <label><span class={label}>N° TVA intracommunautaire</span><input name="vat_number" value={c?.vat_number ?? ''} placeholder="FR…" class="{input} font-mono" /></label>
       </div>
     </section>

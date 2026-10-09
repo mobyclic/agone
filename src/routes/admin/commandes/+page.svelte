@@ -40,7 +40,7 @@
 
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">{data.type === 'en_ligne' ? 'Commandes en ligne' : data.type === 'bons' ? 'Bons de commande' : 'Commandes'}</h2>
+    <h2 class="text-xl font-bold">{data.type === 'en_ligne' ? 'Commandes web' : data.type === 'bons' ? 'Bons de commande' : 'Commandes'}</h2>
     <p class="text-sm text-muted-foreground">{data.total} commande{data.total > 1 ? 's' : ''}</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
@@ -68,7 +68,7 @@
   </select>
   <!-- Invités (sans compte) / clients (avec compte) -->
   <div class="flex overflow-hidden rounded-md border border-border bg-background text-sm">
-    {#each [['', 'Toutes'], ['en_ligne', 'En ligne'], ['bons', 'Bons de commande'], ['clients', 'Avec compte'], ['invites', 'Invités']] as [k, v] (k)}
+    {#each [['', 'Toutes'], ['en_ligne', 'Web (site)'], ['bons', 'Bons de commande (pro, comptoir)'], ['clients', 'Avec compte'], ['invites', 'Invités']] as [k, v] (k)}
       <button type="button" onclick={() => nav({ type: k || undefined, page: 1 })}
         class="px-3.5 transition-colors {(data.type ?? '') === k ? 'bg-foreground text-background' : 'hover:bg-muted'}">{v}</button>
     {/each}
