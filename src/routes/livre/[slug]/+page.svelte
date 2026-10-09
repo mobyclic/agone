@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Partager from '$lib/components/Partager.svelte';
   import { colonneCollante } from '$lib/client/sticky';
   /** Un ISBN ne s'affiche que s'il en est un : « 0 » ou une mention interne (« CONV IMP ») restent cachés. */
   const isbnAffichable = (v?: string) => !!v && /^\d{10}(\d{3})?$/.test(v.replace(/-/g, ''));
@@ -257,6 +258,8 @@
           {/each}
         </div>
       {/if}
+
+      <Partager title={b.title} class="mt-4" />
 
 {/snippet}
 

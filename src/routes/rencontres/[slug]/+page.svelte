@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Partager from '$lib/components/Partager.svelte';
   import { embedsSociaux } from '$lib/client/embeds';
   import { colonneCollante } from '$lib/client/sticky';
   import { page } from '$app/state';
@@ -51,6 +52,7 @@
     {#if e.venue?.name}
       <span class="inline-flex items-center gap-1.5"><MapPin size={16} class="text-link" /> {e.venue.name}{e.venue.city ? `, ${e.venue.city}` : ''}</span>
     {/if}
+    <Partager title={e.title} />
   </div>
 
   {#if e.authors.length}
