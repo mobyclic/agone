@@ -53,8 +53,11 @@ sans destinataire ; une réimpression dans « entrées » ; leur correction dans
 à construire : stock BLDD début + entrées − sorties − ventes nettes + inventaire = stock fin, et nos sorties
 vers les dépôts doivent égaler leurs « sorties ».
 
-Reste à faire : réassort expédié par l'EDI BLDD vers le dépôt ; factures directes qui créent leurs lignes de
-vente ; écran de rapprochement mensuel (écarts à qualifier : SP, pilon, perte).
+Fait le 9 octobre 2026 : réassort expédié par l'EDI BLDD (commande « depot » à 0 €, hors ventes) ; factures
+directes qui créent leur relevé sur le canal « Facturation directe » (règle : émise + lignes du catalogue, pas de
+commande ni de carnet ; MEG à la demande) ; écran Rapprochement (Droits d'auteur) : état mensuel BLDD face aux
+sorties connues d'AGONE, écart à qualifier. Reste : qualifier les écarts (SP, pilon, perte) depuis l'écran, et
+l'assiette « net facturé » dans le moteur des droits.
 
 ## Bibliothèque ebook
 - Un acheteur d'ebook doit disposer d'une **bibliothèque en ligne** pour re-télécharger ses livres achetés (entitlements liés au compte, fichiers sur R2).

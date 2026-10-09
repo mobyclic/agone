@@ -70,6 +70,7 @@ export const ADMIN_NAV: NavSection[] = [
       { label: 'Cessions de droits', href: '/admin/droits/cessions', icon: 'Globe', adminOnly: true },
       { label: 'Canaux de vente', href: '/admin/canaux', icon: 'Storefront', adminOnly: true },
       { label: 'Ventes par exercice', href: '/admin/droits/ventes', icon: 'Receipt', adminOnly: true },
+      { label: 'Rapprochement', href: '/admin/droits/rapprochement', icon: 'Warehouse', adminOnly: true },
       { label: 'Reddition de comptes', href: '/admin/droits/reddition', icon: 'Invoice', adminOnly: true }
     ]
   },
