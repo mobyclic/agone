@@ -64,10 +64,8 @@ export const ADMIN_NAV: NavSection[] = [
     // La gestion : clients, commandes, facturation, dépôts.
     title: 'Gestion',
     items: [
-      { label: 'Clients web', href: '/admin/clients', icon: 'Users', adminOnly: true },
-      { label: 'Clients pro', href: '/admin/clients?type=pro', icon: 'Buildings', adminOnly: true },
-      { label: 'Commandes', href: '/admin/commandes?type=en_ligne', icon: 'Receipt', adminOnly: true },
-      { label: 'Bons de commande', href: '/admin/commandes?type=bons', icon: 'ClipboardText', adminOnly: true },
+      { label: 'Clients', href: '/admin/clients', icon: 'Users', adminOnly: true },
+      { label: 'Commandes', href: '/admin/commandes', icon: 'Receipt', adminOnly: true },
       { label: 'Factures', href: '/admin/factures?kind=invoice', icon: 'Invoice', adminOnly: true },
       { label: 'Avoirs', href: '/admin/factures?kind=credit_note', icon: 'ArrowUUpLeft', adminOnly: true },
       { label: 'Dépôts', href: '/admin/depots', icon: 'Package', adminOnly: true },

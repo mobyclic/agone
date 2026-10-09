@@ -14,17 +14,12 @@ const PAYEES = ['completed', 'paid', 'processing', 'sent_to_bl'];
 export const load: PageServerLoad = async ({ url }) => {
   const q = url.searchParams.get('q')?.trim().toLowerCase() || undefined;
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1);
-  const type = url.searchParams.get('type') === 'pro' ? 'pro' : 'web';
+  // Filtre de liste : tous, clients web (acheteurs du site), clients pro (facturés). ?type=pro : anciens liens.
+  const l = url.searchParams.get('liste') ?? (url.searchParams.get('type') === 'pro' ? 'pro' : '');
+  const liste = l === 'web' || l === 'pro' ? l : undefined;
+  const kind = url.searchParams.get('kind') || undefined;
 
-  // ── Clients pro : visibles dans la liste « pro » (facturés) ──
-  if (type === 'pro') {
-    const kind = url.searchParams.get('kind') || undefined;
-    const { clients, total } = await listClientsPro({ liste: 'pro', q, kind, limit: LIMIT, offset: (page - 1) * LIMIT });
-    return { type, clients, total, q, kind, kinds: KINDS_CLIENT, page, limit: LIMIT, filtreAchat: false, min: 0, livre: null, auteur: null };
-  }
-
-  // ── Clients web : le registre (acheteurs du site, entrés à leur première commande payée) ──
-  // Filtres d'achat : un livre, un auteur (tous ses livres), un nombre minimal de commandes — via le compte lié.
+  // Filtres d'achat sur le site (livre, auteur, nombre de commandes) — via le compte lié.
   const livre = url.searchParams.get('livre') || undefined;
   const auteur = url.searchParams.get('auteur') || undefined;
   const min = Math.max(0, Number(url.searchParams.get('min') ?? 0) || 0);
@@ -44,13 +39,15 @@ export const load: PageServerLoad = async ({ url }) => {
     }
     userIds = [...(ids ?? new Set<string>())];
   }
-  const [{ clients, total }, livreL, auteurL] = await Promise.all([
-    listClientsPro({ liste: 'web', q, userIds, limit: LIMIT, offset: (page - 1) * LIMIT }),
+  const [{ clients, total }, comptes, livreL, auteurL] = await Promise.all([
+    listClientsPro({ liste, q, kind, userIds, limit: LIMIT, offset: (page - 1) * LIMIT }),
+    query<any>(`SELECT count() AS n, math::sum(IF web THEN 1 ELSE 0 END) AS web, math::sum(IF pro THEN 1 ELSE 0 END) AS pro FROM client GROUP ALL`),
     livre ? query<any>(`SELECT VALUE title FROM $id`, { id: recId('book', livre) }) : Promise.resolve([]),
     auteur ? query<any>(`SELECT VALUE full_name FROM $id`, { id: recId('author', auteur) }) : Promise.resolve([])
   ]);
   return {
-    type, clients, total, q, kind: undefined, kinds: KINDS_CLIENT, page, limit: LIMIT, filtreAchat, min,
+    clients, total, q, liste, kind, kinds: KINDS_CLIENT, page, limit: LIMIT, filtreAchat, min,
+    comptes: { tous: Number(comptes[0]?.n ?? 0), web: Number(comptes[0]?.web ?? 0), pro: Number(comptes[0]?.pro ?? 0) },
     livre: livre ? { id: livre, label: livreL[0] ?? livre } : null,
     auteur: auteur ? { id: auteur, label: auteurL[0] ?? auteur } : null
   };

@@ -13,7 +13,7 @@
 
 <svelte:head><title>{c ? c.name : 'Nouveau professionnel'} · Clients · Admin</title></svelte:head>
 
-<a href="/admin/clients?type=pro" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Clients professionnels</a>
+<a href="/admin/clients" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Clients professionnels</a>
 
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
   <div>

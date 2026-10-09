@@ -40,7 +40,7 @@
 
 <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
   <div>
-    <h2 class="text-xl font-bold">{data.type === 'en_ligne' ? 'Commandes web' : data.type === 'bons' ? 'Bons de commande' : 'Commandes'}</h2>
+    <h2 class="text-xl font-bold">Commandes</h2>
     <p class="text-sm text-muted-foreground">{data.total} commande{data.total > 1 ? 's' : ''}</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">

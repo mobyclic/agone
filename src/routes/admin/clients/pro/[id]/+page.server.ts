@@ -40,6 +40,6 @@ export const actions: Actions = {
     requireAdmin(locals);
     const r = await deleteClientPro(params.id!);
     if (!r.ok) return fail(400, { error: r.error });
-    throw redirect(303, withFlash('/admin/clients?type=pro', 'Client supprimé.', 'success'));
+    throw redirect(303, withFlash('/admin/clients', 'Client supprimé.', 'success'));
   }
 };
