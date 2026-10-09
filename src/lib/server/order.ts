@@ -36,6 +36,8 @@ export interface CreateOrderInput {
   eventId?: string;
   /** Date de la commande, pour une saisie antidatée (défaut : maintenant). */
   placedAt?: Date;
+  /** Part de la remise sur chaque ligne (net exact par livre). */
+  lineDiscounts?: { id: string; format: string; discount: number }[];
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<{ id: string; number: number }> {
@@ -64,10 +66,12 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: string
   });
   const orderId = String(rows[0].id).replace(/^order:/, '');
 
+  const remises = new Map((input.lineDiscounts ?? []).map((x) => [`${String(x.id).replace(/^book:/, '')}|${x.format}`, x.discount]));
   for (const l of input.lines) {
+    const d = remises.get(`${String(l.id).replace(/^book:/, '')}|${l.format}`);
     await query(
-      `RELATE $o->contains->$b SET format = $format, qty = $qty, unit_price = $unit_price, line_total = $line_total, title_snapshot = $title`,
-      { o: recId('order', orderId), b: recId('book', l.id), format: l.format, qty: l.qty, unit_price: l.unit_price, line_total: l.line_total, title: l.title }
+      `RELATE $o->contains->$b SET format = $format, qty = $qty, unit_price = $unit_price, line_total = $line_total, title_snapshot = $title, discount = $discount`,
+      { o: recId('order', orderId), b: recId('book', l.id), format: l.format, qty: l.qty, unit_price: l.unit_price, line_total: l.line_total, title: l.title, discount: d && d > 0 ? d : undefined }
     );
   }
   return { id: orderId, number };

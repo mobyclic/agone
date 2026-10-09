@@ -1038,3 +1038,30 @@ DEFINE FIELD OVERWRITE ends_at    ON reclame TYPE option<datetime>;
 DEFINE FIELD OVERWRITE created_at ON reclame TYPE datetime DEFAULT time::now();
 DEFINE FIELD OVERWRITE updated_at ON reclame TYPE datetime DEFAULT time::now() VALUE time::now();
 DEFINE INDEX OVERWRITE idx_reclame_kind ON reclame FIELDS kind, status;
+
+-- Promotions : conditions et plafond (voir $lib/promoCalcul.ts).
+DEFINE FIELD OVERWRITE fond_years      ON promo_code TYPE int DEFAULT 2 VALUE $value ?? 2;            -- périmètre « fond » : parus depuis plus de N ans
+DEFINE FIELD OVERWRITE condition       ON promo_code TYPE string DEFAULT 'none' VALUE $value ?? 'none'
+  ASSERT $value IN ['none','min_qty','contains'];
+DEFINE FIELD OVERWRITE condition_qty   ON promo_code TYPE option<int>;                                -- min_qty : au moins N livres dans le panier
+DEFINE FIELD OVERWRITE condition_books ON promo_code TYPE option<array<record<book>>>;                -- contains : un de ces livres dans le panier
+DEFINE FIELD OVERWRITE max_items       ON promo_code TYPE option<int>;                                -- au plus N exemplaires remisés (les moins chers)
+
+-- Remise de la ligne (part de la promotion de la commande), pour un net exact par livre.
+DEFINE FIELD OVERWRITE discount ON contains TYPE option<number>;
+
+-- Le Club des lecteurs : adhésion annuelle donnant une remise sur le fonds (réglages : site_setting « club »).
+DEFINE TABLE OVERWRITE club_membership SCHEMAFULL;
+DEFINE FIELD OVERWRITE user           ON club_membership TYPE record<user>;
+DEFINE FIELD OVERWRITE starts_at      ON club_membership TYPE datetime;
+DEFINE FIELD OVERWRITE ends_at        ON club_membership TYPE datetime;
+DEFINE FIELD OVERWRITE status         ON club_membership TYPE string DEFAULT 'active' VALUE $value ?? 'active' ASSERT $value IN ['active','cancelled'];
+DEFINE FIELD OVERWRITE source         ON club_membership TYPE string DEFAULT 'manuel' VALUE $value ?? 'manuel' ASSERT $value IN ['stripe','manuel','offert'];
+DEFINE FIELD OVERWRITE amount         ON club_membership TYPE option<number>;     -- montant TTC payé
+DEFINE FIELD OVERWRITE invoice        ON club_membership TYPE option<record<invoice>>;
+DEFINE FIELD OVERWRITE stripe_session ON club_membership TYPE option<string>;     -- idempotence du webhook
+DEFINE FIELD OVERWRITE note           ON club_membership TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at     ON club_membership TYPE datetime DEFAULT time::now();
+DEFINE INDEX OVERWRITE idx_club_user    ON club_membership FIELDS user;
+DEFINE INDEX OVERWRITE idx_club_ends    ON club_membership FIELDS ends_at;
+DEFINE INDEX OVERWRITE idx_club_session ON club_membership FIELDS stripe_session;

@@ -24,6 +24,11 @@
   const openLightbox = (i = 0) => { lbIndex = i; lbOpen = true; };
 
   // Modal « Ajouté au panier »
+  /** Meilleur prix remisé affichable pour un format (promotion sans condition, ou club du membre). */
+  function prixRemise(format: string): number | null {
+    const prix = (data.offres ?? []).map((o) => (format === 'epub' ? o.prix_ebook : format === 'papier' ? o.prix_paper : undefined)).filter((x): x is number => typeof x === 'number');
+    return prix.length ? Math.min(...prix) : null;
+  }
   let cartOpen = $state(false);
   let addedFormat = $state('');
   let loadingFormat = $state(''); // format en cours d'ajout (loader sur le bouton)
@@ -274,14 +279,26 @@
               <input type="hidden" name="qty" value="1" />
               <button type="submit" disabled={loadingFormat === f.key} class="flex items-center gap-2.5 border-2 border-foreground px-4 py-2.5 max-sm:w-full max-sm:justify-center font-display text-sm font-bold uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background disabled:cursor-wait disabled:opacity-70">
                 {#if loadingFormat === f.key}<CircleNotch size={20} weight="bold" class="animate-spin" />{:else if f.key === 'epub'}<FileText size={20} weight="regular" />{:else if f.key === 'souscription'}<HandCoins size={20} weight="regular" />{:else}<BookOpen size={20} weight="regular" />{/if}
-                {f.key === 'souscription' ? 'Souscrire' : `Format ${f.label}`} <span>({euros(f.price)})</span>
+                {f.key === 'souscription' ? 'Souscrire' : `Format ${f.label}`}
+                {#if prixRemise(f.key) != null && prixRemise(f.key)! < f.price}<span>(<s class="font-normal opacity-60">{euros(f.price)}</s> <span class="text-link">{euros(prixRemise(f.key)!)}</span>)</span>{:else}<span>({euros(f.price)})</span>{/if}
               </button>
             </form>
           {/each}
         </div>
-      {:else if epuise}
+      {/if}
+      <!-- Offres : promotions automatiques sur ce livre, remise du club (membre) ou invitation au club. -->
+      {#if formats.length && data.offres.length}
+        <ul class="mt-3 space-y-1 text-sm">
+          {#each data.offres as o (o.code)}
+            <li class={o.club === 'invitation' ? 'text-muted-foreground' : 'font-medium text-link'}>
+              {#if o.club === 'invitation'}<a href="/club" class="underline-offset-4 hover:underline">{o.libelle}</a>{:else}{o.libelle}{#if o.club === 'membre'} <span class="font-normal text-muted-foreground">(appliquée au panier)</span>{/if}{/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if !formats.length && epuise}
         <p class="mt-6 inline-block border-2 border-border px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">Épuisé</p>
-      {:else if !forthcoming}
+      {:else if !formats.length && !forthcoming}
         <p class="mt-6 text-sm text-muted-foreground">Bientôt disponible.</p>
       {/if}
 

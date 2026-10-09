@@ -56,7 +56,7 @@ gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personali
     <main class="flex-1 border-t-[5px] border-t-white">
       {@render children?.()}
     </main>
-    <PublicFooter />
+    <PublicFooter club={data.club} />
   </div>
   {#if data.tracking?.gtm_id}
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={data.tracking.gtm_id}" height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe></noscript>

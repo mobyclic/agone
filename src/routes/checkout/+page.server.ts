@@ -2,7 +2,8 @@ import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/access';
 import { cartDetails, clearCart, getPromoCode, clearPromoCode } from '$lib/server/cart';
-import { validatePromo, promoAutomatique } from '$lib/server/promo';
+import { remisePanier } from '$lib/server/promo';
+import { getClub, adhesionActive, portOffert } from '$lib/server/club';
 import { activeShipZones } from '$lib/server/shipping';
 import { quoteShippingFor } from '$lib/shipping-calc';
 import { COUNTRIES } from '$lib/countries';
@@ -11,6 +12,15 @@ import { formatVendable } from '$lib/server/catalogue';
 import { isStripeEnabled, createPaymentCheckout } from '$lib/server/stripe';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
+
+/** Port offert à ce membre du club pour ce panier ? */
+async function francoPour(cart: { has_physical: boolean; lines: { id: string }[] }, userId: string): Promise<boolean> {
+  if (!cart.has_physical) return false;
+  const [club, membre] = await Promise.all([getClub(), adhesionActive(userId)]);
+  if (!club.active || !membre || club.franco === 'non') return false;
+  const parutions = await query<string>(`SELECT VALUE published_at FROM book WHERE id IN $ids`, { ids: cart.lines.map((l) => recId('book', String(l.id).replace(/^book:/, ''))) });
+  return portOffert(club, true, parutions);
+}
 
 export const load: PageServerLoad = async ({ locals, cookies }) => {
   const user = requireUser(locals, '/checkout');
@@ -21,12 +31,13 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
     { id: recId('user', user.id) }
   ))[0];
   const code = getPromoCode(cookies);
-  const promo = code ? await validatePromo(code, cart, user.id) : await promoAutomatique(cart, user.id);
+  const { promo } = await remisePanier(cart, user.id, code);
+  const francoClub = await francoPour(cart, user.id);
   const shipZones = await activeShipZones();
   const shipCountries = shipZones.some((z) => z.rest_of_world)
     ? COUNTRIES
     : COUNTRIES.filter((c) => shipZones.some((z) => z.countries.includes(c.code)));
-  return { cart, user: u, stripeEnabled: isStripeEnabled(), promo, shipZones, shipCountries, countries: COUNTRIES };
+  return { cart, user: u, stripeEnabled: isStripeEnabled(), promo, francoClub, shipZones, shipCountries, countries: COUNTRIES };
 };
 
 export const actions: Actions = {
@@ -70,17 +81,19 @@ export const actions: Actions = {
       : undefined;
     // Code promo : re-validé au moment de la commande (le panier a pu changer).
     const code = getPromoCode(cookies);
-    const promoRes = code ? await validatePromo(code, cart, user.id) : await promoAutomatique(cart, user.id);
+    const { promo: promoRes } = await remisePanier(cart, user.id, code);
     const discount = promoRes && promoRes.ok ? promoRes.discount : 0;
     const promoCode = promoRes && promoRes.ok ? promoRes.code : undefined;
+    const lineDiscounts = promoRes && promoRes.ok ? promoRes.lignes : [];
 
     // Frais de port (autoritatif) selon pays + poids.
     const shipQuote = quoteShippingFor(await activeShipZones(), shipping?.country ?? billing.country, cart.total_weight, cart.subtotal);
     if (cart.has_physical && !shipQuote.ok)
       return fail(400, { error: shipQuote.error ?? 'Nous ne livrons pas encore ce pays.', values });
-    const shippingTotal = shipQuote.ok ? shipQuote.price : 0;
+    // Membres du club : port offert selon le réglage (toujours, ou commandes avec une nouveauté).
+    const shippingTotal = shipQuote.ok && !(await francoPour(cart, user.id)) ? shipQuote.price : 0;
 
-    const order = await createOrder({ customerId: user.id, email: billing.email, billing, shipping, lines: cart.lines, discount, promoCode, shippingTotal });
+    const order = await createOrder({ customerId: user.id, email: billing.email, billing, shipping, lines: cart.lines, discount, promoCode, shippingTotal, lineDiscounts });
     // Les deux adresses sont mémorisées pour préremplir la prochaine commande.
     await query(`UPDATE $id SET billing = $b${separee ? ', shipping = $s' : ''}`, {
       id: recId('user', user.id), b: billing, s: autre
@@ -89,11 +102,11 @@ export const actions: Actions = {
     clearPromoCode(cookies);
 
     if (isStripeEnabled()) {
-      // Répartit la remise proportionnellement sur les lignes (Stripe n'accepte pas de ligne négative).
-      const scale = discount > 0 && cart.subtotal > 0 ? (cart.subtotal - discount) / cart.subtotal : 1;
+      // Chaque ligne au prix remisé (Stripe n'accepte pas de ligne négative) : la remise de la ligne, répartie par exemplaire.
+      const rem = new Map(lineDiscounts.map((x) => [`${String(x.id).replace(/^book:/, '')}|${x.format}`, x.discount]));
       const co = await createPaymentCheckout({
         lineItems: [
-          ...cart.lines.map((l) => ({ name: `${l.title} — ${l.format}`, amount: Math.round(l.unit_price * scale * 100), qty: l.qty })),
+          ...cart.lines.map((l) => ({ name: `${l.title} — ${l.format}`, amount: Math.round(((l.line_total - (rem.get(`${String(l.id).replace(/^book:/, '')}|${l.format}`) ?? 0)) / l.qty) * 100), qty: l.qty })),
           ...(shippingTotal > 0 ? [{ name: 'Frais de port', amount: Math.round(shippingTotal * 100), qty: 1 }] : [])
         ],
         customerEmail: billing.email,

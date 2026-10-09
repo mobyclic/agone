@@ -5,6 +5,7 @@ import { cartBookSlugs } from '$lib/server/cart';
 import { purchasedBookSlugs } from '$lib/server/order';
 import { isStaff } from '$lib/roles';
 import { upcomingForBook } from '$lib/server/events';
+import { offresPourLivre } from '$lib/server/promo';
 
 export const load: PageServerLoad = async ({ params, cookies, locals }) => {
   const book = await getBookBySlug(params.slug, !!locals.user && isStaff(locals.user.role));
@@ -26,6 +27,8 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
     locals.user ? purchasedBookSlugs(locals.user.id) : Promise.resolve([]),
     upcomingForBook(book.id)
   ]);
+  // Promotions automatiques qui couvrent ce livre, et le club (remise du membre, ou invitation).
+  const offres = await offresPourLivre({ id: book.id, price_paper: book.price_paper, price_ebook: book.price_ebook, published_at: book.published_at }, locals.user?.id);
 
-  return { book, sameAuthor, contributions, sameCollection, cartSlugs, purchasedSlugs, rencontres, primaryAuthor: book.authors?.[0] };
+  return { book, sameAuthor, contributions, sameCollection, cartSlugs, purchasedSlugs, rencontres, offres, primaryAuthor: book.authors?.[0] };
 };

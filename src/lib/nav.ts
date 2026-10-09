@@ -51,21 +51,22 @@ export const ADMIN_NAV: NavSection[] = [
     ]
   },
   {
-    // Ce que voit le visiteur du site : ses clients, ses commandes, ses promotions, ses réclames.
+    // Ce que le site propose de lui-même : promotions, réclames, livraison, club.
     title: 'Boutique en ligne',
     items: [
-      { label: 'Clients web', href: '/admin/clients', icon: 'Users', adminOnly: true },
-      { label: 'Commandes', href: '/admin/commandes?type=en_ligne', icon: 'Receipt', adminOnly: true },
       { label: 'Promotions', href: '/admin/promos', icon: 'Percent', adminOnly: true },
       { label: 'Réclames', href: '/admin/reclames', icon: 'Megaphone', adminOnly: true },
-      { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true }
+      { label: 'Livraison', href: '/admin/livraison', icon: 'Truck', adminOnly: true },
+      { label: 'Le club', href: '/admin/club', icon: 'Star', adminOnly: true }
     ]
   },
   {
-    // La gestion commerciale hors site : professionnels, bons de commande, facturation, dépôts.
+    // La gestion : clients, commandes, facturation, dépôts.
     title: 'Gestion',
     items: [
+      { label: 'Clients web', href: '/admin/clients', icon: 'Users', adminOnly: true },
       { label: 'Clients pro', href: '/admin/clients?type=pro', icon: 'Buildings', adminOnly: true },
+      { label: 'Commandes', href: '/admin/commandes?type=en_ligne', icon: 'Receipt', adminOnly: true },
       { label: 'Bons de commande', href: '/admin/commandes?type=bons', icon: 'ClipboardText', adminOnly: true },
       { label: 'Factures', href: '/admin/factures?kind=invoice', icon: 'Invoice', adminOnly: true },
       { label: 'Avoirs', href: '/admin/factures?kind=credit_note', icon: 'ArrowUUpLeft', adminOnly: true },

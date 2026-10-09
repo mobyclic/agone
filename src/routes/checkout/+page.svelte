@@ -22,7 +22,7 @@
   const shipCountries = $derived(data.shipCountries.length ? data.shipCountries : [{ code: 'FR', name: 'France' }]);
   const paysLivraison = $derived(separee ? shipCountry : country);
   const shipQuote = $derived(quoteShippingFor(data.shipZones, paysLivraison, data.cart.total_weight, data.cart.subtotal));
-  const shipping = $derived(data.cart.has_physical && shipQuote.ok ? shipQuote.price : 0);
+  const shipping = $derived(data.cart.has_physical && shipQuote.ok && !data.francoClub ? shipQuote.price : 0);
   const total = $derived(Math.max(0, data.cart.subtotal - discount) + shipping);
 
   onMount(() => {

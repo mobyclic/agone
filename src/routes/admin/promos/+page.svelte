@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { Plus } from 'phosphor-svelte';
 
@@ -33,7 +34,7 @@
       <tr>
         <th class="px-3 py-2 font-medium">Code</th>
         <th class="px-3 py-2 font-medium">Remise</th>
-        <th class="px-3 py-2 font-medium">Périmètre</th>
+        <th class="px-3 py-2 font-medium">Règle</th>
         <th class="px-3 py-2 font-medium">Validité</th>
         <th class="px-3 py-2 text-right font-medium">Utilisations</th>
         <th class="px-3 py-2 font-medium">État</th>
@@ -41,10 +42,10 @@
     </thead>
     <tbody class="divide-y divide-border">
       {#each data.promos as p (p.id)}
-        <tr class="hover:bg-muted/30">
+        <tr class="cursor-pointer hover:bg-muted/30" onclick={(e) => { if (!(e.target as HTMLElement).closest('a,button,form')) goto(`/admin/promos/${p.id}`); }}>
           <td class="px-3 py-2"><a href="/admin/promos/{p.id}" class="font-mono font-semibold hover:text-link">{p.code}</a>{#if p.automatic}<span class="ml-2 rounded bg-success/15 px-1.5 py-0.5 text-[11px] font-medium text-success" title="Appliquée d'office au panier, sans code">automatique</span>{/if}</td>
           <td class="px-3 py-2 font-medium">{valueLabel(p)}</td>
-          <td class="px-3 py-2 text-muted-foreground">{SCOPE[p.scope] ?? p.scope}</td>
+          <td class="px-3 py-2 text-xs text-muted-foreground">{p.regle}</td>
           <td class="px-3 py-2 text-muted-foreground">{windowLabel(p)}</td>
           <td class="px-3 py-2 text-right tabular-nums text-muted-foreground">{p.used_count}{p.max_uses != null ? ` / ${p.max_uses}` : ''}</td>
           <td class="px-3 py-2">

@@ -37,7 +37,9 @@ export const actions: Actions = {
         collectionIds: fd.getAll('collections').map(String),
         bookIds: J('bookIds'), userIds: J('userIds'),
         active: fd.get('active') === 'on',
-        automatic: fd.get('automatic') === 'on'
+        automatic: fd.get('automatic') === 'on',
+        fond_years: I('fond_years'), condition: S('condition') || 'none', condition_qty: I('condition_qty'),
+        conditionBookIds: J('conditionBookIds'), max_items: I('max_items')
       });
     } catch {
       return fail(400, { error: 'Enregistrement impossible — ce code existe peut-être déjà.' });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  let { club = null }: { club?: string | null } = $props();
   import Wordmark from './Wordmark.svelte';
   import { enhance } from '$app/forms';
   import { FacebookLogo, InstagramLogo, LinkedinLogo, Butterfly, MastodonLogo } from 'phosphor-svelte';
@@ -47,6 +48,7 @@
         <ul class="space-y-2 text-sm">
           <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/a-propos">À propos</a></li>
           <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/a-paraitre">À paraître</a></li>
+          {#if club}<li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/club">{club}</a></li>{/if}
           <li><a class="inline-block py-1 text-muted-foreground hover:text-foreground" href="/contact">Contact</a></li>
         </ul>
       </div>

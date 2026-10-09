@@ -9,6 +9,10 @@
   const eur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
   const FORMAT: Record<string, string> = { papier: 'Papier', epub: 'Numérique (ePub)', souscription: 'Souscription' };
   const discount = $derived(data.promo && data.promo.ok ? data.promo.discount : 0);
+  /** Part de la remise sur chaque ligne (id|format → €). */
+  const remiseLigne = $derived(new Map((data.promo && data.promo.ok ? data.promo.lignes : []).map((x) => [`${String(x.id).replace(/^book:/, '')}|${x.format}`, x.discount])));
+  const rl = (l: { id: string; format: string }) => remiseLigne.get(`${String(l.id).replace(/^book:/, '')}|${l.format}`) ?? 0;
+  const libellePromo = $derived(data.promo && data.promo.ok ? (data.promo.auto ? (data.promo.code === 'CLUB' ? data.club?.nom ?? 'Club' : 'Promotion') : `Code ${data.promo.code}`) : '');
   const total = $derived(Math.max(0, data.cart.subtotal - discount));
 </script>
 
@@ -35,6 +39,7 @@
             <a href="/livre/{l.slug}" class="font-display font-semibold leading-snug hover:text-link">{l.title}</a>
             {#if l.authors?.length}<p class="text-sm text-link">{l.authors.join(', ')}</p>{:else if l.author}<p class="text-sm text-link">{l.author}</p>{/if}
             <p class="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{FORMAT[l.format] ?? l.format} · {eur(l.unit_price)}</p>
+            {#if rl(l) > 0}<p class="mt-0.5 text-xs font-medium text-success">−{eur(rl(l))} · {libellePromo}</p>{/if}
           </div>
 
           <!-- Quantité : − / + -->
@@ -50,7 +55,9 @@
             </form>
           </div>
 
-          <div class="w-20 text-right font-display font-semibold tabular-nums">{eur(l.line_total)}</div>
+          <div class="w-24 text-right font-display font-semibold tabular-nums">
+            {#if rl(l) > 0}<span class="block text-xs font-normal text-muted-foreground line-through">{eur(l.line_total)}</span>{eur(l.line_total - rl(l))}{:else}{eur(l.line_total)}{/if}
+          </div>
           <form method="POST" action="?/remove" use:enhance>
             <input type="hidden" name="id" value={l.id} /><input type="hidden" name="format" value={l.format} />
             <button type="submit" class="grid size-9 place-items-center text-muted-foreground hover:text-destructive" aria-label="Retirer l'article"><Trash size={16} /></button>
@@ -66,10 +73,10 @@
           <div class="space-y-2 text-sm">
             <div class="flex justify-between"><span class="text-muted-foreground">Sous-total</span><span class="font-semibold tabular-nums">{eur(data.cart.subtotal)}</span></div>
             {#if data.promo && data.promo.ok}
-              <div class="flex justify-between text-success"><span>{data.promo.auto ? (data.promo.description || 'Promotion') : `Code ${data.promo.code}`}</span><span class="tabular-nums">−{eur(data.promo.discount)}</span></div>
+              <div class="flex justify-between gap-3 text-success"><span>{data.promo.auto ? (data.promo.description || 'Promotion') : `Code ${data.promo.code}`}</span><span class="shrink-0 tabular-nums">−{eur(data.promo.discount)}</span></div>
             {/if}
             {#if data.cart.has_physical}
-              <div class="flex justify-between"><span class="text-muted-foreground">Livraison</span><span class="text-muted-foreground">calculée au paiement</span></div>
+              <div class="flex justify-between"><span class="text-muted-foreground">Livraison</span><span class={data.francoClub ? 'text-success' : 'text-muted-foreground'}>{data.francoClub ? `offerte (${data.club?.nom})` : 'calculée au paiement'}</span></div>
             {/if}
           </div>
           <div class="mt-3 flex items-baseline justify-between border-t border-border pt-3 text-base font-bold">
@@ -86,12 +93,16 @@
             {#if data.promo && data.promo.ok && data.promo.auto}
               <div class="mt-3 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">✓ {data.promo.description || 'Promotion en cours'} — appliquée automatiquement</div>
             {/if}
+            {#if data.codeMoinsBon}<p class="mt-1.5 text-xs text-muted-foreground">Votre code « {data.promoCode} » est valable, mais la remise ci-dessus est plus avantageuse.</p>{/if}
             <form method="POST" action="?/applyPromo" use:enhance class="mt-3 flex gap-2">
               <input name="code" placeholder="Code promo" autocomplete="off" class="h-9 w-full min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm uppercase outline-none focus:border-primary" />
               <button type="submit" class="shrink-0 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted">Appliquer</button>
             </form>
-            {#if data.promoCode && data.promo && !data.promo.ok}
-              <p class="mt-1.5 text-xs text-destructive">Code « {data.promoCode} » : {data.promo.error}</p>
+            {#if data.promoCode && data.codeErreur}
+              <p class="mt-1.5 text-xs text-destructive">Code « {data.promoCode} » : {data.codeErreur}</p>
+            {/if}
+            {#if data.club && !data.club.membre}
+              <p class="mt-3 text-xs text-muted-foreground"><a href="/club" class="text-link underline-offset-4 hover:underline">{data.club.nom}</a> : −{data.club.remise} % sur le fonds toute l'année.</p>
             {/if}
           {/if}
 

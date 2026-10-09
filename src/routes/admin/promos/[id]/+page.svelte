@@ -9,6 +9,7 @@
   const p = $derived(data.promo);
   let scope = $state(untrack(() => data.promo?.scope ?? 'all'));
   let type = $state(untrack(() => data.promo?.type ?? 'percent'));
+  let condition = $state(untrack(() => data.promo?.condition ?? 'none'));
   const collSet = $derived(new Set((data.promo?.collection_ids ?? []).map(String)));
   const startDate = $derived(data.promo?.starts_at ? String(data.promo.starts_at).slice(0, 10) : '');
   const endDate = $derived(data.promo?.ends_at ? String(data.promo.ends_at).slice(0, 10) : '');
@@ -21,7 +22,7 @@
 
 <svelte:head><title>{data.isNew ? 'Nouveau code' : p?.code} · Admin</title></svelte:head>
 
-<a href="/admin/promos" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Codes promo</a>
+<a href="/admin/promos" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /> Promotions</a>
 
 <form method="POST" action="?/save" use:enhance={() => { saving = true; return async ({ update }) => { await update(); saving = false; }; }} class="max-w-2xl pb-24">
   <h2 class="mb-4 text-xl font-bold">{data.isNew ? 'Nouveau code promo' : p?.code}</h2>
@@ -67,12 +68,17 @@
       <h3 class="eyebrow mb-3">Périmètre</h3>
       <label class={label}>S'applique à
         <select name="scope" bind:value={scope} class={input}>
-          <option value="all">Tout le catalogue</option>
+          <option value="all">Tout le panier (tout le catalogue)</option>
           <option value="collection">Certaines collections</option>
           <option value="book">Certains livres</option>
-          <option value="fond">Le fond : livres parus depuis plus de deux ans</option>
+          <option value="fond">Le fonds : livres parus depuis plus de N ans</option>
         </select>
       </label>
+      {#if scope === 'fond'}
+        <label class="{label} mt-3 max-w-xs">Parus depuis plus de (ans)
+          <input name="fond_years" type="number" min="1" step="1" value={p?.fond_years ?? 2} class={input} />
+        </label>
+      {/if}
       {#if scope === 'collection'}
         <div class="mt-3 max-h-48 space-y-1 overflow-auto rounded-md border border-border p-2">
           {#each data.collections as c (c.id)}
@@ -84,6 +90,32 @@
           {#key p?.id}<EntityPicker name="bookIds" searchUrl="/api/books/search" labelField="title" initial={data.promo?.books ?? []} placeholder="Rechercher un livre…" />{/key}
         </div>
       {/if}
+    </div>
+
+    <!-- Conditions : quand la remise s'applique, et dans quelle limite -->
+    <div class="rounded-lg border border-border bg-card p-4">
+      <h3 class="eyebrow mb-1">Conditions</h3>
+      <p class="mb-3 text-xs text-muted-foreground">Quand la remise s'applique ; elle porte ensuite sur le périmètre ci-dessus.</p>
+      <label class={label}>S'applique
+        <select name="condition" bind:value={condition} class={input}>
+          <option value="none">Toujours</option>
+          <option value="min_qty">Si le panier contient au moins N livres</option>
+          <option value="contains">Si le panier contient un de ces livres</option>
+        </select>
+      </label>
+      {#if condition === 'min_qty'}
+        <label class="{label} mt-3 max-w-xs">Nombre de livres (exemplaires) dans le panier
+          <input name="condition_qty" type="number" min="1" step="1" value={p?.condition_qty ?? 3} class={input} />
+        </label>
+      {:else if condition === 'contains'}
+        <div class="mt-3">
+          {#key p?.id}<EntityPicker name="conditionBookIds" searchUrl="/api/books/search" labelField="title" initial={data.promo?.condition_books ?? []} placeholder="Livre déclencheur…" />{/key}
+        </div>
+      {/if}
+      <label class="{label} mt-4 max-w-sm">Dans la limite de (exemplaires remisés)
+        <input name="max_items" type="number" min="1" step="1" value={p?.max_items ?? ''} placeholder="sans limite" class={input} />
+        <span class="mt-1 block text-xs font-normal text-muted-foreground">Les exemplaires les moins chers du périmètre d'abord (« 3 pour 2 » : 100 %, au moins 3 livres, limite 1).</span>
+      </label>
     </div>
 
     <!-- Validité & limite -->

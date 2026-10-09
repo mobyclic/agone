@@ -2,6 +2,7 @@ import { json, text } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getStripe, STRIPE_WEBHOOK_SECRET, isStripeEnabled } from '$lib/server/stripe';
 import { markOrderPaid } from '$lib/server/order';
+import { ajouterAdhesion } from '$lib/server/club';
 import { query, recId } from '$lib/server/surreal';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -18,6 +19,14 @@ export const POST: RequestHandler = async ({ request }) => {
       : JSON.parse(body);
   } catch (e: any) {
     return text(`bad signature: ${e?.message ?? e}`, { status: 400 });
+  }
+
+  // Adhésion au club payée : une période d'adhésion + sa facture réglée (idempotent par session).
+  if (event.type === 'checkout.session.completed' && (event.data.object as any)?.metadata?.type === 'club') {
+    const s: any = event.data.object;
+    try { await ajouterAdhesion(String(s.metadata.user), { source: 'stripe', montant: Number(s.amount_total ?? 0) / 100, methode: 'stripe', stripeSession: String(s.id) }); }
+    catch (e) { console.error('[stripe webhook] adhésion club', e); }
+    return json({ received: true });
   }
 
   if (event.type === 'checkout.session.completed' || event.type === 'payment_intent.succeeded') {
