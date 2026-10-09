@@ -7,6 +7,7 @@
  * Infos société éditables dans Paramètres (clé de réglage « billing »).
  */
 import { query, recId } from './surreal';
+import { synchroniserVentesFacture } from './facturesVentes';
 import { getSetting } from './site';
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -402,6 +403,7 @@ export async function emettreFacture(id: string, date?: Date): Promise<{ ref: st
     c: { year: quand.getFullYear(), number, ref, status: 'unpaid', issued_at: quand, proforma_ref: inv.status === 'proforma' ? inv.ref : undefined, validation_token: undefined }
   });
   await recomputeInvoiceStatus(id);
+  await synchroniserVentesFacture(id); // une facture émise avec des lignes du catalogue compte dans les ventes
   return { ref };
 }
 
@@ -423,6 +425,7 @@ export async function retourBrouillon(id: string): Promise<void> {
   if (!inv || inv.status !== 'proforma') throw new Error('Seule une pro forma revient en brouillon.');
   if (inv.validated_at) throw new Error('Cette pro forma a été validée par le client : émettez-la.');
   await query(`UPDATE $id MERGE $c`, { id: recId('invoice', id), c: { status: 'draft', proforma_ref: inv.ref, ref: `BR-${Date.now().toString(36)}`, number: 0, validation_token: undefined, sent_at: undefined } });
+  await synchroniserVentesFacture(id); // plus émise : plus de relevé
 }
 
 /** Annulation : jamais d'un document réglé, même en partie. */
@@ -431,6 +434,7 @@ export async function annulerFacture(id: string): Promise<void> {
   if (!inv) throw new Error('Document introuvable');
   if (Number(inv.paid_total ?? 0) > 0) throw new Error('Des règlements sont enregistrés : retirez-les avant d’annuler, ou faites un avoir.');
   await query(`UPDATE $id SET status = 'cancelled'`, { id: recId('invoice', id) });
+  await synchroniserVentesFacture(id); // retire son relevé de ventes
 }
 
 /* ————————————————————— Lecture ————————————————————— */

@@ -6,6 +6,7 @@ import {
   listPayments, addPayment, deletePayment, facturesImputables, imputerAvoir, PAYMENT_METHODS
 } from '$lib/server/invoice';
 import { envoyerFacture } from '$lib/server/factureMail';
+import { etatVentesFacture, definirComptageVentes } from '$lib/server/facturesVentes';
 import { query } from '$lib/server/surreal';
 import { heureParisVersDate } from '$lib/dates';
 import { withFlash } from '$lib/toasts';
@@ -17,19 +18,36 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const invoice = await getInvoice(params.id);
   if (!invoice) throw error(404, { message: 'Facture introuvable' });
   if (invoice.status === 'draft') throw redirect(303, `/admin/factures/${params.id}/modifier`);
-  const [payments, historique, imputables] = await Promise.all([
+  const [payments, historique, imputables, ventes] = await Promise.all([
     listPayments(params.id),
     // Tout ce que le journal sait de ce document : création, émission, envois, règlements…
     query<any>(`SELECT action, actor_name, details, created_at FROM admin_log WHERE target_type = 'invoice' AND target_id = $id ORDER BY created_at DESC LIMIT 50`, { id: params.id }),
     // Pour un avoir encore ouvert : les factures du même client où l'imputer.
-    invoice.kind === 'credit_note' && ['unpaid', 'partial'].includes(invoice.status) ? facturesImputables(params.id) : []
+    invoice.kind === 'credit_note' && ['unpaid', 'partial'].includes(invoice.status) ? facturesImputables(params.id) : [],
+    etatVentesFacture(params.id)
   ]);
-  return { invoice, payments, historique, imputables, methods: PAYMENT_METHODS };
+  return { invoice, payments, historique, imputables, ventes, methods: PAYMENT_METHODS };
 };
 
 const retour = (id: string, message: string, type: 'success' | 'error' | 'info' = 'success') => redirect(303, withFlash(`/admin/factures/${id}`, message, type));
 
 export const actions: Actions = {
+  /** Comptage dans les ventes : inclure, exclure, ou revenir à la règle. */
+  ventes: async ({ request, params, locals }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const mode = String(fd.get('mode') ?? '');
+    const id = String(params.id);
+    try {
+      const r = await definirComptageVentes(id, mode === 'inclure' ? true : mode === 'exclure' ? false : null);
+      await journaliser(locals, { action: 'invoice.ventes', cible: { type: 'invoice', id }, details: { mode, comptee: r.comptee, lignes: r.lignes } });
+      throw retour(id, r.comptee ? `Comptée dans les ventes (${r.lignes} titre${r.lignes > 1 ? 's' : ''}).` : 'Retirée des ventes.');
+    } catch (e) {
+      if ((e as any)?.status === 303) throw e;
+      return fail(400, { error: e instanceof Error ? e.message : 'Impossible.' });
+    }
+  },
+
   /** Envoi au client, PDF joint ; une pro forma part avec son lien de validation. */
   envoyer: async ({ request, params, locals }) => {
     requireAdmin(locals);

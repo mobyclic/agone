@@ -146,6 +146,26 @@
       </div>
     </div>
 
+    <!-- Ventes : une facture émise avec des lignes du catalogue compte dans les droits d'auteur -->
+    {#if data.ventes}
+      <div class="rounded-lg border border-border bg-card p-4">
+        <h3 class="eyebrow mb-2">Ventes</h3>
+        {#if data.ventes.comptee}
+          <p class="text-sm">Comptée dans les ventes <span class="text-muted-foreground">(canal Facturation directe, {data.ventes.exemplaires} ex.{isCredit ? ' en retour' : ''})</span>.</p>
+          <p class="mt-1 text-xs text-muted-foreground">Visible dans <a href="/admin/droits/ventes?annee={new Date(f.issued_at).getFullYear()}" class="text-link underline-offset-4 hover:underline">Ventes par exercice</a>.</p>
+          <form method="POST" action="?/ventes" use:enhance class="mt-2"><input type="hidden" name="mode" value="exclure" /><Button type="submit" size="sm" variant="outline" class="w-full">Ne pas compter dans les ventes</Button></form>
+        {:else}
+          <p class="text-sm">Non comptée dans les ventes{#if data.ventes.raison}<span class="text-muted-foreground"> : {data.ventes.raison}</span>{/if}.</p>
+          {#if !isCancelled && !isProforma}
+            <form method="POST" action="?/ventes" use:enhance class="mt-2"><input type="hidden" name="mode" value="inclure" /><Button type="submit" size="sm" variant="outline" class="w-full">Compter dans les ventes</Button></form>
+          {/if}
+        {/if}
+        {#if data.ventes.mode !== null}
+          <form method="POST" action="?/ventes" use:enhance class="mt-1"><input type="hidden" name="mode" value="auto" /><button type="submit" class="text-xs text-muted-foreground underline-offset-4 hover:underline">Revenir à la règle</button></form>
+        {/if}
+      </div>
+    {/if}
+
     {#if isCredit && !isCancelled}
       <!-- Solde de l'avoir : imputé sur des factures du client, ou remboursé -->
       <div class="rounded-lg border border-border bg-card p-4">

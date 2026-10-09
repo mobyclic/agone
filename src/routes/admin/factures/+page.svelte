@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   /**
    * Facturation : la liste, un bouton « Trier & filtrer » (type, état, période,
    * tri, nombre par page) qui ouvre une fenêtre, des cases pour agir sur
@@ -149,6 +150,11 @@
     <a href="/admin/factures/export.csv?ids={idsSelection}" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted"><Download size={14} /> CSV</a>
     <a href="/admin/factures/export.zip?ids={idsSelection}" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted"><FileZip size={14} /> ZIP des PDF</a>
     <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted" onclick={() => (stats = true)}><ChartBar size={14} /> Chiffres de la sélection</button>
+    <form method="POST" action="?/ventes" use:enhance class="inline-flex gap-1.5">
+      <input type="hidden" name="ids" value={idsSelection} />
+      <button type="submit" name="mode" value="inclure" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted" title="Créer le relevé de ventes de chaque document émis ayant des lignes du catalogue (canal Facturation directe)">Compter dans les ventes</button>
+      <button type="submit" name="mode" value="exclure" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm hover:bg-muted" title="Retirer ces documents des ventes">Exclure des ventes</button>
+    </form>
     <button type="button" class="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => coches.clear()}><X size={12} /> Tout décocher</button>
   </div>
 {/if}

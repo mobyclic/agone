@@ -1,4 +1,9 @@
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/access';
+import { definirComptageVentes } from '$lib/server/facturesVentes';
+import { journaliser } from '$lib/server/journal';
+import { withFlash } from '$lib/toasts';
 import { listInvoices } from '$lib/server/invoice';
 import { getClientPro } from '$lib/server/clients';
 import { query, recId } from '$lib/server/surreal';
@@ -28,4 +33,24 @@ export const load: PageServerLoad = async ({ url }) => {
   const clientFiltre = pro ? { type: 'pro' as const, id: pro.id, label: pro.name }
     : customerId && particulier ? { type: 'user' as const, id: customerId, label: (particulier as any).full_name || (particulier as any).email || 'client' } : null;
   return { invoices, total, q, kind, status, from, to, sort, page, limit, clientFiltre };
+};
+
+export const actions: Actions = {
+  /** Sélection → compter (ou non) dans les ventes ; utile pour les factures importées de MEG. */
+  ventes: async ({ request, locals, url }) => {
+    requireAdmin(locals);
+    const fd = await request.formData();
+    const ids = String(fd.get('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const mode = String(fd.get('mode') ?? '');
+    if (!ids.length) return fail(400, { error: 'Aucun document coché.' });
+    let comptees = 0, retirees = 0;
+    for (const id of ids) {
+      try {
+        const r = await definirComptageVentes(id, mode === 'inclure' ? true : mode === 'exclure' ? false : null);
+        if (r.comptee) comptees++; else retirees++;
+      } catch { retirees++; }
+    }
+    await journaliser(locals, { action: 'invoice.ventes_lot', details: { mode, ids: ids.length, comptees, retirees } });
+    throw redirect(303, withFlash(`/admin/factures${url.search}`, `${comptees} document${comptees > 1 ? 's' : ''} compté${comptees > 1 ? 's' : ''} dans les ventes, ${retirees} non compté${retirees > 1 ? 's' : ''}.`, 'success'));
+  }
 };

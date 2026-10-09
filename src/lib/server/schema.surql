@@ -984,3 +984,9 @@ DEFINE FIELD OVERWRITE report       ON carnet TYPE option<record<sales_report>>;
 DEFINE FIELD OVERWRITE invoice      ON carnet TYPE option<record<invoice>>;
 DEFINE FIELD OVERWRITE created_at   ON carnet TYPE datetime DEFAULT time::now();
 DEFINE INDEX OVERWRITE idx_carnet_client ON carnet FIELDS client;
+
+-- Factures → ventes : une facture émise avec des lignes du catalogue crée son relevé
+-- sur le canal « factures » (voir facturesVentes.ts). count_sales force (true) ou
+-- interdit (false) ce comptage ; NONE = la règle (pas de commande, pas de carnet, pas d'import MEG).
+DEFINE FIELD OVERWRITE count_sales  ON invoice TYPE option<bool>;
+DEFINE FIELD OVERWRITE sales_report ON invoice TYPE option<record<sales_report>>;

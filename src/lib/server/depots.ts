@@ -243,11 +243,12 @@ export async function validerCarnet(
     reportId = String(rep[0].id).replace(/^sales_report:/, '');
     await query(`INSERT INTO sales_line $d`, {
       d: vendues.map((l) => {
+        // gross_ht / net_receipt sont des TOTAUX de ligne HT (convention des relevés distributeur).
         const ht = l.prix_retenu / (1 + l.vat_rate / 100);
         return {
           report: recId('sales_report', reportId!), book: recId('book', l.book_id!), isbn: l.isbn, format: 'paper',
           units_sold: l.ventes, units_returned: 0, units_free: l.sp,
-          gross_price: l.prix_retenu, gross_ht: Math.round(ht * 100) / 100, net_receipt: Math.round(ht * (1 - opts.remise / 100) * 100) / 100,
+          gross_price: l.prix_retenu, gross_ht: Math.round(ht * l.ventes * 100) / 100, net_receipt: Math.round(ht * (1 - opts.remise / 100) * l.ventes * 100) / 100,
           note: `carnet ${opts.label.trim() || ''}`.trim()
         };
       })
