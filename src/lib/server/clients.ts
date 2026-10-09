@@ -62,7 +62,7 @@ export async function listClientsPro(opts: { q?: string; kind?: string; limit?: 
   const parUser = new Map<string, { n: number; total: number; derniere?: string }>();
   if (users.length) {
     const cmd = await query<any>(
-      `SELECT customer, count() AS n, math::sum(total) AS total, math::max(created_at) AS derniere FROM order
+      `SELECT customer, count() AS n, math::sum(total) AS total, time::max(created_at) AS derniere FROM order
         WHERE customer IN $users AND status IN ['completed','paid','processing','sent_to_bl'] GROUP BY customer`, { users }
     );
     for (const c of cmd) parUser.set(String(c.customer).replace(/^user:/, ''), { n: Number(c.n ?? 0), total: Number(c.total ?? 0), derniere: c.derniere ?? undefined });

@@ -1018,3 +1018,23 @@ DEFINE FIELD OVERWRITE pro      ON client TYPE bool DEFAULT true VALUE $value ??
 DEFINE INDEX OVERWRITE idx_client_web  ON client FIELDS web;
 DEFINE INDEX OVERWRITE idx_client_pro  ON client FIELDS pro;
 DEFINE INDEX OVERWRITE idx_client_user ON client FIELDS user;
+
+-- Réclames : ce que le site annonce de lui-même — un bandeau au-dessus du menu ou une
+-- fenêtre à l'arrivée du visiteur —, programmées (dates) et publiées ou en brouillon.
+-- Sur le site, la réclame publiée la plus récente de chaque type, dans ses dates, s'affiche.
+DEFINE TABLE OVERWRITE reclame SCHEMAFULL;
+DEFINE FIELD OVERWRITE kind       ON reclame TYPE string ASSERT $value IN ['bandeau','modal'];
+DEFINE FIELD OVERWRITE status     ON reclame TYPE string ASSERT $value IN ['draft','published'] DEFAULT 'draft' VALUE $value ?? 'draft';
+DEFINE FIELD OVERWRITE title      ON reclame TYPE string;                  -- nom interne (bandeau) ou titre affiché (fenêtre)
+DEFINE FIELD OVERWRITE message    ON reclame TYPE option<string>;          -- texte du bandeau / de la fenêtre
+DEFINE FIELD OVERWRITE url        ON reclame TYPE option<string>;          -- lien du bandeau / du bouton
+DEFINE FIELD OVERWRITE cta_label  ON reclame TYPE option<string>;          -- libellé du bouton (fenêtre)
+DEFINE FIELD OVERWRITE image      ON reclame TYPE option<record<media>>;   -- fenêtre : image en tête
+DEFINE FIELD OVERWRITE variant    ON reclame TYPE string DEFAULT 'info' VALUE $value ?? 'info';  -- bandeau : info | brand | warning | success
+DEFINE FIELD OVERWRITE frequency  ON reclame TYPE string DEFAULT 'day' VALUE $value ?? 'day';    -- fenêtre : once | day | session | always
+DEFINE FIELD OVERWRITE delay      ON reclame TYPE int DEFAULT 2 VALUE $value ?? 2;               -- fenêtre : secondes avant apparition
+DEFINE FIELD OVERWRITE starts_at  ON reclame TYPE option<datetime>;
+DEFINE FIELD OVERWRITE ends_at    ON reclame TYPE option<datetime>;
+DEFINE FIELD OVERWRITE created_at ON reclame TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at ON reclame TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_reclame_kind ON reclame FIELDS kind, status;

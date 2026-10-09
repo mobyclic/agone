@@ -32,8 +32,10 @@ function usageDe(key: string): UsageMedia {
   return 'autres';
 }
 
-export async function listMedias(opts: { usage?: UsageMedia; q?: string; limit?: number; offset?: number } = {}) {
+export async function listMedias(opts: { usage?: UsageMedia; q?: string; limit?: number; offset?: number; imagesSeules?: boolean } = {}) {
   const where: string[] = [];
+  // Images publiques seulement (sélecteur de la médiathèque) : ni documents privés, ni fichiers non image.
+  if (opts.imagesSeules) where.push("(string::starts_with(mime ?? '', 'image/') OR string::ends_with(key, '.webp') OR string::ends_with(key, '.jpg') OR string::ends_with(key, '.jpeg') OR string::ends_with(key, '.png') OR string::ends_with(key, '.gif') OR string::ends_with(key, '.avif')) AND string::starts_with(key, 'contrats/') = false AND string::starts_with(key, 'factures/') = false AND string::starts_with(key, 'carnets/') = false");
   const vars: Record<string, unknown> = { limit: opts.limit ?? 48, start: opts.offset ?? 0 };
   if (opts.usage && opts.usage !== 'autres') {
     const prefs = USAGES[opts.usage].prefixes;
