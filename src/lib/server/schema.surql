@@ -991,3 +991,18 @@ DEFINE INDEX OVERWRITE idx_carnet_client ON carnet FIELDS client;
 -- interdit (false) ce comptage ; NONE = la règle (pas de commande, pas de carnet, pas d'import MEG).
 DEFINE FIELD OVERWRITE count_sales  ON invoice TYPE option<bool>;
 DEFINE FIELD OVERWRITE sales_report ON invoice TYPE option<record<sales_report>>;
+
+-- Rapprochement BLDD : qualification des sorties du distributeur que nos commandes
+-- n'expliquent pas (écart du mois, par titre) : service de presse, pilon, perte,
+-- réassort d'un dépôt fait hors AGONE, autre. Une ligne par titre, mois et nature.
+DEFINE TABLE OVERWRITE bldd_ecart SCHEMAFULL;
+DEFINE FIELD OVERWRITE book       ON bldd_ecart TYPE record<book>;
+DEFINE FIELD OVERWRITE year       ON bldd_ecart TYPE int;
+DEFINE FIELD OVERWRITE month      ON bldd_ecart TYPE int;
+DEFINE FIELD OVERWRITE kind       ON bldd_ecart TYPE string ASSERT $value IN ['sp','pilon','perte','depot','autre'];
+DEFINE FIELD OVERWRITE qty        ON bldd_ecart TYPE int;
+DEFINE FIELD OVERWRITE note       ON bldd_ecart TYPE option<string>;
+DEFINE FIELD OVERWRITE created_at ON bldd_ecart TYPE datetime DEFAULT time::now();
+DEFINE FIELD OVERWRITE updated_at ON bldd_ecart TYPE datetime DEFAULT time::now() VALUE time::now();
+DEFINE INDEX OVERWRITE idx_bldd_ecart_mois ON bldd_ecart FIELDS year, month;
+DEFINE INDEX OVERWRITE idx_bldd_ecart_cle  ON bldd_ecart FIELDS year, month, book, kind UNIQUE;

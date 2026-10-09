@@ -5,10 +5,17 @@
    * Ce qui reste est l'écart à qualifier : service de presse, pilon, perte.
    */
   import { goto } from '$app/navigation';
-  let { data } = $props();
+  import { enhance } from '$app/forms';
+  import { toast } from 'svelte-sonner';
+  let { data, form } = $props();
+  $effect(() => { if (form?.error) toast.error(form.error); });
   let ecartsSeuls = $state(true);
   const r = $derived(data.rapprochement);
-  const lignes = $derived(r ? (ecartsSeuls ? r.lignes.filter((l) => l.ecart_sorties || l.controle || l.inventory) : r.lignes) : []);
+  const lignes = $derived(r ? (ecartsSeuls ? r.lignes.filter((l) => l.reste || l.controle || l.inventory) : r.lignes) : []);
+  /** Ligne dont on ouvre la qualification. */
+  let ouverte = $state<string | null>(null);
+  const kinds = $derived(Object.entries(data.kinds) as [string, string][]);
+  const chips = (q: Record<string, number | undefined>) => Object.entries(q).filter(([, n]) => n).map(([k, n]) => `${data.kinds[k as keyof typeof data.kinds] ?? k} ${n}`).join(' · ');
   const moisFr = (s: string) => { const [y, m] = s.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); };
   const n = (v: number) => (v ? String(v) : '');
   const signe = (v: number) => (v > 0 ? `+${v}` : v < 0 ? String(v) : '');
@@ -40,7 +47,7 @@
     {#each [
       { l: 'Ventes nettes', v: r.totaux.net_sales, d: `${r.totaux.gross_sales} vendus, ${r.totaux.returns} retours` },
       { l: 'Sorties BLDD', v: r.totaux.exits, d: `dont ${r.totaux.vpc} VPC et ${r.totaux.depots} dépôts connus` },
-      { l: 'Écart de sorties', v: r.totaux.ecart_sorties, d: 'à qualifier : SP, pilon, perte' },
+      { l: 'Reste à qualifier', v: r.totaux.reste, d: r.totaux.ecart_sorties !== r.totaux.reste ? `sur ${r.totaux.ecart_sorties} d'écart · ${chips(r.totaux.qualifie)}` : `écart de sorties : SP, pilon, perte…` },
       { l: 'Réimpressions', v: r.totaux.entries, d: 'entrées du mois' },
       { l: 'Inventaire BLDD', v: r.totaux.inventory, d: 'corrections du distributeur' }
     ] as t (t.l)}
@@ -62,7 +69,7 @@
           <th class="px-2 py-2 text-right font-medium" title="Exemplaires sortis sans vente chez BLDD">Sorties</th>
           <th class="px-2 py-2 text-right font-medium" title="Commandes papier du site sur le mois">VPC</th>
           <th class="px-2 py-2 text-right font-medium" title="Réassorts de dépôts commandés">Dépôts</th>
-          <th class="px-2 py-2 text-right font-medium" title="Sorties − VPC − dépôts">Écart</th>
+          <th class="px-2 py-2 text-right font-medium" title="Sorties − VPC − dépôts − qualifié">Reste</th>
           <th class="px-2 py-2 text-right font-medium">Ventes nettes</th>
           <th class="px-2 py-2 text-right font-medium" title="Correction d'inventaire du distributeur">Inv.</th>
           <th class="px-2 py-2 text-right font-medium">Fin</th>
@@ -74,14 +81,28 @@
           <tr class="hover:bg-muted/30">
             <td class="px-3 py-1.5">
               {#if l.slug}<a href="/admin/catalogue/{l.slug}" class="hover:text-link">{l.title}</a>{:else}<span>{l.title}</span> <span class="text-xs text-destructive">hors catalogue</span>{/if}
-              <div class="text-xs text-muted-foreground">{#if l.author}{l.author} · {/if}<span class="font-mono">{l.ean}</span></div>
+              <div class="text-xs text-muted-foreground">{#if l.author}{l.author} · {/if}<span class="font-mono">{l.ean}</span>{#if Object.keys(l.qualifie).length} · <span class="text-foreground">{chips(l.qualifie)}</span>{/if}</div>
+              {#if ouverte === l.ean && l.book_id}
+                <form method="POST" action="?/qualifier" use:enhance class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <input type="hidden" name="book" value={l.book_id} /><input type="hidden" name="annee" value={r.annee} /><input type="hidden" name="mois" value={r.mois} />
+                  <select name="kind" class="h-8 rounded-md border border-border bg-background px-2">{#each kinds as [k, nom] (k)}<option value={k}>{nom}</option>{/each}</select>
+                  <input type="number" name="qty" step="1" value={l.reste} class="h-8 w-20 rounded-md border border-border bg-background px-2 text-right" />
+                  <input name="note" placeholder="note" class="h-8 w-40 rounded-md border border-border bg-background px-2" />
+                  <button type="submit" class="h-8 rounded-md bg-foreground px-3 font-medium text-background">Qualifier</button>
+                  <span class="text-muted-foreground">0 retire la nature choisie</span>
+                </form>
+              {/if}
             </td>
             <td class="px-2 py-1.5 text-right">{l.stock_start}</td>
             <td class="px-2 py-1.5 text-right text-success">{n(l.entries)}</td>
             <td class="px-2 py-1.5 text-right">{n(l.exits)}</td>
             <td class="px-2 py-1.5 text-right text-muted-foreground">{n(l.vpc)}</td>
             <td class="px-2 py-1.5 text-right text-muted-foreground">{n(l.depots)}</td>
-            <td class="px-2 py-1.5 text-right {cls(l.ecart_sorties)}">{signe(l.ecart_sorties)}</td>
+            <td class="px-2 py-1.5 text-right">
+              {#if l.book_id && (l.reste || Object.keys(l.qualifie).length)}
+                <button type="button" onclick={() => (ouverte = ouverte === l.ean ? null : l.ean)} class="{cls(l.reste)} underline-offset-4 hover:underline" title="Qualifier cet écart">{l.reste ? signe(l.reste) : '0'}</button>
+              {:else}<span class={cls(l.reste)}>{signe(l.reste)}</span>{/if}
+            </td>
             <td class="px-2 py-1.5 text-right font-medium">{l.net_sales}</td>
             <td class="px-2 py-1.5 text-right {cls(l.inventory)}">{signe(l.inventory)}</td>
             <td class="px-2 py-1.5 text-right">{l.stock_end}</td>
@@ -100,7 +121,7 @@
           <td class="px-2 py-2 text-right">{r.totaux.exits}</td>
           <td class="px-2 py-2 text-right">{r.totaux.vpc}</td>
           <td class="px-2 py-2 text-right">{r.totaux.depots}</td>
-          <td class="px-2 py-2 text-right {cls(r.totaux.ecart_sorties)}">{signe(r.totaux.ecart_sorties)}</td>
+          <td class="px-2 py-2 text-right {cls(r.totaux.reste)}">{signe(r.totaux.reste)}</td>
           <td class="px-2 py-2 text-right">{r.totaux.net_sales}</td>
           <td class="px-2 py-2 text-right">{signe(r.totaux.inventory)}</td>
           <td class="px-2 py-2 text-right">{r.totaux.stock_end}</td>
