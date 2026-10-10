@@ -20,7 +20,7 @@
   }
   interface Entry {
     slug: string; title: string; start_at?: string; end_at?: string;
-    excerpt?: string; author_names: string[]; venue?: Venue;
+    excerpt?: string; cover_url?: string; author_names: string[]; venue?: Venue;
   }
 
   let { events = [] }: { events?: Entry[] } = $props();
@@ -218,6 +218,12 @@
                 <span class="first-letter:uppercase">{periode(e.start_at, e.end_at)}</span>
                 {#if heure(e.start_at)}<span class="text-muted-foreground">· {heure(e.start_at)}</span>{/if}
               </p>
+
+              <!-- Vignette de la rencontre : entre la date et le texte, jamais plus large que le texte
+                   (une affiche en hauteur est bornée pour ne pas déborder de la liste). -->
+              {#if e.cover_url}
+                <img src={e.cover_url} alt="" loading="lazy" class="mt-3 block h-auto max-h-80 w-auto max-w-full border border-border" />
+              {/if}
 
               {#if e.author_names.length}
                 <p class="mt-1 text-muted-foreground">Avec {e.author_names.join(', ')}</p>

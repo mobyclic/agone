@@ -314,6 +314,8 @@ export interface UpcomingEntry {
   start_at?: string;
   end_at?: string;
   excerpt?: string;
+  /** Vignette de la rencontre (champ « couverture » du back-office). */
+  cover_url?: string;
   author_names: string[];
   venue?: {
     name?: string;
@@ -342,7 +344,7 @@ function extraitTexte(html: string | undefined, max = 260): string | undefined {
 
 export async function listUpcomingWithVenues(): Promise<UpcomingEntry[]> {
   const rows = await query<any>(
-    `SELECT title, slug, start_at, end_at, body_html,
+    `SELECT title, slug, start_at, end_at, body_html, cover.url AS cover_url,
         venue.name AS v_name, venue.address AS v_address, venue.city AS v_city,
         venue.post_code AS v_post_code, venue.country AS v_country,
         venue.phone AS v_phone, venue.website AS v_website,
@@ -357,6 +359,7 @@ export async function listUpcomingWithVenues(): Promise<UpcomingEntry[]> {
     start_at: r.start_at ?? undefined,
     end_at: r.end_at ?? undefined,
     excerpt: extraitTexte(r.body_html ?? undefined),
+    cover_url: r.cover_url ?? undefined,
     author_names: (r.author_names ?? []).filter(Boolean),
     venue: r.v_name
       ? {

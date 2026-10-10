@@ -31,7 +31,8 @@
 
 <svelte:head><title>{e.title} · Rencontres Agone</title></svelte:head>
 
-<PageHead eyebrow="Rencontres" title={e.title} inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'} />
+<!-- Titre à la taille de celui d'une fiche livre : les intitulés de rencontre sont longs. -->
+<PageHead eyebrow="Rencontres" title={e.title} titleClass="text-2xl leading-tight sm:text-4xl" inner={data.books.length ? 'lg:max-w-[calc(100%_-_400px)]' : 'max-w-4xl'} />
 
 {#if isStaff}
   <div class="fixed bottom-6 right-6 z-40">

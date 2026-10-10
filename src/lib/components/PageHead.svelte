@@ -9,6 +9,7 @@
     barDate,
     barAuteur,
     kicker,
+    titleClass = 'text-4xl leading-[0.9] sm:text-5xl',
     children
   }: {
     eyebrow?: string; title: string; subtitle?: string; meta?: string;
@@ -19,6 +20,8 @@
     /** Surtitre riche (ex. « RUBRIQUE · date ») ; remplace `eyebrow` au-dessus du titre,
      *  `eyebrow` restant utilisé par la bande de rappel au défilement. */
     kicker?: import('svelte').Snippet;
+    /** Taille du titre (par défaut le grand titre des pages de liste). */
+    titleClass?: string;
     children?: import('svelte').Snippet;
   } = $props();
 
@@ -46,7 +49,7 @@
       {:else if eyebrow}
         <p class="font-display text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
       {/if}
-      <h1 class="display-title mt-2 text-4xl leading-[0.9] sm:text-5xl">{title}</h1>
+      <h1 class="display-title mt-2 {titleClass}">{title}</h1>
       {#if subtitle}<p class="mt-5 max-w-5xl text-lg leading-snug text-muted-foreground sm:text-xl">{subtitle}</p>{/if}
       {#if meta}<p class="mt-4 text-sm text-muted-foreground/70">{meta}</p>{/if}
       {@render children?.()}
