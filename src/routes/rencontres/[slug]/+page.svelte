@@ -53,8 +53,8 @@
     {#if e.venue?.name}
       <span class="inline-flex items-center gap-1.5"><MapPin size={16} class="text-link" /> {e.venue.name}{e.venue.city ? `, ${e.venue.city}` : ''}</span>
     {/if}
-    <Partager title={e.title} />
   </div>
+  <Partager title={e.title} class="mt-3" />
 
   {#if e.authors.length}
     <p class="mt-3 text-sm">

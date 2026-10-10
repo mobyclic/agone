@@ -45,8 +45,9 @@
     {#if isStaff && a.views > 0}
       <span class="inline-flex items-center gap-1 normal-case tracking-normal" title="Nombre de vues (visible admin uniquement)"><Eye size={14} /> {a.views.toLocaleString('fr-FR')}</span>
     {/if}
-    <Partager title={a.title} class="normal-case tracking-normal" />
+
   </div>
+  <Partager title={a.title} class="mt-4" />
 </PageHead>
 
 {#if isStaff}

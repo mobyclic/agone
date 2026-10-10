@@ -264,7 +264,6 @@
         </div>
       {/if}
 
-      <Partager title={b.title} class="mt-4" />
 
 {/snippet}
 
@@ -310,6 +309,9 @@
       {#if forthcoming && formats.length && subEndLabel}
         <p class="mt-2 text-sm text-muted-foreground">Souscription ouverte jusqu'au {subEndLabel}.</p>
       {/if}
+
+      <!-- Partage : sous les boutons d'achat. -->
+      <Partager title={b.title} class="mt-5" />
 
 {/snippet}
 
