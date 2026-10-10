@@ -4,7 +4,7 @@
   import { CheckCircle, Clock, BookOpen, Receipt, Truck } from 'phosphor-svelte';
   import { trackPurchase, itemId } from '$lib/analytics';
 
-  let { data } = $props();
+  let { data, form } = $props();
   const o = $derived(data.order);
   const eur = (n: number) => `${(n ?? 0).toFixed(2).replace('.', ',')} €`;
   const FORMAT: Record<string, string> = { papier: 'Papier', epub: 'Numérique', souscription: 'Souscription' };
@@ -37,7 +37,13 @@
     {:else}
       <Clock size={48} class="mx-auto text-link" weight="fill" />
       <h1 class="mt-3 text-2xl font-extrabold">Commande enregistrée</h1>
-      <p class="mt-1 text-sm text-muted-foreground">Elle est en attente de paiement. Nous vous recontacterons pour la finaliser.</p>
+      {#if data.payable}
+        <p class="mt-1 text-sm text-muted-foreground">Elle est en attente de paiement.</p>
+        <form method="POST" action="?/payer" class="mt-4"><button type="submit" class="btn-brand px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wide">Payer maintenant</button></form>
+        {#if form?.error}<p class="mt-2 text-sm text-destructive">{form.error}</p>{/if}
+      {:else}
+        <p class="mt-1 text-sm text-muted-foreground">Elle est en attente de paiement. Nous vous recontacterons pour la finaliser.</p>
+      {/if}
     {/if}
     <p class="mt-2 text-muted-foreground">Commande <span class="font-semibold text-foreground">n°{o.number}</span> · {STATUS[o.status] ?? o.status}</p>
   </div>

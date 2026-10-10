@@ -1065,3 +1065,8 @@ DEFINE FIELD OVERWRITE created_at     ON club_membership TYPE datetime DEFAULT t
 DEFINE INDEX OVERWRITE idx_club_user    ON club_membership FIELDS user;
 DEFINE INDEX OVERWRITE idx_club_ends    ON club_membership FIELDS ends_at;
 DEFINE INDEX OVERWRITE idx_club_session ON club_membership FIELDS stripe_session;
+
+-- Club : adhésion par abonnement Stripe, renouvelée automatiquement chaque période.
+DEFINE FIELD OVERWRITE stripe_subscription ON club_membership TYPE option<string>;               -- abonnement Stripe à l'origine de la période
+DEFINE FIELD OVERWRITE auto_renew          ON club_membership TYPE bool DEFAULT false VALUE $value ?? false;  -- renouvellement automatique en cours
+DEFINE INDEX OVERWRITE idx_club_sub ON club_membership FIELDS stripe_subscription;

@@ -74,7 +74,7 @@
             <tr class={a.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
               <td class="px-3 py-2"><a href="/admin/utilisateurs/{a.user_id}" class="font-medium hover:text-link">{a.nom}</a>{#if a.email}<div class="text-xs text-muted-foreground">{a.email}</div>{/if}</td>
               <td class="whitespace-nowrap px-3 py-2">{dateFr(a.starts_at)} → {dateFr(a.ends_at)}{#if a.active}<span class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[11px] font-medium text-success">active</span>{/if}</td>
-              <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{SOURCE[a.source] ?? a.source}{#if a.amount} · {euros(a.amount)}{/if}{#if a.note}<div class="text-xs">{a.note}</div>{/if}</td>
+              <td class="whitespace-nowrap px-3 py-2 text-muted-foreground">{SOURCE[a.source] ?? a.source}{#if a.amount} · {euros(a.amount)}{/if}{#if a.stripe_subscription}<span class="ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium {a.auto_renew ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}" title="Abonnement Stripe {a.stripe_subscription}">{a.auto_renew ? 'renouvellement auto' : 'renouvellement arrêté'}</span>{/if}{#if a.note}<div class="text-xs">{a.note}</div>{/if}</td>
               <td class="px-3 py-2">{#if a.invoice_id}<a href="/admin/factures/{a.invoice_id}" class="text-link hover:underline">{a.invoice_ref}</a>{:else}<span class="text-muted-foreground">—</span>{/if}</td>
               <td class="px-3 py-2 text-right">
                 {#if a.status === 'active'}

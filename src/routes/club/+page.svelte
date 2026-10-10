@@ -28,11 +28,18 @@
       {#if data.merci}
         <p class="mt-4 bg-success/10 px-3 py-2 text-sm text-success">Merci ! Votre adhésion est enregistrée dès la confirmation du paiement.</p>
       {/if}
+      <p class="mt-1 text-xs text-muted-foreground">Renouvelée automatiquement chaque année ; vous l'arrêtez quand vous voulez.</p>
       {#if data.adhesion}
-        <p class="mt-4 text-sm">Vous êtes membre jusqu'au <strong>{dateFr(data.adhesion.ends_at)}</strong>.</p>
-        <form method="POST" action="?/adherer" use:enhance class="mt-3"><button type="submit" class="w-full border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide hover:bg-foreground hover:text-background">Renouveler d'un an</button></form>
+        <p class="mt-4 text-sm">Vous êtes membre jusqu'au <strong>{dateFr(data.adhesion.ends_at)}</strong>{data.adhesion.auto_renew ? ', renouvellement automatique à cette date' : ''}.</p>
+        {#if !data.adhesion.auto_renew}
+          <form method="POST" action="?/adherer" use:enhance class="mt-3"><button type="submit" class="w-full border-2 border-foreground px-4 py-2.5 font-display text-sm font-bold uppercase tracking-wide hover:bg-foreground hover:text-background">Renouveler automatiquement</button></form>
+          <p class="mt-1 text-xs text-muted-foreground">Rien n'est prélevé avant la fin de votre adhésion en cours.</p>
+        {/if}
       {:else}
         <form method="POST" action="?/adherer" use:enhance class="mt-4"><button type="submit" class="btn-brand w-full px-4 py-3 font-display text-sm font-bold uppercase tracking-wide">{data.connecte ? 'Adhérer' : 'Se connecter pour adhérer'}</button></form>
+      {/if}
+      {#if data.portail}
+        <form method="POST" action="?/gerer" use:enhance class="mt-3"><button type="submit" class="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Gérer mon abonnement (carte, factures, arrêt du renouvellement)</button></form>
       {/if}
       {#if form?.error}<p class="mt-3 text-sm text-destructive">{form.error}</p>{/if}
     </aside>

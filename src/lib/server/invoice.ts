@@ -154,27 +154,38 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
   if (existing[0]) return existing[0].id;
 
   const o = (
-    await query<any>(`SELECT number, customer, email, billing, shipping, status, channel, payment_method, paid_at, total FROM order WHERE id = $id LIMIT 1`, {
+    await query<any>(`SELECT number, customer, email, billing, shipping, status, channel, payment_method, paid_at, total, subtotal, discount_total, shipping_total FROM order WHERE id = $id LIMIT 1`, {
       id: recId('order', orderId)
     })
   )[0];
   if (!o) return null;
 
   const rawLines = await query<any>(
-    `SELECT out.title AS title, out.vat_rate AS vat, meta::id(out) AS book, out.isbn_paper AS isbn, title_snapshot, format, qty, unit_price FROM contains WHERE in = $id`,
+    `SELECT out.title AS title, out.vat_rate AS vat, meta::id(out) AS book, out.isbn_paper AS isbn, title_snapshot, format, qty, unit_price, line_total, discount FROM contains WHERE in = $id`,
     { id: recId('order', orderId) }
   );
   const { vat_rate } = await getCompany(); // TVA par défaut, si le livre n'en porte pas
   const cleanText = (s: string) =>
     s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, '’').replace(/\s+/g, ' ').trim();
+  // Remise de la commande : celle de chaque ligne si elle est stockée, sinon répartie au prorata
+  // (commandes antérieures au stockage par ligne). La facture doit égaler ce que le client a payé.
+  const brut = rawLines.reduce((n: number, l: any) => n + Number(l.line_total ?? (l.qty ?? 1) * (l.unit_price ?? 0)), 0);
+  const remiseCommande = Number(o.discount_total ?? 0);
+  const parLigne = rawLines.some((l: any) => Number(l.discount ?? 0) > 0);
+  const euro = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
   const lines: InvoiceLine[] = rawLines.map((l) => {
     const vat = Number.isFinite(Number(l.vat)) ? Number(l.vat) : vat_rate;
+    const qty = Number(l.qty ?? 1) || 1;
+    const total = Number(l.line_total ?? qty * (l.unit_price ?? 0));
+    const remise = parLigne ? Number(l.discount ?? 0) : brut > 0 ? r2((remiseCommande * total) / brut) : 0;
+    const unitaire = r2((total - remise) / qty);
+    const titre = `${cleanText(String(l.title_snapshot || l.title || 'Livre'))}${l.format && l.format !== 'papier' ? ` (${l.format})` : ''}`;
     return {
-      description: `${cleanText(String(l.title_snapshot || l.title || 'Livre'))}${l.format && l.format !== 'papier' ? ` (${l.format})` : ''}`,
-      qty: l.qty ?? 1,
-      unit_price_ttc: l.unit_price ?? 0,
-      unit_price_ht: r2((l.unit_price ?? 0) / (1 + vat / 100)),
-      line_total_ttc: r2((l.qty ?? 1) * (l.unit_price ?? 0)),
+      description: remise > 0 ? `${titre} — prix public ${euro(Number(l.unit_price ?? 0))}, remise −${euro(remise)}` : titre,
+      qty,
+      unit_price_ttc: unitaire,
+      unit_price_ht: r2(unitaire / (1 + vat / 100)),
+      line_total_ttc: r2(qty * unitaire),
       vat_rate: vat, book: l.book ? String(l.book) : undefined, isbn: l.isbn ?? undefined
     };
   });
@@ -188,6 +199,15 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
   }
   const bill_to = billToFromAddress(name, email, o.billing ?? o.shipping ?? {});
   const totals = computeTotals(lines);
+  // Frais de port à leur propre taux (20 %, comme sur les factures saisies à la main).
+  const portTTC = Number(o.shipping_total ?? 0);
+  const portTaux = 20;
+  const portHT = portTTC > 0 ? r2(portTTC / (1 + portTaux / 100)) : 0;
+  if (portHT) {
+    totals.subtotal_ht = r2(totals.subtotal_ht + portHT);
+    totals.total_ttc = r2(totals.total_ttc + portTTC);
+    totals.tax_total = r2(totals.total_ttc - totals.subtotal_ht);
+  }
   const year = new Date().getFullYear();
   const { number, ref } = await nextInvoiceRef(year);
 
@@ -196,7 +216,8 @@ export async function createInvoiceForOrder(orderId: string): Promise<string | n
       year, number, ref, kind: 'invoice',
       order: recId('order', orderId),
       customer: o.customer ? recId('user', String(o.customer)) : undefined,
-      bill_to, lines, vat_rate, ...totals
+      bill_to, lines, vat_rate, ...totals,
+      shipping_ht: portHT || undefined, shipping_vat_rate: portHT ? portTaux : undefined
     }
   });
   const id = String(rows[0].id).replace(/^invoice:/, '');

@@ -11,7 +11,8 @@ export function getStripe(): Stripe | null {
   if (_stripe) return _stripe;
   const key = env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  _stripe = new Stripe(key, { apiVersion: '2025-09-30.clover' as any });
+  // Version d'API alignée sur le SDK (stripe 23 : 2026-09-30.endive) — types et réponses concordent.
+  _stripe = new Stripe(key, { apiVersion: '2026-09-30.endive' });
   return _stripe;
 }
 
@@ -73,6 +74,38 @@ export async function createPaymentCheckout(opts: {
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     metadata: opts.metadata
+  });
+  return { id: session.id, url: session.url };
+}
+
+/**
+ * Adhésion au club en ABONNEMENT : un prix récurrent créé à la volée (tous les
+ * `mois` mois), renouvelé automatiquement par Stripe. Les métadonnées
+ * (type « club », compte) suivent l'abonnement, donc chaque facture de
+ * renouvellement : le webhook `invoice.paid` prolonge l'adhésion.
+ * `debutFacturation` : un membre déjà actif ne paie qu'à la fin de son adhésion
+ * en cours (période d'essai jusque-là ; Stripe exige au moins 48 h).
+ */
+export async function createClubSubscriptionCheckout(opts: {
+  nom: string; montant: number; mois: number; userId: string;
+  customerId?: string | null; customerEmail?: string; debutFacturation?: Date;
+  successUrl: string; cancelUrl: string;
+}): Promise<{ id: string; url: string | null } | null> {
+  const stripe = getStripe();
+  if (!stripe) return null;
+  const metadata = { type: 'club', user: opts.userId };
+  const essai = opts.debutFacturation && opts.debutFacturation.getTime() - Date.now() > 49 * 3600_000 ? Math.floor(opts.debutFacturation.getTime() / 1000) : undefined;
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{
+      quantity: 1,
+      price_data: { currency: 'eur', unit_amount: Math.round(opts.montant * 100), recurring: { interval: 'month', interval_count: opts.mois }, product_data: { name: opts.nom } }
+    }],
+    ...(opts.customerId ? { customer: opts.customerId } : { customer_email: opts.customerEmail }),
+    subscription_data: { metadata, ...(essai ? { trial_end: essai } : {}) },
+    metadata,
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl
   });
   return { id: session.id, url: session.url };
 }

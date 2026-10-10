@@ -7,9 +7,9 @@ import { getClub, adhesionActive, portOffert } from '$lib/server/club';
 import { activeShipZones } from '$lib/server/shipping';
 import { quoteShippingFor } from '$lib/shipping-calc';
 import { COUNTRIES } from '$lib/countries';
-import { createOrder } from '$lib/server/order';
+import { createOrder, sessionPaiementCommande } from '$lib/server/order';
 import { formatVendable } from '$lib/server/catalogue';
-import { isStripeEnabled, createPaymentCheckout } from '$lib/server/stripe';
+import { isStripeEnabled } from '$lib/server/stripe';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
 
@@ -102,22 +102,12 @@ export const actions: Actions = {
     clearPromoCode(cookies);
 
     if (isStripeEnabled()) {
-      // Chaque ligne au prix remisé (Stripe n'accepte pas de ligne négative) : la remise de la ligne, répartie par exemplaire.
-      const rem = new Map(lineDiscounts.map((x) => [`${String(x.id).replace(/^book:/, '')}|${x.format}`, x.discount]));
-      const co = await createPaymentCheckout({
-        lineItems: [
-          ...cart.lines.map((l) => ({ name: `${l.title} — ${l.format}`, amount: Math.round(((l.line_total - (rem.get(`${String(l.id).replace(/^book:/, '')}|${l.format}`) ?? 0)) / l.qty) * 100), qty: l.qty })),
-          ...(shippingTotal > 0 ? [{ name: 'Frais de port', amount: Math.round(shippingTotal * 100), qty: 1 }] : [])
-        ],
-        customerEmail: billing.email,
-        clientReferenceId: order.id,
-        successUrl: `${url.origin}/commande/${order.number}?paid=1`,
-        cancelUrl: `${url.origin}/commande/${order.number}`
-      });
-      if (co) {
-        await query(`UPDATE $id SET stripe_session = $s`, { id: recId('order', order.id), s: co.id });
-        if (co.url) throw redirect(303, co.url);
-      }
+      // Chaque ligne au prix remisé (la remise est stockée par ligne), plus le port.
+      let lien: string | null = null;
+      try { lien = await sessionPaiementCommande(order.number, url.origin); }
+      catch (e) { console.error('[checkout] session Stripe', e); }
+      if (lien) throw redirect(303, lien);
+      throw redirect(303, withFlash(`/commande/${order.number}`, 'Commande enregistrée, mais le paiement n’a pas pu démarrer : réessayez depuis cette page.', 'error'));
     }
     throw redirect(303, withFlash(`/commande/${order.number}`, 'Commande enregistrée.', 'success'));
   }

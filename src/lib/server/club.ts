@@ -46,15 +46,18 @@ export async function getClub(): Promise<ReglagesClub> {
 
 export async function setClub(r: ReglagesClub) { await setSetting('club', { ...r }); }
 
-export interface Adhesion { id: string; user_id: string; nom: string; email?: string; starts_at: string; ends_at: string; status: string; source: string; amount?: number; invoice_id?: string; invoice_ref?: string; note?: string; active: boolean }
+export interface Adhesion { id: string; user_id: string; nom: string; email?: string; starts_at: string; ends_at: string; status: string; source: string; amount?: number; invoice_id?: string; invoice_ref?: string; note?: string; active: boolean;
+  /** Abonnement Stripe (renouvellement automatique) et son état. */
+  stripe_subscription?: string; auto_renew: boolean }
 
 const normaliser = (r: any): Adhesion => ({
   id: String(r.id), user_id: String(r.user).replace(/^user:/, ''), nom: r.nom || r.email || '—', email: r.email ?? undefined,
   starts_at: r.starts_at, ends_at: r.ends_at, status: r.status, source: r.source, amount: r.amount ?? undefined,
   invoice_id: r.invoice ? String(r.invoice).replace(/^invoice:/, '') : undefined, invoice_ref: r.invoice_ref ?? undefined, note: r.note ?? undefined,
+  stripe_subscription: r.stripe_subscription ?? undefined, auto_renew: r.auto_renew === true,
   active: r.status === 'active' && new Date(r.starts_at).getTime() <= Date.now() && new Date(r.ends_at).getTime() > Date.now()
 });
-const CHAMPS = `meta::id(id) AS id, user, user.full_name AS nom, user.email AS email, starts_at, ends_at, status, source, amount, invoice, invoice.ref AS invoice_ref, note, created_at`;
+const CHAMPS = `meta::id(id) AS id, user, user.full_name AS nom, user.email AS email, starts_at, ends_at, status, source, amount, invoice, invoice.ref AS invoice_ref, note, created_at, stripe_subscription, auto_renew`;
 
 /** Adhésion en cours d'un compte (la plus lointaine), ou null. */
 export async function adhesionActive(userId?: string | null): Promise<Adhesion | null> {
@@ -88,7 +91,11 @@ export async function statsClub() {
  * période commence à la fin de la précédente. Avec `facturer`, une facture est
  * émise au membre et réglée du montant.
  */
-export async function ajouterAdhesion(userId: string, opts: { source: 'stripe' | 'manuel' | 'offert'; montant?: number; methode?: string; debut?: Date; note?: string; stripeSession?: string; facturer?: boolean }) {
+/**
+ * `stripeSession` : clé d'idempotence (session Checkout ou facture Stripe) — un webhook rejoué ne crée rien.
+ * `fin` : fin de période imposée (abonnement : fin de la période facturée par Stripe).
+ */
+export async function ajouterAdhesion(userId: string, opts: { source: 'stripe' | 'manuel' | 'offert'; montant?: number; methode?: string; debut?: Date; fin?: Date; note?: string; stripeSession?: string; stripeSubscription?: string; facturer?: boolean }) {
   const club = await getClub();
   const uid = recId('user', userId.replace(/^user:/, ''));
   if (opts.stripeSession) {
@@ -97,7 +104,7 @@ export async function ajouterAdhesion(userId: string, opts: { source: 'stripe' |
   }
   const enCours = await adhesionActive(userId);
   const debut = opts.debut ?? (enCours ? new Date(enCours.ends_at) : new Date());
-  const fin = new Date(debut); fin.setMonth(fin.getMonth() + club.duree_mois);
+  const fin = opts.fin ?? (() => { const f = new Date(debut); f.setMonth(f.getMonth() + club.duree_mois); return f; })();
   const montant = opts.source === 'offert' ? 0 : (opts.montant ?? club.prix_ttc);
 
   let invoice: string | undefined;
@@ -114,9 +121,27 @@ export async function ajouterAdhesion(userId: string, opts: { source: 'stripe' |
     await addPayment(invoice, { amount: montant, method: opts.methode ?? (opts.source === 'stripe' ? 'stripe' : 'cheque'), reference: opts.stripeSession, note: 'Adhésion au club' });
   }
   const rows = await query<any>(`CREATE club_membership CONTENT $c`, {
-    c: { user: uid, starts_at: debut, ends_at: fin, status: 'active', source: opts.source, amount: montant, invoice: invoice ? recId('invoice', invoice) : undefined, stripe_session: opts.stripeSession, note: opts.note?.trim() || undefined }
+    c: { user: uid, starts_at: debut, ends_at: fin, status: 'active', source: opts.source, amount: montant, invoice: invoice ? recId('invoice', invoice) : undefined, stripe_session: opts.stripeSession,
+         stripe_subscription: opts.stripeSubscription, auto_renew: !!opts.stripeSubscription, note: opts.note?.trim() || undefined }
   });
   return String(rows[0].id).replace(/^club_membership:/, '');
+}
+
+/**
+ * État d'un abonnement Stripe (résilié, ou renouvellement coupé en fin de période) :
+ * reporté sur les périodes qu'il a créées. L'adhésion en cours reste valable jusqu'à sa fin.
+ */
+export async function majAbonnementClub(subscriptionId: string, renouvellement: boolean) {
+  await query(`UPDATE club_membership SET auto_renew = $r WHERE stripe_subscription = $s`, { s: subscriptionId, r: renouvellement });
+}
+
+/** Client Stripe d'un compte (créé au premier paiement), pour le portail de gestion. */
+export async function memoriserClientStripe(userId: string, customerId: string) {
+  await query(`UPDATE $u SET stripe_customer_id = $c`, { u: recId('user', userId.replace(/^user:/, '')), c: customerId });
+}
+export async function clientStripe(userId: string): Promise<string | null> {
+  const r = await query<string>(`SELECT VALUE stripe_customer_id FROM $u`, { u: recId('user', userId.replace(/^user:/, '')) });
+  return r[0] ?? null;
 }
 
 export async function annulerAdhesion(id: string) {

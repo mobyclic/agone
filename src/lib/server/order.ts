@@ -131,10 +131,37 @@ export async function getOrderByNumber(number: number) {
   const o = rows[0];
   if (!o) return null;
   const lines = await query<any>(
-    `SELECT out AS book_id, out.title AS title, out.slug AS slug, format, qty, unit_price, line_total FROM contains WHERE in = $id`,
+    `SELECT out AS book_id, out.title AS title, out.slug AS slug, format, qty, unit_price, line_total, discount FROM contains WHERE in = $id`,
     { id: recId('order', String(o.id)) }
   );
   return { ...o, lines };
+}
+
+/**
+ * Session Stripe Checkout pour une commande déjà enregistrée (au passage en caisse,
+ * ou pour payer plus tard une commande restée en attente) : chaque ligne au prix
+ * remisé, plus le port. Renvoie l'URL de paiement, ou null si Stripe est absent.
+ */
+export async function sessionPaiementCommande(number: number, origin: string): Promise<string | null> {
+  const o = await getOrderByNumber(number);
+  if (!o || o.status !== 'pending') return null;
+  const { createPaymentCheckout } = await import('./stripe');
+  const lignes = (o.lines ?? []).map((l: any) => ({
+    name: `${l.title} — ${l.format}`, qty: Number(l.qty) || 1,
+    amount: Math.round(((Number(l.line_total) - Number(l.discount ?? 0)) / (Number(l.qty) || 1)) * 100)
+  })).filter((l: any) => l.amount > 0);
+  const port = Number(o.shipping_total ?? 0);
+  if (!lignes.length && port <= 0) return null;
+  const co = await createPaymentCheckout({
+    lineItems: [...lignes, ...(port > 0 ? [{ name: 'Frais de port', amount: Math.round(port * 100), qty: 1 }] : [])],
+    customerEmail: o.email ?? undefined,
+    clientReferenceId: String(o.id).replace(/^order:/, ''),
+    successUrl: `${origin}/commande/${o.number}?paid=1`,
+    cancelUrl: `${origin}/commande/${o.number}`
+  });
+  if (!co) return null;
+  await query(`UPDATE $id SET stripe_session = $s`, { id: recId('order', String(o.id).replace(/^order:/, '')), s: co.id });
+  return co.url;
 }
 
 export async function listOrdersForUser(userId: string) {
