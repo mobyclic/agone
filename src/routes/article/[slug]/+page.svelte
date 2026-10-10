@@ -106,7 +106,7 @@
     {#if data.ladder.length > 1}
       <!-- Échelle : l'article courant au milieu de ses voisins chronologiques,
            plus récents au-dessus, plus anciens en dessous (ordre de l'Antichambre). -->
-      <nav aria-label="Articles voisins dans l’Antichambre">
+      <nav aria-label="Articles voisins sur Antichambre">
         <h2 class="eyebrow mb-4">Au fil d’Antichambre</h2>
         <ol>
           {#each data.ladder as r (r.slug)}

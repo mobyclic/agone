@@ -6,7 +6,7 @@
 
 <svelte:head><title>Rencontres · Agone</title></svelte:head>
 
-<PageHead eyebrow="L’agenda" title="Rencontres" subtitle="Débats, tables rondes et présentations autour des livres et des auteurs." />
+<PageHead eyebrow="L’agenda" title="Rencontres" subtitle="Salons, débats, tables rondes et rencontres autour de nos livres ou de nos auteurs." />
 
 <!-- Même principe que l'accueil : la liste défile, la carte suit. -->
 <section class="py-10" style="padding-inline: var(--page-gutter)">

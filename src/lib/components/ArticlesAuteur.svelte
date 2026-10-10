@@ -11,7 +11,7 @@
 
 {#if articles.length}
   <div>
-    <div class="tick-label mb-3">Dans l’Antichambre</div>
+    <div class="tick-label mb-3">Lire sur Antichambre</div>
     <ul class="max-w-[400px] divide-y divide-border border-y border-border">
       {#each tout ? articles : articles.slice(0, VISIBLES) as a (a.id)}
         <li>
