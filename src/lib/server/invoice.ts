@@ -563,132 +563,238 @@ function wrapText(s: string, font: any, size: number, width: number): string[] {
 }
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('fr-FR') : '');
 
+/** Polices du site pour les PDF (Oswald pour les titres, Roboto pour le texte), lues dans node_modules. */
+async function policesPdf(doc: any) {
+  const { readFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const lire = async (pkg: string, fichier: string) => {
+    try { return await readFile(join(process.cwd(), 'node_modules', pkg, 'files', fichier)); } catch { return null; }
+  };
+  const [o7, o5, r4, r7, ri] = await Promise.all([
+    lire('@fontsource/oswald', 'oswald-latin-700-normal.woff'), lire('@fontsource/oswald', 'oswald-latin-500-normal.woff'),
+    lire('@fontsource/roboto', 'roboto-latin-400-normal.woff'), lire('@fontsource/roboto', 'roboto-latin-700-normal.woff'),
+    lire('@fontsource/roboto', 'roboto-latin-400-italic.woff')
+  ]);
+  const { StandardFonts } = await import('pdf-lib');
+  const repli = { display: await doc.embedFont(StandardFonts.HelveticaBold), displayMoyen: await doc.embedFont(StandardFonts.HelveticaBold), texte: await doc.embedFont(StandardFonts.Helvetica), gras: await doc.embedFont(StandardFonts.HelveticaBold), italique: await doc.embedFont(StandardFonts.HelveticaOblique) };
+  if (!o7 || !r4) return repli;
+  const fontkit = (await import('@pdf-lib/fontkit')).default;
+  doc.registerFontkit(fontkit);
+  return {
+    display: await doc.embedFont(o7, { subset: true }),
+    displayMoyen: o5 ? await doc.embedFont(o5, { subset: true }) : await doc.embedFont(o7, { subset: true }),
+    texte: await doc.embedFont(r4, { subset: true }),
+    gras: r7 ? await doc.embedFont(r7, { subset: true }) : repli.gras,
+    italique: ri ? await doc.embedFont(ri, { subset: true }) : repli.italique
+  };
+}
+
+/**
+ * PDF d'une facture, d'un avoir ou d'une pro forma, à la charte du site : bandeau
+ * noir et wordmark blanc, surtitre rouge, numéro en capitales Oswald, blocs à filet
+ * rouge, tableau à filets (désignations sur plusieurs lignes), total en évidence,
+ * mentions légales et numéro de page sur chaque page (pagination automatique).
+ */
 export async function renderInvoicePdf(id: string): Promise<Uint8Array> {
   const inv = await getInvoice(id);
   if (!inv) throw new Error('Facture introuvable');
   const company = await getCompany();
-  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const { PDFDocument, StandardFonts, rgb, setCharacterSpacing } = await import('pdf-lib');
 
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595.28, 841.89]); // A4
-  const W = page.getWidth();
-  const H = page.getHeight();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const ink = rgb(0.08, 0.08, 0.08);
-  const grey = rgb(0.45, 0.45, 0.45);
+  doc.setTitle(`${inv.kind === 'credit_note' ? 'Avoir' : 'Facture'} ${inv.ref}`);
+  doc.setAuthor(company.legal_name || 'Éditions Agone');
+  const P = await policesPdf(doc);
+  const serifGras = await doc.embedFont(StandardFonts.TimesRomanBold);
+  const serifGrasItalique = await doc.embedFont(StandardFonts.TimesRomanBoldItalic);
 
-  const M = 48;
-  const text = (s: string, x: number, yTop: number, opts: { size?: number; bold?: boolean; color?: any; right?: number } = {}) => {
-    const size = opts.size ?? 9;
-    const f = opts.bold ? bold : font;
-    let xx = x;
-    if (opts.right != null) xx = opts.right - f.widthOfTextAtSize(s, size);
-    page.drawText(s, { x: xx, y: H - yTop, size, font: f, color: opts.color ?? ink });
-  };
-  const hline = (yTop: number, x1 = M, x2 = W - M, c = rgb(0.85, 0.85, 0.85)) =>
-    page.drawLine({ start: { x: x1, y: H - yTop }, end: { x: x2, y: H - yTop }, thickness: 0.7, color: c });
+  const hex = (h: string) => rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
+  const C = { encre: hex('#141414'), texte: hex('#262626'), gris: hex('#6b6b6b'), filet: hex('#e4e4e4'), rouge: hex('#d4211c'), vert: hex('#15803d'), blanc: rgb(1, 1, 1) };
+  const W = 595.28, H = 841.89, M = 48;
+  const BAS = 118; // réserve du pied de page
 
   const isCredit = inv.kind === 'credit_note';
   const isProforma = inv.status === 'proforma';
   const isDraft = inv.status === 'draft';
+  const nature = isDraft ? 'Brouillon' : isCredit ? 'Avoir' : isProforma ? 'Facture pro forma' : 'Facture';
 
-  // — En-tête société (gauche) —
-  let y = M + 4;
-  text(company.legal_name, M, y, { size: 14, bold: true });
-  y += 16;
-  for (const l of String(company.address || '').split('\n').map((s) => s.trim()).filter(Boolean)) {
-    text(l, M, y, { size: 9, color: grey }); y += 12;
+  let page = doc.addPage([W, H]);
+  const pages: any[] = [page];
+
+  type Opts = { size?: number; font?: any; color?: any; right?: number; center?: number; espacement?: number };
+  const largeur = (s: string, o: Opts) => (o.font ?? P.texte).widthOfTextAtSize(s, o.size ?? 9) + (o.espacement ?? 0) * Math.max(0, s.length - 1);
+  /** Texte à `yTop` (distance depuis le haut) ; `right` aligne à droite ; `espacement` = interlettrage. */
+  const text = (s: string, x: number, yTop: number, o: Opts = {}) => {
+    const size = o.size ?? 9, font = o.font ?? P.texte;
+    let xx = x;
+    if (o.right != null) xx = o.right - largeur(s, o);
+    if (o.center != null) xx = o.center - largeur(s, o) / 2;
+    if (o.espacement) page.pushOperators(setCharacterSpacing(o.espacement));
+    page.drawText(s, { x: xx, y: H - yTop, size, font, color: o.color ?? C.texte });
+    if (o.espacement) page.pushOperators(setCharacterSpacing(0));
+  };
+  const filet = (yTop: number, ep = 0.6, couleur = C.filet, x1 = M, x2 = W - M) =>
+    page.drawLine({ start: { x: x1, y: H - yTop }, end: { x: x2, y: H - yTop }, thickness: ep, color: couleur });
+  /** Étiquette du site : filet rouge vertical + capitales Oswald. */
+  const etiquette = (s: string, x: number, yTop: number) => {
+    page.drawRectangle({ x, y: H - yTop - 7.6, width: 2.4, height: 8.6, color: C.rouge }); // aligné sur les capitales
+    text(s.toUpperCase(), x + 8, yTop + 6.5, { font: P.display, size: 8, color: C.encre, espacement: 0.9 });
+  };
+
+  /** Bandeau noir et wordmark ; `compact` pour les pages suivantes. */
+  const bandeau = (compact = false) => {
+    const h = compact ? 34 : 62;
+    page.drawRectangle({ x: 0, y: H - h, width: W, height: h, color: C.encre });
+    const base = compact ? 23 : 41, grand = compact ? 21 : 32, petit = compact ? 15 : 22.5;
+    let x = M;
+    const lettre = (s: string, f: any, size: number) => { page.drawText(s, { x, y: H - base, size, font: f, color: C.blanc }); x += f.widthOfTextAtSize(s, size); };
+    lettre('A', serifGrasItalique, grand); lettre('GON', serifGras, petit); lettre('E', serifGras, grand);
+    const hote = (company.email ? '' : '') + 'agone.org';
+    text(hote.toUpperCase(), 0, base, { right: W - M, font: P.displayMoyen, size: compact ? 7.5 : 8.5, color: hex('#bdbdbd'), espacement: 1 });
+    return h;
+  };
+
+  // ── Page 1 : en-tête ──
+  let y = bandeau() + 34;
+  text(nature.toUpperCase(), M, y, { font: P.display, size: 9, color: C.rouge, espacement: 1.3 });
+  y += 26;
+  text(isDraft ? 'Sans numéro' : `N° ${inv.ref}`, M, y, { font: P.display, size: 25, color: C.encre });
+  // Méta à droite : date, commande, échéance, référence pro forma.
+  const meta: [string, string][] = [['Date', fmtDate(inv.issued_at)]];
+  if (inv.order_number) meta.push(['Commande', `n° ${inv.order_number}`]);
+  if (inv.due_at && !isCredit) meta.push(['Échéance', fmtDate(inv.due_at)]);
+  if (inv.proforma_ref) meta.push(['Pro forma', String(inv.proforma_ref)]);
+  let my = y - 26;
+  for (const [k, v] of meta) {
+    text(k.toUpperCase(), 0, my, { right: W - M - 92, font: P.display, size: 7.5, color: C.gris, espacement: 0.8 });
+    text(v, 0, my, { right: W - M, font: P.gras, size: 9.5, color: C.encre });
+    my += 14;
   }
-  const idBits = [company.siret ? `SIRET ${company.siret}` : '', company.vat_number ? `TVA ${company.vat_number}` : '']
-    .filter(Boolean).join('  ·  ');
-  if (idBits) { text(idBits, M, y, { size: 8, color: grey }); y += 12; }
+  y = Math.max(y, my) + 26;
 
-  // — Titre + réf (droite) —
-  text(isDraft ? 'BROUILLON' : isCredit ? 'AVOIR' : isProforma ? 'FACTURE PRO FORMA' : 'FACTURE', W - M, M + 6, { size: isProforma ? 16 : 20, bold: true, right: W - M });
-  text(isDraft ? 'Sans numéro — document non émis' : `N° ${inv.ref}`, W - M, M + 26, { size: isDraft ? 9 : 11, bold: !isDraft, right: W - M, color: isDraft ? grey : ink });
-  text(`Date : ${fmtDate(inv.issued_at)}`, W - M, M + 42, { size: 9, color: grey, right: W - M });
-  if (inv.order_number) text(`Commande n° ${inv.order_number}`, W - M, M + 55, { size: 9, color: grey, right: W - M });
-
-  // — Facturé à —
-  y = Math.max(y, M + 70) + 22;
-  text('Facturé à', M, y, { size: 8, bold: true, color: grey }); y += 14;
+  // ── Émetteur | Facturé à ──
+  const colG = M, colD = W / 2 + 6, larg = W / 2 - M - 16;
+  etiquette('Émetteur', colG, y);
+  etiquette(isCredit ? 'Avoir à' : 'Facturé à', colD, y);
+  let yg = y + 24, yd = y + 24;
+  text(company.legal_name || 'Éditions Agone', colG, yg, { font: P.gras, size: 10, color: C.encre }); yg += 14;
+  for (const l of [...String(company.address || '').split('\n').map((s) => s.trim()).filter(Boolean),
+    company.siret ? `SIRET ${company.siret}` : '', company.vat_number ? `TVA ${company.vat_number}` : '', company.email || ''].filter(Boolean)) {
+    for (const w of wrapText(String(l), P.texte, 9, larg)) { text(w, colG, yg, { size: 9, color: C.gris }); yg += 12.5; }
+  }
   const bt = inv.bill_to ?? {};
-  text(bt.name || 'Client', M, y, { size: 10, bold: true }); y += 13;
-  for (const l of [bt.contact_name ? `À l’attention de ${bt.contact_name}` : '', bt.address_1, [bt.postcode, bt.city].filter(Boolean).join(' '), bt.country, bt.email,
-    bt.vat_number ? `TVA ${bt.vat_number}` : '', bt.siret ? `SIRET ${bt.siret}` : ''].filter(Boolean)) {
-    text(String(l), M, y, { size: 9, color: grey }); y += 12;
+  for (const w of wrapText(String(bt.name || 'Client'), P.gras, 10, larg)) { text(w, colD, yd, { font: P.gras, size: 10, color: C.encre }); yd += 14; }
+  for (const l of [bt.contact_name ? `À l’attention de ${bt.contact_name}` : '', bt.address_1, bt.address_2, [bt.postcode, bt.city].filter(Boolean).join(' '), bt.country,
+    bt.email, bt.vat_number ? `TVA ${bt.vat_number}` : '', bt.siret ? `SIRET ${bt.siret}` : ''].filter(Boolean)) {
+    for (const w of wrapText(String(l), P.texte, 9, larg)) { text(w, colD, yd, { size: 9, color: C.gris }); yd += 12.5; }
   }
+  y = Math.max(yg, yd) + 18;
 
-  // — Objet / texte d'introduction —
+  // ── Objet ──
   if (inv.intro) {
-    y += 16;
-    for (const l of wrapText(String(inv.intro), font, 9, W - 2 * M)) { text(l, M, y, { size: 9 }); y += 12; }
+    for (const l of wrapText(String(inv.intro), P.texte, 9.5, W - 2 * M)) { text(l, M, y, { size: 9.5, color: C.texte }); y += 13.5; }
+    y += 10;
   }
 
-  // — Tableau des lignes : en mode HT, prix unitaire HT, montant HT et taux de TVA ;
-  //   en mode TTC, prix et total TTC. —
+  // ── Tableau ──
   const modeHT = inv.price_mode === 'ht';
-  y += 18;
   const colTot = W - M;
-  // En mode HT, une colonne TVA s'intercale : les autres reculent d'autant pour que rien ne se chevauche.
-  const colTva = modeHT ? W - M - 100 : 0;
-  const colPU = modeHT ? W - M - 190 : W - M - 120;
-  const colQty = modeHT ? W - M - 270 : W - M - 210;
-  text('Désignation', M, y, { size: 8, bold: true, color: grey });
-  text('Qté', colQty, y, { size: 8, bold: true, color: grey, right: colQty + 30 });
-  text(modeHT ? 'P.U. HT' : 'P.U. TTC', colPU, y, { size: 8, bold: true, color: grey, right: colPU + 70 });
-  if (modeHT) text('TVA', colTva, y, { size: 8, bold: true, color: grey, right: colTva + 30 });
-  text(modeHT ? 'Montant HT' : 'Total TTC', colTot, y, { size: 8, bold: true, color: grey, right: colTot });
-  y += 6; hline(y); y += 14;
-
-  const maxDesc = modeHT ? 50 : 58;
-  for (const l of (inv.lines ?? []) as InvoiceLine[]) {
-    let desc = l.description || '';
-    if (desc.length > maxDesc) desc = desc.slice(0, maxDesc - 1) + '…';
-    const unitHt = l.unit_price_ht ?? l.unit_price_ttc / (1 + (l.vat_rate ?? 0) / 100);
-    text(desc, M, y, { size: 9 });
-    text(String(l.qty), colQty, y, { size: 9, right: colQty + 30 });
-    text(fmtEur(modeHT ? unitHt : l.unit_price_ttc), colPU, y, { size: 9, right: colPU + 70 });
-    if (modeHT) text(`${String(l.vat_rate ?? inv.vat_rate).replace('.', ',')} %`, colTva, y, { size: 9, right: colTva + 30 });
-    text(fmtEur(modeHT ? r2(l.qty * unitHt) : l.line_total_ttc), colTot, y, { size: 9, right: colTot });
+  const colTva = modeHT ? W - M - 92 : 0;
+  const colPU = modeHT ? W - M - 136 : W - M - 82;
+  const colQty = modeHT ? W - M - 214 : W - M - 160;
+  const largDesc = colQty - 34 - M;
+  const enTeteTableau = () => {
+    filet(y, 1.6, C.encre);
     y += 15;
+    const o = { font: P.display, size: 7.5, color: C.gris, espacement: 0.8 } as Opts;
+    text('DÉSIGNATION', M, y, o);
+    text('QTÉ', 0, y, { ...o, right: colQty });
+    text(modeHT ? 'P.U. HT' : 'P.U. TTC', 0, y, { ...o, right: colPU });
+    if (modeHT) text('TVA', 0, y, { ...o, right: colTva });
+    text(modeHT ? 'MONTANT HT' : 'TOTAL TTC', 0, y, { ...o, right: colTot });
+    y += 8; filet(y);
+    y += 15;
+  };
+  const nouvellePage = () => {
+    page = doc.addPage([W, H]); pages.push(page);
+    y = bandeau(true) + 30;
+    text(`${nature.toUpperCase()} ${isDraft ? '' : `N° ${inv.ref}`} — SUITE`, M, y, { font: P.display, size: 9, color: C.rouge, espacement: 1.2 });
+    y += 18;
+  };
+  enTeteTableau();
+  for (const l of (inv.lines ?? []) as InvoiceLine[]) {
+    const desc = wrapText(String(l.description || ''), P.texte, 9, largDesc);
+    const hauteur = Math.max(1, desc.length) * 12 + 9;
+    if (y + hauteur > H - BAS - 40) { nouvellePage(); enTeteTableau(); }
+    const unitHt = l.unit_price_ht ?? l.unit_price_ttc / (1 + (l.vat_rate ?? 0) / 100);
+    desc.forEach((d, i) => text(d, M, y + i * 12, { size: 9, color: C.texte }));
+    text(String(l.qty), 0, y, { right: colQty, size: 9 });
+    text(fmtEur(modeHT ? unitHt : l.unit_price_ttc), 0, y, { right: colPU, size: 9 });
+    if (modeHT) text(`${String(l.vat_rate ?? inv.vat_rate).replace('.', ',')} %`, 0, y, { right: colTva, size: 9, color: C.gris });
+    text(fmtEur(modeHT ? r2(l.qty * unitHt) : l.line_total_ttc), 0, y, { right: colTot, size: 9, font: P.gras, color: C.encre });
+    y += hauteur - 9 + 6;
+    filet(y - 2);
+    y += 13;
   }
-  y += 2; hline(y); y += 16;
 
-  // — Totaux (droite), avec ventilation TVA par taux —
+  // ── Totaux ──
   const sign = isCredit ? -1 : 1;
-  const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[], inv.price_mode === 'ht' ? 'ht' : 'ttc');
-  const totRows: [string, string, boolean][] = [
-    ...(inv.shipping_ht ? [[`Total HT lignes`, fmtEur(sign * r2(inv.subtotal_ht - inv.shipping_ht)), false] as [string, string, boolean], [`Frais de port HT`, fmtEur(sign * inv.shipping_ht), false] as [string, string, boolean]] : []),
-    ['Total HT', fmtEur(sign * inv.subtotal_ht), false],
-    ...breakdown.map(
-      (b) => [`TVA ${String(b.rate).replace('.', ',')} %`, fmtEur(sign * b.tax), false] as [string, string, boolean]
-    ),
-    ['Total TTC', fmtEur(sign * inv.total_ttc), true]
+  const breakdown = vatBreakdown((inv.lines ?? []) as InvoiceLine[], modeHT ? 'ht' : 'ttc');
+  const lignesTot: [string, string][] = [
+    ...(inv.shipping_ht ? [['Total HT des lignes', fmtEur(sign * r2(inv.subtotal_ht - inv.shipping_ht))], ['Frais de port HT', fmtEur(sign * inv.shipping_ht)]] as [string, string][] : []),
+    ['Total HT', fmtEur(sign * inv.subtotal_ht)],
+    ...breakdown.map((b) => [`TVA ${String(b.rate).replace('.', ',')} %`, fmtEur(sign * b.tax)] as [string, string]),
+    ...(inv.shipping_ht ? [[`TVA port ${String(inv.shipping_vat_rate ?? 20).replace('.', ',')} %`, fmtEur(sign * r2(inv.shipping_ht * Number(inv.shipping_vat_rate ?? 20) / 100))]] as [string, string][] : [])
   ];
-  for (const [k, v, b] of totRows) {
-    text(k, colPU, y, { size: b ? 11 : 9, bold: b });
-    text(v, colTot, y, { size: b ? 11 : 9, bold: b, right: colTot });
-    y += b ? 18 : 14;
+  const hauteurTot = lignesTot.length * 14 + 48 + (inv.notes ? 40 : 0);
+  if (y + hauteurTot > H - BAS) nouvellePage();
+  const xTot = W - M - 220;
+  y += 4;
+  for (const [k, v] of lignesTot) {
+    text(k, xTot, y, { size: 9, color: C.gris });
+    text(v, 0, y, { right: colTot, size: 9, color: C.texte });
+    y += 14;
+  }
+  y += 2; filet(y, 1.6, C.encre, xTot, W - M); y += 20;
+  text(isCredit ? 'TOTAL AVOIR TTC' : 'TOTAL TTC', xTot, y, { font: P.display, size: 11.5, color: C.encre, espacement: 0.8 });
+  text(fmtEur(sign * inv.total_ttc), 0, y + 1, { right: colTot, font: P.display, size: 17, color: C.encre });
+  y += 18;
+  if (!isCredit && inv.status === 'paid') {
+    text('ACQUITTÉE', 0, y + 2, { right: colTot, font: P.display, size: 9, color: C.vert, espacement: 1.2 });
+    y += 14;
+  } else if (!isCredit && Number(inv.paid_total ?? 0) > 0 && Number(inv.paid_total) < Number(inv.total_ttc)) {
+    text(`Déjà réglé ${fmtEur(Number(inv.paid_total))} — reste ${fmtEur(r2(Number(inv.total_ttc) - Number(inv.paid_total)))}`, 0, y + 2, { right: colTot, size: 8.5, color: C.gris });
+    y += 14;
   }
 
-  if (inv.notes) { y += 10; for (const l of String(inv.notes).split('\n')) { text(l, M, y, { size: 9, color: grey }); y += 12; } }
+  // ── Notes ──
+  if (inv.notes) {
+    y += 14;
+    for (const l of wrapText(String(inv.notes), P.italique, 9, W - 2 * M)) {
+      if (y > H - BAS - 10) { nouvellePage(); }
+      text(l, M, y, { font: P.italique, size: 9, color: C.gris }); y += 12.5;
+    }
+  }
 
-  // — Pied de page (mentions légales) —
-  let fy = H - 70;
-  const footBits = [
+  // ── Pied de page sur chaque page : mentions légales + pagination ──
+  const mentions = [
     company.footer,
     [company.iban ? `IBAN ${company.iban}` : '', company.bic ? `BIC ${company.bic}` : ''].filter(Boolean).join('  ·  '),
     [company.rcs ? `RCS ${company.rcs}` : '', company.ape ? `APE ${company.ape}` : '', company.capital ? `Capital ${company.capital}` : ''].filter(Boolean).join('  ·  '),
     isProforma ? 'Facture pro forma : document sans valeur comptable, émis pour accord. La facture définitive suit votre validation.' : '',
+    isDraft ? 'Brouillon : document non émis, sans valeur comptable.' : '',
     isCredit ? '' : 'TVA acquittée sur les encaissements. Pas d’escompte pour paiement anticipé.'
   ].filter(Boolean) as string[];
-  page.drawLine({ start: { x: M, y: fy + 8 }, end: { x: W - M, y: fy + 8 }, thickness: 0.7, color: rgb(0.85, 0.85, 0.85) });
-  for (const l of footBits) {
-    page.drawText(l, { x: M, y: fy, size: 7.5, font, color: grey });
-    fy -= 11;
-  }
+  pages.forEach((pg, i) => {
+    page = pg;
+    let fy = H - BAS + 34;
+    filet(fy - 12);
+    text('ÉDITIONS AGONE', M, fy, { font: P.display, size: 7.5, color: C.encre, espacement: 0.9 });
+    text('— Éditeur indépendant. Actualité & histoire politiques, sciences sociales & humaines.', M + largeur('ÉDITIONS AGONE', { font: P.display, size: 7.5, espacement: 0.9 }) + 4, fy, { size: 7.5, color: C.gris });
+    text(`${i + 1} / ${pages.length}`, 0, fy, { right: W - M, font: P.displayMoyen, size: 7.5, color: C.gris, espacement: 0.6 });
+    fy += 13;
+    for (const m of mentions) for (const l of wrapText(m, P.texte, 7.2, W - 2 * M)) { text(l, M, fy, { size: 7.2, color: C.gris }); fy += 10; }
+  });
 
   return doc.save();
 }
