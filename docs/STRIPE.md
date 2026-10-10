@@ -26,7 +26,8 @@ de la page `/club` y renvoie le membre.
 
 ## 4. Recommandé
 
-- E-mails Stripe : reçus de paiement, rappel avant renouvellement annuel, échec de paiement.
+- E-mails Stripe : reçus de paiement, échec de paiement. Le rappel 15 jours avant le renouvellement est envoyé
+  par le site (`/api/cron/club-rappels`, à planifier chaque jour) : inutile d'activer celui de Stripe en plus.
 - Faire une recette en mode test (`sk_test_…`) : une commande papier, une commande ePub, une adhésion.
 
 ## Ce que fait le site

@@ -1070,3 +1070,4 @@ DEFINE INDEX OVERWRITE idx_club_session ON club_membership FIELDS stripe_session
 DEFINE FIELD OVERWRITE stripe_subscription ON club_membership TYPE option<string>;               -- abonnement Stripe à l'origine de la période
 DEFINE FIELD OVERWRITE auto_renew          ON club_membership TYPE bool DEFAULT false VALUE $value ?? false;  -- renouvellement automatique en cours
 DEFINE INDEX OVERWRITE idx_club_sub ON club_membership FIELDS stripe_subscription;
+DEFINE FIELD OVERWRITE reminder_sent_at ON club_membership TYPE option<datetime>;   -- rappel envoyé 15 jours avant le renouvellement automatique

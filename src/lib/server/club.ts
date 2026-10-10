@@ -14,6 +14,7 @@
 import { query, recId } from './surreal';
 import { getSetting, setSetting } from './site';
 import { createManualInvoice, emettreFacture, addPayment } from './invoice';
+import { sendMail, layout, button, SITE_URL } from './mail';
 import type { RegleRemise } from '$lib/promoCalcul';
 
 export interface ReglagesClub {
@@ -48,16 +49,16 @@ export async function setClub(r: ReglagesClub) { await setSetting('club', { ...r
 
 export interface Adhesion { id: string; user_id: string; nom: string; email?: string; starts_at: string; ends_at: string; status: string; source: string; amount?: number; invoice_id?: string; invoice_ref?: string; note?: string; active: boolean;
   /** Abonnement Stripe (renouvellement automatique) et son état. */
-  stripe_subscription?: string; auto_renew: boolean }
+  stripe_subscription?: string; auto_renew: boolean; reminder_sent_at?: string }
 
 const normaliser = (r: any): Adhesion => ({
   id: String(r.id), user_id: String(r.user).replace(/^user:/, ''), nom: r.nom || r.email || '—', email: r.email ?? undefined,
   starts_at: r.starts_at, ends_at: r.ends_at, status: r.status, source: r.source, amount: r.amount ?? undefined,
   invoice_id: r.invoice ? String(r.invoice).replace(/^invoice:/, '') : undefined, invoice_ref: r.invoice_ref ?? undefined, note: r.note ?? undefined,
-  stripe_subscription: r.stripe_subscription ?? undefined, auto_renew: r.auto_renew === true,
+  stripe_subscription: r.stripe_subscription ?? undefined, auto_renew: r.auto_renew === true, reminder_sent_at: r.reminder_sent_at ?? undefined,
   active: r.status === 'active' && new Date(r.starts_at).getTime() <= Date.now() && new Date(r.ends_at).getTime() > Date.now()
 });
-const CHAMPS = `meta::id(id) AS id, user, user.full_name AS nom, user.email AS email, starts_at, ends_at, status, source, amount, invoice, invoice.ref AS invoice_ref, note, created_at, stripe_subscription, auto_renew`;
+const CHAMPS = `meta::id(id) AS id, user, user.full_name AS nom, user.email AS email, starts_at, ends_at, status, source, amount, invoice, invoice.ref AS invoice_ref, note, created_at, stripe_subscription, auto_renew, reminder_sent_at`;
 
 /** Adhésion en cours d'un compte (la plus lointaine), ou null. */
 export async function adhesionActive(userId?: string | null): Promise<Adhesion | null> {
@@ -162,4 +163,45 @@ export function portOffert(club: ReglagesClub, membre: boolean, publications: (s
   if (club.franco === 'toujours') return true;
   const limite = new Date(); limite.setFullYear(limite.getFullYear() - club.fond_ans);
   return publications.some((p) => !p || new Date(p) > limite);
+}
+
+/** Jours avant l'échéance où le membre est prévenu du renouvellement automatique. */
+export const RAPPEL_JOURS = 15;
+
+/**
+ * Rappel avant renouvellement (tâche quotidienne, /api/cron/club-rappels) : aux
+ * membres dont l'adhésion se renouvelle automatiquement et arrive à échéance dans
+ * RAPPEL_JOURS jours ou moins, un e-mail — une seule fois par période
+ * (reminder_sent_at). Le montant annoncé est celui de la période en cours :
+ * Stripe reconduit le prix souscrit.
+ */
+export async function envoyerRappelsRenouvellement(jours = RAPPEL_JOURS): Promise<{ envoyes: number; echecs: number }> {
+  const club = await getClub();
+  const rows = await query<any>(
+    `SELECT meta::id(id) AS id, user, user.full_name AS nom, user.first_name AS prenom, user.email AS email, ends_at, amount
+       FROM club_membership
+      WHERE status = 'active' AND auto_renew = true AND reminder_sent_at = NONE
+        AND ends_at > time::now() AND ends_at <= $limite
+      ORDER BY ends_at ASC`,
+    { limite: new Date(Date.now() + jours * 86400_000) }
+  );
+  const euro = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+  let envoyes = 0, echecs = 0;
+  for (const m of rows) {
+    if (!m.email) { echecs++; continue; }
+    const date = new Date(m.ends_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const montant = Number(m.amount ?? club.prix_ttc);
+    const html = layout(`Votre adhésion se renouvelle le ${date}`, `
+      <p style="margin:0 0 14px">${m.prenom ? `Bonjour ${String(m.prenom).replace(/</g, '&lt;')},` : 'Bonjour,'}</p>
+      <p style="margin:0 0 14px">Votre adhésion au ${club.nom} arrive à échéance le <strong>${date}</strong>. Elle sera renouvelée automatiquement pour ${club.duree_mois} mois :
+        <strong>${euro(montant)}</strong> seront prélevés ce jour-là sur votre moyen de paiement enregistré, et vous recevrez la facture.</p>
+      <p style="margin:0 0 14px">Vous n'avez rien à faire pour continuer à bénéficier de −${club.remise} % sur le fonds.</p>
+      <p style="margin:0 0 8px">Pour changer de carte ou arrêter le renouvellement :</p>
+      <p>${button(`${SITE_URL}/club`, 'Gérer mon adhésion')}</p>
+      <p style="color:#8a857c;font-size:12px;margin-top:20px">Merci de soutenir une maison d'édition indépendante.</p>`);
+    const r = await sendMail({ to: m.email, subject: `Votre adhésion au ${club.nom} se renouvelle le ${date}`, html });
+    if (r.ok) { await query(`UPDATE $id SET reminder_sent_at = time::now()`, { id: recId('club_membership', String(m.id)) }); envoyes++; }
+    else echecs++;
+  }
+  return { envoyes, echecs };
 }

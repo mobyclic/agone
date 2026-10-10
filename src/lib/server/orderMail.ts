@@ -74,7 +74,7 @@ export async function sendOrderConfirmation(orderId: string, opts: { force?: boo
     `<p style="margin:0 0 16px">${prenom ? `Bonjour ${esc(prenom)},` : 'Bonjour,'} nous avons bien reçu votre commande et votre paiement.</p>
      ${recapitulatif(o)}
      ${o.has_ebook ? `<p style="margin:18px 0 6px">Vos livres numériques sont disponibles dès maintenant dans votre bibliothèque :</p><p>${button(`${SITE_URL}/compte/bibliotheque`, 'Ouvrir ma bibliothèque')}</p>` : ''}
-     ${o.has_physical ? `<p style="margin:18px 0 6px;color:#57534e;font-size:13px">Livraison à :</p><p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p><p style="margin:12px 0 0;color:#57534e;font-size:13px">Les livres papier sont expédiés par notre distributeur sous quelques jours ; vous recevrez un email au départ du colis.</p>` : ''}
+     ${o.has_physical ? `<p style="margin:18px 0 6px;color:#57534e;font-size:13px">Livraison à :</p><p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p>` : ''}
      <p style="margin-top:20px"><a href="${lien}" style="color:#d4211c">Voir ma commande</a></p>
      <p style="color:#8a857c;font-size:12px;margin-top:20px">${esc(company.legal_name ?? 'Éditions Agone')}${company.address ? ` — ${esc(String(company.address).replace(/\n/g, ', '))}` : ''}</p>`
   );
