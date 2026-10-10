@@ -14,7 +14,7 @@
 import { query, recId } from './surreal';
 import { getSetting, setSetting } from './site';
 import { createManualInvoice, emettreFacture, addPayment } from './invoice';
-import { sendMail, layout, button, SITE_URL } from './mail';
+import { sendMail, layout, button, note, MAIL, SITE_URL } from './mail';
 import type { RegleRemise } from '$lib/promoCalcul';
 
 export interface ReglagesClub {
@@ -192,13 +192,16 @@ export async function envoyerRappelsRenouvellement(jours = RAPPEL_JOURS): Promis
     const date = new Date(m.ends_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     const montant = Number(m.amount ?? club.prix_ttc);
     const html = layout(`Votre adhésion se renouvelle le ${date}`, `
-      <p style="margin:0 0 14px">${m.prenom ? `Bonjour ${String(m.prenom).replace(/</g, '&lt;')},` : 'Bonjour,'}</p>
-      <p style="margin:0 0 14px">Votre adhésion au ${club.nom} arrive à échéance le <strong>${date}</strong>. Elle sera renouvelée automatiquement pour ${club.duree_mois} mois :
-        <strong>${euro(montant)}</strong> seront prélevés ce jour-là sur votre moyen de paiement enregistré, et vous recevrez la facture.</p>
-      <p style="margin:0 0 14px">Vous n'avez rien à faire pour continuer à bénéficier de −${club.remise} % sur le fonds.</p>
-      <p style="margin:0 0 8px">Pour changer de carte ou arrêter le renouvellement :</p>
-      <p>${button(`${SITE_URL}/club`, 'Gérer mon adhésion')}</p>
-      <p style="color:#8a857c;font-size:12px;margin-top:20px">Merci de soutenir une maison d'édition indépendante.</p>`);
+      <p style="margin:0 0 16px">${m.prenom ? `Bonjour ${String(m.prenom).replace(/</g, '&lt;')},` : 'Bonjour,'}</p>
+      <p style="margin:0 0 16px">Votre adhésion au ${club.nom} arrive à échéance le <strong>${date}</strong>. Elle sera renouvelée automatiquement pour ${club.duree_mois} mois ;
+        le montant sera prélevé ce jour-là sur votre moyen de paiement enregistré, et vous recevrez la facture.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;border-top:2px solid ${MAIL.encre}">
+        <tr><td style="padding:12px 0;font-family:${MAIL.display};font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MAIL.encre}">Le ${date}</td>
+            <td style="padding:12px 0;text-align:right;font-family:${MAIL.display};font-size:20px;font-weight:700;color:${MAIL.encre}">${euro(montant)}</td></tr>
+      </table>
+      <p style="margin:0 0 20px">Vous n'avez rien à faire pour continuer à bénéficier de <strong>−${club.remise} % sur le fonds</strong>. Pour changer de carte ou arrêter le renouvellement :</p>
+      <p style="margin:0">${button(`${SITE_URL}/club`, 'Gérer mon adhésion')}</p>
+      ${note("Merci de soutenir une maison d'édition indépendante.")}`, { surtitre: club.nom, apercu: `Renouvellement le ${date} : ${euro(montant)}` });
     const r = await sendMail({ to: m.email, subject: `Votre adhésion au ${club.nom} se renouvelle le ${date}`, html });
     if (r.ok) { await query(`UPDATE $id SET reminder_sent_at = time::now()`, { id: recId('club_membership', String(m.id)) }); envoyes++; }
     else echecs++;

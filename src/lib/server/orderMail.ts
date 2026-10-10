@@ -9,7 +9,7 @@
  * Chaque envoi est horodaté sur la commande : un webhook rejoué ou un double
  * clic ne renverra rien. `force` sert au bouton « Renvoyer » de la fiche.
  */
-import { sendMail, layout, button, SITE_URL } from './mail';
+import { sendMail, layout, button, lien, etiquette, note, MAIL, SITE_URL } from './mail';
 import { query, recId } from './surreal';
 import { getCompany } from './invoice';
 
@@ -45,18 +45,21 @@ function adresse(a?: Record<string, any>): string {
 }
 
 function recapitulatif(o: any): string {
+  const td = `padding:12px 0;border-bottom:1px solid ${MAIL.filet};vertical-align:top`;
   const lignes = (o.lignes ?? []).map((l: any) =>
-    `<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${esc(l.title)}<br><span style="color:#8a857c;font-size:12px">${FORMAT[l.format] ?? esc(l.format)} × ${l.qty}</span></td>
-     <td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${eur(l.line_total)}</td></tr>`
+    `<tr><td style="${td}"><span style="font-weight:700;color:${MAIL.encre}">${esc(l.title)}</span><br>
+       <span style="font-family:${MAIL.display};font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${MAIL.gris}">${FORMAT[l.format] ?? esc(l.format)} × ${l.qty}</span></td>
+     <td style="${td};text-align:right;white-space:nowrap">${eur(l.line_total)}</td></tr>`
   ).join('');
-  const total = (libelle: string, montant: string, gras = false) =>
-    `<tr><td style="padding:4px 0;color:#57534e">${libelle}</td><td style="padding:4px 0;text-align:right;${gras ? 'font-weight:700;font-size:16px' : ''}">${montant}</td></tr>`;
-  return `<table style="width:100%;border-collapse:collapse;font-size:14px">${lignes}</table>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:10px">
+  const total = (libelle: string, montant: string, couleur = MAIL.texte) =>
+    `<tr><td style="padding:5px 0;color:${MAIL.gris}">${libelle}</td><td style="padding:5px 0;text-align:right;white-space:nowrap;color:${couleur}">${montant}</td></tr>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;border-top:2px solid ${MAIL.encre}">${lignes}</table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-top:8px">
       ${total('Sous-total', eur(o.subtotal))}
-      ${o.discount_total > 0 ? total(`Remise${o.promo_code ? ` (${esc(o.promo_code)})` : ''}`, `−${eur(o.discount_total)}`) : ''}
+      ${o.discount_total > 0 ? total(`Remise${o.promo_code ? ` (${esc(o.promo_code)})` : ''}`, `−${eur(o.discount_total)}`, '#15803d') : ''}
       ${o.has_physical ? total('Livraison', o.shipping_total > 0 ? eur(o.shipping_total) : 'Offerte') : ''}
-      ${total('Total', eur(o.total), true)}
+      <tr><td style="padding:12px 0 0;border-top:1px solid ${MAIL.filet};font-family:${MAIL.display};font-size:15px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${MAIL.encre}">Total</td>
+          <td style="padding:12px 0 0;border-top:1px solid ${MAIL.filet};text-align:right;white-space:nowrap;font-family:${MAIL.display};font-size:18px;font-weight:700;color:${MAIL.encre}">${eur(o.total)}</td></tr>
     </table>`;
 }
 
@@ -67,16 +70,17 @@ export async function sendOrderConfirmation(orderId: string, opts: { force?: boo
   if (o.confirmation_sent_at && !opts.force) return { ok: true, id: 'déjà envoyée' };
   const company = await getCompany();
   const prenom = o.prenom || o.billing?.first_name;
-  const lien = `${SITE_URL}/commande/${o.number}`;
+  const url = `${SITE_URL}/commande/${o.number}`;
 
   const html = layout(
-    `Merci pour votre commande n°${o.number}`,
-    `<p style="margin:0 0 16px">${prenom ? `Bonjour ${esc(prenom)},` : 'Bonjour,'} nous avons bien reçu votre commande et votre paiement.</p>
+    'Merci pour votre commande',
+    `<p style="margin:0 0 22px">${prenom ? `Bonjour ${esc(prenom)},` : 'Bonjour,'} nous avons bien reçu votre commande et votre paiement.</p>
      ${recapitulatif(o)}
-     ${o.has_ebook ? `<p style="margin:18px 0 6px">Vos livres numériques sont disponibles dès maintenant dans votre bibliothèque :</p><p>${button(`${SITE_URL}/compte/bibliotheque`, 'Ouvrir ma bibliothèque')}</p>` : ''}
-     ${o.has_physical ? `<p style="margin:18px 0 6px;color:#57534e;font-size:13px">Livraison à :</p><p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p>` : ''}
-     <p style="margin-top:20px"><a href="${lien}" style="color:#d4211c">Voir ma commande</a></p>
-     <p style="color:#8a857c;font-size:12px;margin-top:20px">${esc(company.legal_name ?? 'Éditions Agone')}${company.address ? ` — ${esc(String(company.address).replace(/\n/g, ', '))}` : ''}</p>`
+     ${o.has_ebook ? `${etiquette('Vos livres numériques')}<p style="margin:0 0 14px">Ils sont disponibles dès maintenant dans votre bibliothèque.</p><p style="margin:0">${button(`${SITE_URL}/compte/bibliotheque`, 'Ouvrir ma bibliothèque')}</p>` : ''}
+     ${o.has_physical ? `${etiquette('Livraison à')}<p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p>` : ''}
+     <p style="margin:26px 0 0">${lien(url, 'Voir ma commande')}</p>
+     ${note(`${esc(company.legal_name ?? 'Éditions Agone')}${company.address ? ` — ${esc(String(company.address).replace(/\n/g, ', '))}` : ''}`)}`,
+    { surtitre: `Commande n° ${o.number}`, apercu: `Votre commande n° ${o.number} est confirmée.` }
   );
   const res = await sendMail({ to: o.email, subject: `Votre commande Agone n°${o.number}`, html });
   if (res.ok) await query(`UPDATE $id SET confirmation_sent_at = time::now()`, { id: recId('order', orderId) });
@@ -91,14 +95,15 @@ export async function sendShippingNotice(orderId: string, opts: { force?: boolea
   if (o.shipping_notified_at && !opts.force) return { ok: true, id: 'déjà envoyé' };
   const prenom = o.prenom || o.billing?.first_name;
   const suivi = o.tracking_number
-    ? `<p style="margin:16px 0 6px">Numéro de suivi${o.carrier ? ` (${esc(o.carrier)})` : ''} : <strong>${esc(o.tracking_number)}</strong></p>${o.tracking_url ? `<p>${button(o.tracking_url, 'Suivre mon colis')}</p>` : ''}`
+    ? `${etiquette(`Suivi${o.carrier ? ` · ${esc(o.carrier)}` : ''}`)}<p style="margin:0 0 14px;font-family:${MAIL.display};font-size:18px;font-weight:700;letter-spacing:0.04em;color:${MAIL.encre}">${esc(o.tracking_number)}</p>${o.tracking_url ? `<p style="margin:0">${button(o.tracking_url, 'Suivre mon colis')}</p>` : ''}`
     : '';
   const html = layout(
-    `Votre commande n°${o.number} est en route`,
-    `<p style="margin:0 0 12px">${prenom ? `Bonjour ${esc(prenom)},` : 'Bonjour,'} votre colis vient de partir.</p>
+    'Votre colis est en route',
+    `<p style="margin:0">${prenom ? `Bonjour ${esc(prenom)},` : 'Bonjour,'} votre commande vient de partir.</p>
      ${suivi}
-     <p style="margin:16px 0 6px;color:#57534e;font-size:13px">Adresse de livraison :</p><p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p>
-     <p style="margin-top:20px"><a href="${SITE_URL}/commande/${o.number}" style="color:#d4211c">Voir ma commande</a></p>`
+     ${etiquette('Adresse de livraison')}<p style="margin:0;font-size:14px">${adresse(o.shipping ?? o.billing)}</p>
+     <p style="margin:26px 0 0">${lien(`${SITE_URL}/commande/${o.number}`, 'Voir ma commande')}</p>`,
+    { surtitre: `Commande n° ${o.number}`, apercu: `Votre commande n° ${o.number} a été expédiée.` }
   );
   const res = await sendMail({ to: o.email, subject: `Votre commande Agone n°${o.number} est en route`, html });
   if (res.ok) await query(`UPDATE $id SET shipping_notified_at = time::now()`, { id: recId('order', orderId) });
@@ -110,9 +115,10 @@ export async function sendRefundNotice(orderId: string, montant: number) {
   const o = await commande(orderId);
   if (!o?.email) return { ok: false, error: 'Commande sans email.' };
   const html = layout(
-    `Remboursement de votre commande n°${o.number}`,
-    `<p style="margin:0 0 12px">Bonjour, nous venons de rembourser <strong>${eur(montant)}</strong> sur votre commande n°${o.number}.</p>
-     <p style="color:#57534e;font-size:13px">Le montant apparaîtra sur votre compte sous quelques jours, selon votre banque.</p>`
+    'Remboursement',
+    `<p style="margin:0">Bonjour, nous venons de rembourser <strong>${eur(montant)}</strong> sur votre commande n° ${o.number}.</p>
+     ${note('Le montant apparaîtra sur votre compte sous quelques jours, selon votre banque.')}`,
+    { surtitre: `Commande n° ${o.number}`, apercu: `Remboursement de ${eur(montant)}` }
   );
   return sendMail({ to: o.email, subject: `Remboursement — commande Agone n°${o.number}`, html });
 }
