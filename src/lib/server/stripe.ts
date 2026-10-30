@@ -11,8 +11,8 @@ export function getStripe(): Stripe | null {
   if (_stripe) return _stripe;
   const key = env.STRIPE_SECRET_KEY;
   if (!key) return null;
-  // Version d'API alignée sur le SDK (stripe 23 : 2026-09-30.endive) — types et réponses concordent.
-  _stripe = new Stripe(key, { apiVersion: '2026-09-30.endive' });
+  // Version d'API alignée sur le SDK (stripe 23 : 2026-10-28.endive) — types et réponses concordent.
+  _stripe = new Stripe(key, { apiVersion: '2026-10-28.endive' });
   return _stripe;
 }
 

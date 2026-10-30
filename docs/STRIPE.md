@@ -1,6 +1,6 @@
 # Paiement en ligne (Stripe) — mise en service
 
-État au 10 octobre 2026 : le code est prêt (SDK `stripe` 23, API `2026-09-30.endive`), mais **aucune clé Stripe
+État au 10 octobre 2026 : le code est prêt (SDK `stripe` 23, API `2026-10-28.endive`), mais **aucune clé Stripe
 n'est configurée en production** : la caisse affiche « Le paiement en ligne sera activé prochainement » et les
 commandes du site restent « en attente ».
 
