@@ -6,7 +6,12 @@
    */
   import { X } from 'phosphor-svelte';
 
-  let { banner }: { banner: { active: boolean; message: string; url?: string } | null } = $props();
+  let { banner, apercu = false, onclose }: {
+    banner: { active: boolean; message: string; url?: string } | null;
+    /** Aperçu du back-office : affiché d'emblée, rien n'est mémorisé ni réservé sous la page. */
+    apercu?: boolean;
+    onclose?: () => void;
+  } = $props();
 
   const cle = $derived(banner?.active && banner.message ? `ag_bandeau_ferme:${banner.message}` : '');
   // Rendu après lecture du choix du visiteur : pas de bandeau qui clignote puis disparaît.
@@ -15,24 +20,28 @@
 
   $effect(() => {
     if (!cle) { visible = false; return; }
+    if (apercu) { visible = true; return; }
     let ferme = false;
     try { ferme = localStorage.getItem(cle) === '1'; } catch { /* stockage indisponible */ }
     visible = !ferme;
   });
   $effect(() => {
+    if (apercu) return;
     document.documentElement.style.setProperty('--bandeau-h', `${visible ? hauteur : 0}px`);
     return () => document.documentElement.style.removeProperty('--bandeau-h');
   });
 
   function fermer() {
     visible = false;
+    onclose?.();
+    if (apercu) return;
     try { localStorage.setItem(cle, '1'); } catch { /* stockage indisponible */ }
   }
 </script>
 
 {#if visible && banner}
   <!-- Réserve la place sous le pied de page : la barre ne masque jamais la fin de la page. -->
-  <div aria-hidden="true" style:height="{hauteur}px"></div>
+  {#if !apercu}<div aria-hidden="true" style:height="{hauteur}px"></div>{/if}
   <div bind:offsetHeight={hauteur} class="fixed inset-x-0 bottom-0 z-50 bg-foreground text-background" role="status">
     <div class="relative px-12 py-2.5 text-center font-display text-sm uppercase tracking-wide">
       {#if banner.url}<a href={banner.url} class="underline-offset-4 hover:underline">{banner.message}</a>{:else}{banner.message}{/if}

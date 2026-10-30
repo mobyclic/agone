@@ -72,6 +72,7 @@
       <h3 class="eyebrow mb-3">Publication</h3>
       <label class="flex items-center gap-2 text-sm"><input type="radio" name="status" value="draft" checked={(r?.status ?? 'draft') === 'draft'} class="accent-foreground" /> Brouillon</label>
       <label class="mt-2 flex items-center gap-2 text-sm"><input type="radio" name="status" value="published" checked={r?.status === 'published'} class="accent-foreground" /> En ligne (dans ses dates)</label>
+      <p class="mt-2 text-xs text-muted-foreground">Un seul {kind === 'modal' ? 'fenêtre' : 'bandeau'} à la fois : la mettre en ligne passe en brouillon {kind === 'modal' ? 'la fenêtre' : 'le bandeau'} dont les dates chevauchent les siennes.</p>
       <div class="mt-4 grid gap-3">
         <label class={label}>Du <input type="date" name="starts_at" value={jour(r?.starts_at)} class="{input} mt-1" /></label>
         <label class={label}>Au <input type="date" name="ends_at" value={jour(r?.ends_at)} class="{input} mt-1" /></label>

@@ -21,13 +21,16 @@ export const actions: Actions = {
     const S = (k: string) => String(fd.get(k) ?? '').trim();
     const editId = params.id === 'nouveau' ? null : String(params.id);
     try {
-      const id = await saveReclame(editId, {
+      const { id, retirees } = await saveReclame(editId, {
         kind: S('kind') === 'modal' ? 'modal' : 'bandeau', status: S('status') === 'published' ? 'published' : 'draft', title: S('title'),
         message: S('message'), url: S('url'), cta_label: S('cta_label'), imageId: S('imageId') || undefined,
         variant: S('variant'), frequency: S('frequency'), delay: Number(S('delay')), starts_at: S('starts_at'), ends_at: S('ends_at')
       });
       await journaliser(locals, { action: editId ? 'reclame.modifiee' : 'reclame.creee', cible: { type: 'reclame', id, libelle: S('title') } });
-      throw redirect(303, withFlash('/admin/reclames', editId ? 'Réclame enregistrée.' : 'Réclame créée.', 'success'));
+      for (const x of retirees) await journaliser(locals, { action: 'reclame.brouillon', cible: { type: 'reclame', id: x.id, libelle: x.title } });
+      const msg = (editId ? 'Réclame enregistrée.' : 'Réclame créée.')
+        + (retirees.length ? ` ${retirees.map((x) => `« ${x.title} »`).join(', ')} ${retirees.length > 1 ? 'passées' : 'passée'} en brouillon.` : '');
+      throw redirect(303, withFlash('/admin/reclames', msg, 'success'));
     } catch (e) {
       if ((e as any)?.status === 303) throw e;
       return fail(400, { error: e instanceof Error ? e.message : 'Enregistrement impossible.' });

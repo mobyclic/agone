@@ -2,6 +2,10 @@
  * Réclames : bandeaux et fenêtres promotionnelles, programmés et publiés ou non.
  * Sur le site, pour chaque type, la réclame publiée la plus récente dont les
  * dates couvrent aujourd'hui s'affiche (voir +layout.server.ts).
+ *
+ * Une seule réclame de chaque type à l'écran : publier une réclame repasse en
+ * brouillon celles du même type dont les dates la chevauchent (aujourd'hui ou
+ * plus tard). Des réclames programmées à la suite restent publiées ensemble.
  */
 import { query, recId } from './surreal';
 
@@ -46,7 +50,34 @@ export interface ReclameInput {
   variant?: string; frequency?: string; delay?: number; starts_at?: string; ends_at?: string;
 }
 
-export async function saveReclame(id: string | null, d: ReclameInput): Promise<string> {
+type Periode = { starts_at?: string | Date; ends_at?: string | Date };
+
+/** Intervalle d'affichage, borné au présent : une réclame échue ne gêne plus personne. */
+function intervalle(r: Periode, now = Date.now()): [number, number] {
+  const debut = Math.max(now, r.starts_at ? new Date(r.starts_at).getTime() : -Infinity);
+  const fin = r.ends_at ? new Date(r.ends_at).getTime() + 86400_000 : Infinity; // date de fin incluse
+  return [debut, fin];
+}
+
+/** Deux réclames s'afficheraient en même temps, aujourd'hui ou plus tard. */
+export function chevauchent(a: Periode, b: Periode): boolean {
+  const [a0, a1] = intervalle(a), [b0, b1] = intervalle(b);
+  return a0 < a1 && b0 < b1 && a0 < b1 && b0 < a1;
+}
+
+/** Réclames publiées du même type que `r` qui s'afficheraient en même temps qu'elle. */
+export function concurrentes(r: Periode & { id?: string | null; kind: KindReclame }, toutes: Reclame[]): Reclame[] {
+  return toutes.filter((x) => x.id !== r.id && x.kind === r.kind && x.status === 'published' && chevauchent(r, x));
+}
+
+/** Repasse en brouillon les concurrentes de `r` ; renvoie celles qui l'ont été. */
+async function retirerConcurrentes(r: Periode & { id: string; kind: KindReclame }): Promise<Reclame[]> {
+  const autres = concurrentes(r, await listReclames());
+  for (const x of autres) await query(`UPDATE $id SET status = 'draft'`, { id: recId('reclame', x.id) });
+  return autres;
+}
+
+export async function saveReclame(id: string | null, d: ReclameInput): Promise<{ id: string; retirees: Reclame[] }> {
   if (!d.title?.trim()) throw new Error('Le titre est requis.');
   const c = {
     kind: d.kind === 'modal' ? 'modal' : 'bandeau', status: d.status === 'published' ? 'published' : 'draft', title: d.title.trim(),
@@ -56,13 +87,26 @@ export async function saveReclame(id: string | null, d: ReclameInput): Promise<s
     delay: Number.isFinite(d.delay) ? Math.min(60, Math.max(0, Math.round(d.delay!))) : 2,
     starts_at: d.starts_at ? new Date(d.starts_at) : undefined, ends_at: d.ends_at ? new Date(d.ends_at) : undefined
   };
-  if (id) { await query(`UPDATE $id MERGE $c`, { id: recId('reclame', id), c }); return id; }
-  const rows = await query<any>(`CREATE reclame CONTENT $c`, { c });
-  return String(rows[0].id).replace(/^reclame:/, '');
+  let rid = id;
+  if (rid) await query(`UPDATE $id MERGE $c`, { id: recId('reclame', rid), c });
+  else {
+    const rows = await query<any>(`CREATE reclame CONTENT $c`, { c });
+    rid = String(rows[0].id).replace(/^reclame:/, '');
+  }
+  const retirees = c.status === 'published' ? await retirerConcurrentes({ id: rid, kind: c.kind as KindReclame, starts_at: c.starts_at, ends_at: c.ends_at }) : [];
+  return { id: rid, retirees };
 }
 
-export async function setStatutReclame(id: string, status: 'draft' | 'published') {
+/** Publie ou dépublie ; publier retire les concurrentes (renvoyées). */
+export async function setStatutReclame(id: string, status: 'draft' | 'published'): Promise<Reclame[]> {
+  let retirees: Reclame[] = [];
+  if (status === 'published') {
+    const r = await getReclame(id);
+    if (!r) throw new Error('Réclame introuvable.');
+    retirees = await retirerConcurrentes(r);
+  }
   await query(`UPDATE $id SET status = $s`, { id: recId('reclame', id), s: status });
+  return retirees;
 }
 
 export async function deleteReclame(id: string) {

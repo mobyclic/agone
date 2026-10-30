@@ -6,7 +6,12 @@
    */
   import { onMount } from 'svelte';
   import { X } from 'phosphor-svelte';
-  let { popup }: { popup: { title: string; body: string; cta_label?: string; cta_url?: string; image_url?: string; frequency: string; delay: number; version: string } | null } = $props();
+  let { popup, apercu = false, onclose }: {
+    popup: { title: string; body: string; cta_label?: string; cta_url?: string; image_url?: string; frequency: string; delay: number; version: string } | null;
+    /** Aperçu du back-office : affichée tout de suite, rien n'est mémorisé. */
+    apercu?: boolean;
+    onclose?: () => void;
+  } = $props();
   let visible = $state(false);
   const CLE = 'agone:popup';
   function dejaVue(): boolean {
@@ -21,9 +26,12 @@
   }
   function fermer() {
     visible = false;
+    onclose?.();
+    if (apercu) return;
     try { (popup?.frequency === 'session' ? sessionStorage : localStorage).setItem(CLE, JSON.stringify({ version: popup?.version, at: Date.now() })); } catch { /* stockage indisponible */ }
   }
   onMount(() => {
+    if (apercu) { visible = true; return; }
     if (!popup || dejaVue()) return;
     const t = setTimeout(() => (visible = true), Math.max(0, popup.delay) * 1000);
     return () => clearTimeout(t);
