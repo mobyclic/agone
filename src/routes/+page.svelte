@@ -43,7 +43,7 @@
             {/if}
             {#if article.published_at}<span class="text-muted-foreground">{fmt(article.published_at)}</span>{/if}
           </div>
-          <h1 class="display-title mt-1 break-words text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">{article.title}</h1>
+          <h1 class="display-title titre-lien mt-1 break-words text-xl">{article.title}</h1>
           {#if article.author}
             <p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{article.author}</p>
           {/if}
@@ -61,7 +61,7 @@
                   {#if a.rubrique_name}<span class="font-semibold text-link">{a.rubrique_name}</span><span class="text-muted-foreground">·</span>{/if}
                   <span class="text-muted-foreground">{fmt(a.published_at)}</span>
                 </div>
-                <h3 class="display-title mt-1 text-xl leading-tight decoration-1 underline-offset-4 group-hover:underline">{a.title}</h3>
+                <h3 class="display-title titre-lien mt-1 text-xl">{a.title}</h3>
                 {#if a.author}<p class="mt-1 font-display text-xs uppercase tracking-wide text-muted-foreground">{a.author}</p>{/if}
                 {#if a.excerpt}
                   <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-foreground/75">{extraitPropre(a.excerpt)}</p>

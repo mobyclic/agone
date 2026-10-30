@@ -312,6 +312,16 @@
   text-transform: uppercase;
 }
 
+/* — Titre d'affichage en lien (listes d'articles), souligné au survol de la carte.
+     À 0.95 d'interligne, le trait tombait sur les capitales de la ligne suivante :
+     un peu d'air entre les lignes, un trait fin, collé au texte. — */
+.display-title.titre-lien {
+  line-height: 1.1;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.1em;
+}
+.group:hover .titre-lien { text-decoration-line: underline; }
+
 /* — Label avec filet rouge (│ LABEL) — */
 .tick-label {
   display: inline-flex;
