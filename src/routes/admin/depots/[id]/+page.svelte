@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   /**
    * Fiche d'un dépôt : le stock confié, l'inventaire (comptage → écarts), le
    * réassort, l'import d'un carnet de vente (aperçu puis validation : relevé de
@@ -301,7 +302,7 @@
                 <td class="py-1.5 pr-2">{#if c.invoice_id}<a href="/admin/factures/{c.invoice_id}" class="text-link hover:underline">{c.invoice_ref ?? 'facture'}</a>{#if c.invoice_status === 'draft'}<span class="ml-1 text-xs text-muted-foreground">brouillon</span>{/if}{:else}—{/if}</td>
                 <td class="py-1.5 text-right">
                   {#if c.status === 'validated'}
-                    <form method="POST" action="?/carnet_annuler" use:enhance class="inline" onsubmit={(e) => { if (!confirm('Annuler ce carnet ? Le relevé de ventes et les mouvements seront retirés, la facture brouillon supprimée.')) e.preventDefault(); }}>
+                    <form method="POST" action="?/carnet_annuler" use:enhance={confirmer(() => 'Annuler ce carnet ? Le relevé de ventes et les mouvements seront retirés, la facture brouillon supprimée.')} class="inline">
                       <input type="hidden" name="carnetId" value={c.id} />
                       <button type="submit" class="text-muted-foreground hover:text-destructive" title="Annuler le carnet" aria-label="Annuler le carnet"><Trash size={14} /></button>
                     </form>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   import { enhance } from '$app/forms';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
   import RichEditor from '$lib/components/RichEditor.svelte';
@@ -162,8 +163,7 @@
 </form>
 
 {#if !data.isNew}
-  <form method="POST" action="?/delete" use:enhance class="mt-6 pb-24"
-    onsubmit={(e) => { if (!confirm('Supprimer définitivement cet article ?')) e.preventDefault(); }}>
+  <form method="POST" action="?/delete" use:enhance={confirmer(() => 'Supprimer définitivement cet article ?')} class="mt-6 pb-24">
     <button type="submit" class="inline-flex items-center gap-1.5 text-sm text-destructive hover:underline">
       <Trash size={15} /> Supprimer l'article
     </button>

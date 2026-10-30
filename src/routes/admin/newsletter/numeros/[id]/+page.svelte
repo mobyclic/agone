@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
   import RichEditor from '$lib/components/RichEditor.svelte';
@@ -236,8 +237,7 @@
       </form>
 
       <form method="POST" action="?/envoyer" class="mt-4"
-        use:enhance={() => async ({ update }) => { await update({ reset: false }); await relireEnvoi(); }}
-        onsubmit={(e: Event) => { if (!confirm(`Envoyer ce numéro aux ${data.abonnes} abonnés ?${data.envoi?.newsletter_sent_at ? '\n\nIl a DÉJÀ été envoyé : ils le recevront une seconde fois.' : ''}`)) e.preventDefault(); }}>
+        use:enhance={confirmer(() => `Envoyer ce numéro aux ${data.abonnes} abonnés ?${data.envoi?.newsletter_sent_at ? '\n\nIl a DÉJÀ été envoyé : ils le recevront une seconde fois.' : ''}`, () => async ({ update }) => { await update({ reset: false }); await relireEnvoi(); })}>
         <Button type="submit" disabled={tache?.enCours}>
           {tache?.enCours ? 'Envoi en cours…' : data.envoi?.newsletter_sent_at ? 'Renvoyer à tous les abonnés' : `Envoyer aux ${data.abonnes} abonnés`}
         </Button>

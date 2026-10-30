@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   /**
    * Médiathèque : tous les fichiers déposés, par usage (livres, auteurs, rencontres,
    * Antichambre, images de l'éditeur, documents), avec ce qui les utilise. Un fichier
@@ -74,7 +75,7 @@
           {/if}
           <div class="mt-2 flex items-center gap-3 text-xs">
             {#if !m.prive}<a href={m.url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"><ArrowSquareOut size={12} /> Ouvrir</a>{/if}
-            <form method="POST" action="?/supprimer" use:enhance class="inline" onsubmit={(e) => { if (!confirm(`Supprimer « ${nom(m)} » définitivement ?${m.liens.length ? ' Il sera détaché de ce qui l’utilise.' : ''}`)) e.preventDefault(); }}>
+            <form method="POST" action="?/supprimer" use:enhance={confirmer(() => `Supprimer « ${nom(m)} » définitivement ?${m.liens.length ? ' Il sera détaché de ce qui l’utilise.' : ''}`)} class="inline">
               <input type="hidden" name="id" value={m.id} /><input type="hidden" name="nom" value={nom(m)} />
               <button type="submit" class="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive"><Trash size={12} /> Supprimer</button>
             </form>

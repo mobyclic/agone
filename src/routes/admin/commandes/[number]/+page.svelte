@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, Check, Truck, PaperPlaneTilt, ArrowCounterClockwise, NotePencil } from 'phosphor-svelte';
@@ -158,8 +159,7 @@
 
     <!-- Remboursement : Stripe si la commande a été payée en ligne, sinon consigné -->
     {#if ['paid', 'processing', 'sent_to_bl', 'completed'].includes(o.status) && !o.stripe_refund_id}
-      <form method="POST" action="?/refund" use:enhance class="rounded-lg border border-border bg-card p-4"
-        onsubmit={(e: Event) => { if (!confirm('Rembourser cette commande ? Le client sera prévenu par email.')) e.preventDefault(); }}>
+      <form method="POST" action="?/refund" use:enhance={confirmer(() => 'Rembourser cette commande ? Le client sera prévenu par email.')} class="rounded-lg border border-border bg-card p-4">
         <h3 class="mb-2 flex items-center gap-1.5 text-sm font-semibold"><ArrowCounterClockwise size={16} /> Rembourser</h3>
         <label class="text-xs font-medium text-muted-foreground">Montant (vide = total {euros(o.total)})
           <input name="montant" type="number" step="0.01" min="0" max={o.total} class="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground" />

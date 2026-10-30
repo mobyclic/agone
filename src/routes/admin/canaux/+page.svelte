@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   /**
    * Canaux de vente : deux familles, autant de canaux qu'on veut. Chaque canal
    * dit d'où viennent ses chiffres (API branchée, API en veille, ou tableur
@@ -102,7 +103,7 @@
               {/if}
               <button type="button" class="mr-2 {edition === c.code ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}" aria-label="Modifier" aria-expanded={edition === c.code} onclick={() => ouvrir(c.code)}><PencilSimple size={15} /></button>
               {#if !c.fixe}
-                <form method="POST" action="?/delete" use:enhance class="inline" onsubmit={(ev: Event) => { if (!confirm(`Supprimer le canal « ${c.name} » ?`)) ev.preventDefault(); }}>
+                <form method="POST" action="?/delete" use:enhance={confirmer(() => `Supprimer le canal « ${c.name} » ?`)} class="inline">
                   <input type="hidden" name="code" value={c.code} />
                   <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Supprimer"><Trash size={15} /></button>
                 </form>

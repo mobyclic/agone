@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   import { enhance } from '$app/forms';
   import { Button } from '$lib/components/ui/button';
   import { ArrowLeft, FloppyDisk, Trash, Plus, Download } from 'phosphor-svelte';
@@ -97,7 +98,7 @@
       </div>
       <!-- Un client facturé ne se supprime pas : ses factures le portent. -->
       {#if data.factures.length === 0}
-        <form method="POST" action="?/delete" use:enhance onsubmit={(e: Event) => { if (!confirm(`Supprimer « ${c.name} » ?`)) e.preventDefault(); }}>
+        <form method="POST" action="?/delete" use:enhance={confirmer(() => `Supprimer « ${c.name} » ?`)}>
           <button type="submit" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"><Trash size={13} /> Supprimer ce client</button>
         </form>
       {:else}

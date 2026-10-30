@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   /**
    * Le club : réglages (prix, remise sur le fonds, port offert), membres, et
    * adhésions enregistrées à la main (chèque sur un salon, adhésion offerte).
@@ -78,7 +79,7 @@
               <td class="px-3 py-2">{#if a.invoice_id}<a href="/admin/factures/{a.invoice_id}" class="text-link hover:underline">{a.invoice_ref}</a>{:else}<span class="text-muted-foreground">—</span>{/if}</td>
               <td class="px-3 py-2 text-right">
                 {#if a.status === 'active'}
-                  <form method="POST" action="?/annuler" use:enhance class="inline" onsubmit={(e) => { if (!confirm(`Annuler l'adhésion de ${a.nom} ?`)) e.preventDefault(); }}>
+                  <form method="POST" action="?/annuler" use:enhance={confirmer(() => `Annuler l'adhésion de ${a.nom} ?`)} class="inline">
                     <input type="hidden" name="id" value={a.id} /><button type="submit" class="text-xs text-muted-foreground hover:text-destructive">Annuler</button>
                   </form>
                 {/if}

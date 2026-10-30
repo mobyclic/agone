@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   import { enhance } from '$app/forms';
   import { beforeNavigate } from '$app/navigation';
   import ImageUpload from '$lib/components/ImageUpload.svelte';
@@ -284,8 +285,7 @@
   <form id="ebook-upload" method="POST" action="?/ebook" enctype="multipart/form-data"
     use:enhance={() => { envoiEbook = true; return async ({ update }) => { await update({ reset: true }); envoiEbook = false; }; }}></form>
   {#each data.ebooks as f (f.id)}
-    <form id="ebook-del-{f.id}" method="POST" action="?/ebookSupprimer" use:enhance
-      onsubmit={(e) => { if (!confirm('Retirer ce fichier ? Les clients qui l’ont acheté n’y auront plus accès.')) e.preventDefault(); }}>
+    <form id="ebook-del-{f.id}" method="POST" action="?/ebookSupprimer" use:enhance={confirmer(() => 'Retirer ce fichier ? Les clients qui l’ont acheté n’y auront plus accès.')}>
       <input type="hidden" name="assetId" value={f.id} />
     </form>
   {/each}

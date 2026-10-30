@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { confirmer } from '$lib/client/confirmer';
   /**
    * Fiche d'un document émis : aperçu, rappel des éléments, et les outils —
    * envoyer par e-mail, enregistrer un règlement, émettre une pro forma,
@@ -180,7 +181,7 @@
                   {#if p.applied_to_id}<a href="/admin/factures/{p.applied_to_id}" class="block text-xs text-link hover:underline">sur la facture n° {p.applied_to_ref}</a>
                   {:else if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
                 </div>
-                <form method="POST" action="?/payment_delete" use:enhance onsubmit={(e: Event) => { if (!confirm(p.applied_to_id ? 'Retirer cette imputation (des deux côtés) ?' : 'Retirer ce remboursement ?')) e.preventDefault(); }}>
+                <form method="POST" action="?/payment_delete" use:enhance={confirmer(() => p.applied_to_id ? 'Retirer cette imputation (des deux côtés) ?' : 'Retirer ce remboursement ?')}>
                   <input type="hidden" name="paymentId" value={p.id} />
                   <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Retirer"><Trash size={13} /></button>
                 </form>
@@ -239,7 +240,7 @@
                   {#if p.credit_note_id}<a href="/admin/factures/{p.credit_note_id}" class="block text-xs text-link hover:underline">Avoir n° {p.credit_note_ref}</a>
                   {:else if p.reference || p.note}<span class="block truncate text-xs text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' — ')}</span>{/if}
                 </div>
-                <form method="POST" action="?/payment_delete" use:enhance onsubmit={(e: Event) => { if (!confirm('Retirer ce règlement ?')) e.preventDefault(); }}>
+                <form method="POST" action="?/payment_delete" use:enhance={confirmer(() => 'Retirer ce règlement ?')}>
                   <input type="hidden" name="paymentId" value={p.id} />
                   <button type="submit" class="text-muted-foreground hover:text-destructive" aria-label="Retirer"><Trash size={13} /></button>
                 </form>
