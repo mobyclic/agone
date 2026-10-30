@@ -49,12 +49,15 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ received: true });
   }
   if (event.type === 'invoice.paid') {
-    const details = obj?.parent?.subscription_details;
+    // Format 2025-03+ : invoice.parent.subscription_details ; un endpoint resté sur une
+    // version d'API antérieure envoie invoice.subscription_details + invoice.subscription.
+    const details = obj?.parent?.subscription_details ?? obj?.subscription_details;
     const meta = details?.metadata ?? {};
     if (meta.type === 'club' && meta.user) {
       const montant = Number(obj.amount_paid ?? 0) / 100;
       const periode = obj.lines?.data?.[0]?.period;
-      const subscription = typeof details.subscription === 'string' ? details.subscription : details.subscription?.id;
+      const ref = details?.subscription ?? obj?.subscription;
+      const subscription = typeof ref === 'string' ? ref : ref?.id;
       // Facture à 0 € : période d'essai jusqu'à la fin d'une adhésion déjà en cours — rien à ajouter.
       if (montant > 0 && periode?.start && periode?.end) {
         try {

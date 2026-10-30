@@ -13,7 +13,9 @@ commandes du site restent « en attente ».
 
 ## 2. Endpoint webhook (tableau de bord Stripe › Développeurs › Webhooks)
 
-URL : `https://<domaine>/api/stripe/webhook` — événements :
+URL : `https://<domaine>/api/stripe/webhook` — **version d'API de l'endpoint : `2026-10-28.endive`** (la plus
+récente ; le compte est par défaut en `2023-10-16`, format d'événements que le webhook sait lire mais qui
+n'est pas celui du code) — événements :
 
 - `checkout.session.completed` — commande payée ; client Stripe d'un membre du club
 - `invoice.paid` — adhésion au club : première période et chaque renouvellement
