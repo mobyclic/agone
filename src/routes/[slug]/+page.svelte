@@ -67,7 +67,7 @@
       {/key}
     </div>
 
-    <div class="fixed bottom-6 right-6 z-40 flex gap-2">
+    <div class="fixed bottom-[calc(1.5rem+var(--bandeau-h,0px))] right-6 z-40 flex gap-2">
       <Button type="button" variant="outline" class="bg-background shadow-2xl" onclick={stopEditing}>
         <X size={16} /> Annuler
       </Button>
@@ -82,7 +82,7 @@
   <StaticPage title={data.page.title} html={data.page.body_html} />
 
   {#if isStaff}
-    <div class="fixed bottom-6 right-6 z-40">
+    <div class="fixed bottom-[calc(1.5rem+var(--bandeau-h,0px))] right-6 z-40">
       <Button type="button" variant="outline" class="bg-background shadow-2xl" onclick={() => (editing = true)}>
         <PencilSimple size={16} /> Éditer
       </Button>

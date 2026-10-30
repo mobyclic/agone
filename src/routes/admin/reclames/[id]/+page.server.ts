@@ -1,13 +1,13 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireAdmin } from '$lib/server/access';
-import { getReclame, saveReclame, KIND_RECLAME, VARIANTS_BANDEAU, FREQUENCES, type KindReclame } from '$lib/server/reclames';
+import { getReclame, saveReclame, KIND_RECLAME, FREQUENCES, type KindReclame } from '$lib/server/reclames';
 import { journaliser } from '$lib/server/journal';
 import { withFlash } from '$lib/toasts';
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
   requireAdmin(locals);
-  const commun = { kinds: KIND_RECLAME, variants: VARIANTS_BANDEAU, frequences: FREQUENCES };
+  const commun = { kinds: KIND_RECLAME, frequences: FREQUENCES };
   if (params.id === 'nouveau') return { reclame: null, kind: (url.searchParams.get('kind') === 'modal' ? 'modal' : 'bandeau') as KindReclame, ...commun };
   const reclame = await getReclame(params.id);
   if (!reclame) throw error(404, { message: 'Réclame introuvable' });

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
-  import Logo from '$lib/components/Logo.svelte';
   import { Button } from '$lib/components/ui/button';
   import { EnvelopeSimple, Lock } from 'phosphor-svelte';
 
@@ -32,77 +31,62 @@
 
 <svelte:head><title>Connexion · Agone</title></svelte:head>
 
-<div class="grid min-h-[calc(100svh-5rem)] lg:grid-cols-2">
-  <!-- Panneau marque -->
-  <div class="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
-    <div class="bg-grid-fade absolute inset-0 opacity-[0.15]"></div>
-    <a href="/" class="relative"><Logo tone="light" size={34} /></a>
-    <div class="relative">
-      <h2 class="max-w-sm text-3xl font-extrabold leading-tight tracking-tight">Content de vous revoir.</h2>
-      <p class="mt-3 max-w-sm text-sidebar-foreground/70">Retrouvez votre bibliothèque, vos commandes et vos téléchargements.</p>
+<div class="flex min-h-[calc(100svh-14rem)] items-center justify-center px-4 py-16">
+  <div class="w-full max-w-sm">
+    <h1 class="text-center text-2xl font-bold">Connexion</h1>
+    <p class="mt-1 text-center text-sm text-muted-foreground">Accédez à votre compte Agone.</p>
+
+    <div class="mt-6 inline-flex w-full rounded-md border border-border p-1 text-sm">
+      <button
+        class="flex-1 rounded px-3 py-1.5 font-medium transition-colors {mode === 'magic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}"
+        onclick={() => { mode = 'magic'; step = 'request'; }}
+      >Lien magique</button>
+      <button
+        class="flex-1 rounded px-3 py-1.5 font-medium transition-colors {mode === 'password' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}"
+        onclick={() => (mode = 'password')}
+      >Mot de passe</button>
     </div>
-    <p class="relative text-xs text-sidebar-foreground/50">Agone — Éditeur indépendant.</p>
-  </div>
 
-  <!-- Formulaire -->
-  <div class="flex items-center justify-center p-6 sm:p-12">
-    <div class="w-full max-w-sm">
-      <div class="mb-8 lg:hidden"><Logo size={30} /></div>
-      <h1 class="text-2xl font-bold">Connexion</h1>
-      <p class="mt-1 text-sm text-muted-foreground">Accédez à votre compte Agone.</p>
+    {#if errText}
+      <p class="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{errText}</p>
+    {/if}
 
-      <div class="mt-6 inline-flex w-full rounded-md border border-border p-1 text-sm">
-        <button
-          class="flex-1 rounded px-3 py-1.5 font-medium transition-colors {mode === 'magic' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}"
-          onclick={() => { mode = 'magic'; step = 'request'; }}
-        >Lien magique</button>
-        <button
-          class="flex-1 rounded px-3 py-1.5 font-medium transition-colors {mode === 'password' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}"
-          onclick={() => (mode = 'password')}
-        >Mot de passe</button>
-      </div>
+    {#if mode === 'password'}
+      <form method="POST" action="?/password{page.url.search}" use:enhance class="mt-5 space-y-4">
+        <label class="block">
+          <span class="mb-1.5 block text-sm font-medium">Email</span>
+          <input name="email" type="email" required bind:value={email} class={inputCls} autocomplete="email" />
+        </label>
+        <label class="block">
+          <span class="mb-1.5 block text-sm font-medium">Mot de passe</span>
+          <input name="password" type="password" required class={inputCls} autocomplete="current-password" />
+        </label>
+        <Button type="submit" class="w-full" size="lg"><Lock size={16} /> Se connecter</Button>
+      </form>
+    {:else if step === 'request'}
+      <form method="POST" action="?/request_otp{page.url.search}" use:enhance class="mt-5 space-y-4">
+        <label class="block">
+          <span class="mb-1.5 block text-sm font-medium">Email</span>
+          <input name="email" type="email" required bind:value={email} class={inputCls} autocomplete="email" />
+        </label>
+        <Button type="submit" class="w-full" size="lg"><EnvelopeSimple size={16} /> Recevoir un lien de connexion</Button>
+      </form>
+    {:else}
+      <p class="mt-5 rounded-md bg-secondary px-3 py-2.5 text-sm">Un email vous a été envoyé avec un lien et un code.</p>
+      <form method="POST" action="?/verify_otp{page.url.search}" use:enhance class="mt-4 space-y-4">
+        <input type="hidden" name="email" value={email} />
+        <label class="block">
+          <span class="mb-1.5 block text-sm font-medium">Code reçu</span>
+          <input name="code" inputmode="numeric" maxlength="6" required
+            class="{inputCls} text-center text-lg font-bold tracking-[0.4em]" placeholder="000000" />
+        </label>
+        <Button type="submit" class="w-full" size="lg">Vérifier</Button>
+      </form>
+    {/if}
 
-      {#if errText}
-        <p class="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{errText}</p>
-      {/if}
-
-      {#if mode === 'password'}
-        <form method="POST" action="?/password{page.url.search}" use:enhance class="mt-5 space-y-4">
-          <label class="block">
-            <span class="mb-1.5 block text-sm font-medium">Email</span>
-            <input name="email" type="email" required bind:value={email} class={inputCls} autocomplete="email" />
-          </label>
-          <label class="block">
-            <span class="mb-1.5 block text-sm font-medium">Mot de passe</span>
-            <input name="password" type="password" required class={inputCls} autocomplete="current-password" />
-          </label>
-          <Button type="submit" class="w-full" size="lg"><Lock size={16} /> Se connecter</Button>
-        </form>
-      {:else if step === 'request'}
-        <form method="POST" action="?/request_otp{page.url.search}" use:enhance class="mt-5 space-y-4">
-          <label class="block">
-            <span class="mb-1.5 block text-sm font-medium">Email</span>
-            <input name="email" type="email" required bind:value={email} class={inputCls} autocomplete="email" />
-          </label>
-          <Button type="submit" class="w-full" size="lg"><EnvelopeSimple size={16} /> Recevoir un lien de connexion</Button>
-        </form>
-      {:else}
-        <p class="mt-5 rounded-md bg-secondary px-3 py-2.5 text-sm">Un email vous a été envoyé avec un lien et un code.</p>
-        <form method="POST" action="?/verify_otp{page.url.search}" use:enhance class="mt-4 space-y-4">
-          <input type="hidden" name="email" value={email} />
-          <label class="block">
-            <span class="mb-1.5 block text-sm font-medium">Code reçu</span>
-            <input name="code" inputmode="numeric" maxlength="6" required
-              class="{inputCls} text-center text-lg font-bold tracking-[0.4em]" placeholder="000000" />
-          </label>
-          <Button type="submit" class="w-full" size="lg">Vérifier</Button>
-        </form>
-      {/if}
-
-      <p class="mt-6 text-center text-sm text-muted-foreground">
-        Pas encore de compte ?
-        <a href="/inscription{page.url.search}" class="font-medium text-link hover:underline">Créer un compte</a>
-      </p>
-    </div>
+    <p class="mt-6 text-center text-sm text-muted-foreground">
+      Pas encore de compte ?
+      <a href="/inscription{page.url.search}" class="font-medium text-link hover:underline">Créer un compte</a>
+    </p>
   </div>
 </div>

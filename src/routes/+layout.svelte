@@ -50,13 +50,13 @@ gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personali
   {@render children?.()}
 {:else}
   <div class="flex min-h-svh flex-col text-plus">
-    <SiteBanner banner={data.bandeau} />
     <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} nav={data.nav} />
     <PromoPopup popup={data.fenetre} />
     <main class="flex-1 border-t-[5px] border-t-white">
       {@render children?.()}
     </main>
     <PublicFooter club={data.club} />
+    <SiteBanner banner={data.bandeau} />
   </div>
   {#if data.tracking?.gtm_id}
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={data.tracking.gtm_id}" height="0" width="0" style="display:none;visibility:hidden" title="Google Tag Manager"></iframe></noscript>

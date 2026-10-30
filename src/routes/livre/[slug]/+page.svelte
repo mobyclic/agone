@@ -83,7 +83,7 @@
 <!-- Fiche livre : PAS de gros header (exception) — le titre vit dans la colonne de contenu. -->
 <div class="py-8" style="padding-inline: var(--page-gutter)">
   {#if isStaff}
-    <div class="fixed bottom-6 right-6 z-40">
+    <div class="fixed bottom-[calc(1.5rem+var(--bandeau-h,0px))] right-6 z-40">
       <Button href="/admin/catalogue/{bookId}" variant="outline" class="bg-background shadow-2xl"><PencilSimple size={16} /> Éditer</Button>
     </div>
   {/if}

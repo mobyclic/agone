@@ -16,7 +16,7 @@
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
   <div>
     <h2 class="text-xl font-bold">Réclames</h2>
-    <p class="text-sm text-muted-foreground">Un bandeau au-dessus du menu, ou une fenêtre à l'arrivée du visiteur ; programmées par dates. Pour chaque type, la réclame en ligne la plus récente s'affiche.</p>
+    <p class="text-sm text-muted-foreground">Un bandeau en bas de l'écran, ou une fenêtre à l'arrivée du visiteur ; programmées par dates. Pour chaque type, la réclame en ligne la plus récente s'affiche.</p>
   </div>
   <div class="flex gap-2">
     <Button href="/admin/reclames/nouveau?kind=bandeau" variant="outline"><Megaphone size={16} /> Nouveau bandeau</Button>

@@ -16,7 +16,7 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
     meta_pixel_id: String(t?.meta_pixel_id ?? '').trim()
   };
   // Réclames publiées et dans leurs dates : au plus un bandeau et une fenêtre.
-  const bandeau = reclames.bandeau ? { active: true, message: reclames.bandeau.message ?? reclames.bandeau.title, variant: reclames.bandeau.variant, url: reclames.bandeau.url } : null;
+  const bandeau = reclames.bandeau ? { active: true, message: reclames.bandeau.message ?? reclames.bandeau.title, url: reclames.bandeau.url } : null;
   const m = reclames.modal;
   const fenetre = m ? { title: m.title, body: m.message ?? '', cta_label: m.cta_label ?? '', cta_url: m.url ?? '', image_url: m.image_url ?? '', frequency: m.frequency, delay: m.delay, version: `${m.id}:${m.updated_at}` } : null;
   return { user: locals.user, cartCount: cartCount(cookies), nav: await navMenus(), tracking, bandeau, fenetre, club: club.active ? club.nom : null };

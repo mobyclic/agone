@@ -26,7 +26,7 @@
   <div class="space-y-5">
     <div class="rounded-lg border border-border bg-card p-5">
       <div class="mb-4 flex overflow-hidden rounded-md border border-border text-sm">
-        <button type="button" onclick={() => (kind = 'bandeau')} class="flex-1 px-3 py-2 {kind === 'bandeau' ? 'bg-foreground text-background' : 'hover:bg-muted'}">Bandeau au-dessus du menu</button>
+        <button type="button" onclick={() => (kind = 'bandeau')} class="flex-1 px-3 py-2 {kind === 'bandeau' ? 'bg-foreground text-background' : 'hover:bg-muted'}">Bandeau en bas de l’écran</button>
         <button type="button" onclick={() => (kind = 'modal')} class="flex-1 px-3 py-2 {kind === 'modal' ? 'bg-foreground text-background' : 'hover:bg-muted'}">Fenêtre à l'arrivée</button>
       </div>
       <input type="hidden" name="kind" value={kind} />
@@ -35,12 +35,8 @@
       <label class={label}>{kind === 'modal' ? 'Titre affiché' : 'Nom (interne)'} <input name="title" required value={r?.title ?? ''} class="{input} mt-1" /></label>
       {#if kind === 'bandeau'}
         <label class="{label} mt-4">Message<textarea name="message" rows="2" required class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary">{r?.message ?? ''}</textarea></label>
-        <div class="mt-4 grid gap-3 sm:grid-cols-2">
-          <label class={label}>Lien (facultatif) <input name="url" value={r?.url ?? ''} placeholder="/livre/… ou https://…" class="{input} mt-1" /></label>
-          <label class={label}>Style
-            <select name="variant" value={r?.variant ?? 'info'} class="{input} mt-1">{#each Object.entries(data.variants) as [k, v] (k)}<option value={k}>{v}</option>{/each}</select>
-          </label>
-        </div>
+        <!-- Barre fixée en bas de l'écran, blanc sur noir : pas de choix de couleur. -->
+        <label class="{label} mt-4">Lien (facultatif) <input name="url" value={r?.url ?? ''} placeholder="/livre/… ou https://…" class="{input} mt-1" /></label>
       {:else}
         <label class="{label} mt-4">Texte<textarea name="message" rows="4" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary">{r?.message ?? ''}</textarea></label>
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
