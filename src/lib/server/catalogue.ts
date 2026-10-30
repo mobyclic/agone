@@ -136,6 +136,34 @@ export async function recentBooks(limit = 8): Promise<BookCard[]> {
   return rows.map(toCard);
 }
 
+/**
+ * Quelques livres du fonds (parus depuis plus de `fondAns` ans), avec couverture et
+ * en stock — tirés au hasard : la page du club montre le prix membre sur de vrais titres.
+ */
+export async function livresDuFonds(fondAns: number, limit = 6): Promise<BookCard[]> {
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() - fondAns);
+  const rows = await query<any>(
+    `SELECT ${CARD_FIELDS}, rand() AS tirage FROM book
+       WHERE status = 'published' AND published_at != NONE AND published_at <= $limite
+         AND cover != NONE AND stock_qty > 0 AND price_paper > 0
+       ORDER BY tirage LIMIT $limit`,
+    { limite, limit }
+  );
+  return rows.map(toCard);
+}
+
+/** Nombre de titres du fonds en vente (parus depuis plus de `fondAns` ans). */
+export async function compterFonds(fondAns: number): Promise<number> {
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() - fondAns);
+  const rows = await query<any>(
+    `SELECT count() AS n FROM book WHERE status = 'published' AND published_at != NONE AND published_at <= $limite GROUP ALL`,
+    { limite }
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 /** Recherche de livres pour un sélecteur (back-office). */
 export async function searchBooksForPicker(q: string): Promise<{ id: string; title: string; image?: string }[]> {
   if (!q || !q.trim()) return [];

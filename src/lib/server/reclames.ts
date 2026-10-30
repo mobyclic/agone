@@ -12,7 +12,7 @@ import { query, recId } from './surreal';
 export type KindReclame = 'bandeau' | 'modal';
 export const KIND_RECLAME: Record<KindReclame, string> = { bandeau: 'Bandeau', modal: 'Fenêtre' };
 export const VARIANTS_BANDEAU: Record<string, string> = { info: 'Information (noir)', brand: 'Marque (rouge)', warning: 'Avertissement', success: 'Succès' };
-export const FREQUENCES: Record<string, string> = { once: 'Une seule fois par visiteur', day: 'Une fois par jour', session: 'À chaque visite', always: 'À chaque page' };
+export const FREQUENCES: Record<string, string> = { once: 'Une seule fois par visiteur', day: 'Une fois par jour', session: 'À chaque visite' };
 
 export interface Reclame {
   id: string; kind: KindReclame; status: 'draft' | 'published'; title: string; message?: string; url?: string; cta_label?: string;
@@ -30,7 +30,8 @@ const dansDates = (r: any, now = Date.now()) =>
 const normaliser = (r: any): Reclame => ({
   id: String(r.id), kind: r.kind, status: r.status === 'published' ? 'published' : 'draft', title: r.title ?? '', message: r.message ?? undefined, url: r.url ?? undefined,
   cta_label: r.cta_label ?? undefined, image_id: r.image ? String(r.image).replace(/^media:/, '') : undefined, image_url: r.image_url ?? undefined,
-  variant: r.variant ?? 'info', frequency: r.frequency ?? 'day', delay: Number(r.delay ?? 2),
+  // « À chaque page » (always) n'existe plus : ramené à « À chaque visite ».
+  variant: r.variant ?? 'info', frequency: r.frequency === 'always' ? 'session' : FREQUENCES[r.frequency] ? r.frequency : 'day', delay: Number(r.delay ?? 2),
   starts_at: r.starts_at ?? undefined, ends_at: r.ends_at ?? undefined, created_at: r.created_at, updated_at: r.updated_at,
   en_ligne: r.status === 'published' && dansDates(r)
 });

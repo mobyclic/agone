@@ -50,7 +50,7 @@ gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personali
   {@render children?.()}
 {:else}
   <div class="flex min-h-svh flex-col text-plus">
-    <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} nav={data.nav} />
+    <PublicHeader user={data.user} cartCount={data.cartCount ?? 0} nav={data.nav} club={data.club} />
     <PromoPopup popup={data.fenetre} />
     <main class="flex-1 border-t-[5px] border-t-white">
       {@render children?.()}

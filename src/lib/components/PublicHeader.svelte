@@ -6,7 +6,7 @@
   import { List, X, MagnifyingGlass, ShoppingCart, CaretDown } from 'phosphor-svelte';
 
   interface NavData { collections: { name: string; slug: string; href: string }[]; rubriques: { name: string; slug: string }[] }
-  let { user, cartCount = 0, nav }: { user: App.Locals['user']; cartCount?: number; nav?: NavData } = $props();
+  let { user, cartCount = 0, nav, club = null }: { user: App.Locals['user']; cartCount?: number; nav?: NavData; club?: string | null } = $props();
 
   // Staff (admin/éditeur) → back-office ; client → espace compte ; visiteur → connexion.
   const accountHref = $derived(user ? (isStaff(user.role) ? '/admin' : '/compte') : '/connexion');
@@ -73,6 +73,11 @@
       <a href="/rencontres" class="group/n inline-flex items-center px-2.5 py-2 whitespace-nowrap font-display text-xl font-medium uppercase tracking-wide">
         <span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>Rencontres<span class="text-link transition-opacity {isActive('/rencontres') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
+      {#if club}
+        <a href="/club" class="group/n inline-flex items-center px-2.5 py-2 whitespace-nowrap font-display text-xl font-medium uppercase tracking-wide">
+          <span class="text-link transition-opacity {isActive('/club') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>Le club<span class="text-link transition-opacity {isActive('/club') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
+        </a>
+      {/if}
       <a href="/a-propos" class="group/n inline-flex items-center px-2.5 py-2 whitespace-nowrap font-display text-xl font-medium uppercase tracking-wide">
         <span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">[</span>À propos<span class="text-link transition-opacity {isActive('/a-propos') ? 'opacity-100' : 'opacity-0 group-hover/n:opacity-100'}">]</span>
       </a>
@@ -104,6 +109,7 @@
         {#each collections as c (c.slug)}<a href={c.href} onclick={() => (open = false)} class="block py-1 pl-4 text-base text-muted-foreground">{c.name}</a>{/each}
         <a href="/auteurs" onclick={() => (open = false)} class="mt-2 block py-2 font-medium">Auteurs</a>
         <a href="/rencontres" onclick={() => (open = false)} class="block py-2 font-medium">Rencontres</a>
+        {#if club}<a href="/club" onclick={() => (open = false)} class="block py-2 font-medium">Le club</a>{/if}
         <a href="/a-propos" onclick={() => (open = false)} class="block py-2 font-medium">À propos</a>
         <a href={accountHref} onclick={() => (open = false)} class="mt-2 block border-t border-border py-2 pt-3 font-medium text-link">{accountLabel}</a>
       </nav>

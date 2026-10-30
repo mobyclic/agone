@@ -3,7 +3,7 @@
    * Fenêtre promotionnelle (Réclames). N'apparaît qu'au défilement (un visiteur
    * qui lit, pas un visiteur qui arrive), en fondu ; se ferme d'un clic ou avec
    * Échap, et ne revient qu'au rythme réglé : une fois (par version du texte),
-   * une fois par jour, à chaque visite, à chaque page.
+   * une fois par jour, ou à chaque visite.
    */
   import { onMount } from 'svelte';
   import { afterNavigate } from '$app/navigation';
@@ -50,7 +50,7 @@
     window.addEventListener('scroll', surDefilement, { passive: true });
     desarmer = () => window.removeEventListener('scroll', surDefilement);
   }
-  // Réarmée à chaque page : « à chaque page » revient bien après une navigation.
+  // Réarmée à chaque page : pas encore vue (pas assez défilé), elle reste à l'affût après une navigation.
   afterNavigate(() => { if (!apercu) armer(); });
 
   /** Mouvement réduit demandé par le système : pas d'animation. */

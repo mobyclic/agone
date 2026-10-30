@@ -6,7 +6,7 @@ import { sendWelcomeEmail } from '$lib/server/mail';
 import { withFlash } from '$lib/toasts';
 
 export const load: ServerLoad = ({ locals, url }) => {
-  if (locals.user) throw redirect(303, url.searchParams.get('next') || '/');
+  if (locals.user) throw redirect(303, safeNext(url.searchParams.get('next')));
 };
 
 function safeNext(next: string | null): string {

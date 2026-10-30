@@ -1,24 +1,42 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getClub, adhesionActive, clientStripe } from '$lib/server/club';
+import { getClub, adhesionActive, clientStripe, regleClub, RAPPEL_JOURS } from '$lib/server/club';
 import { isStripeEnabled, createClubSubscriptionCheckout, createBillingPortalSession } from '$lib/server/stripe';
+import { livresDuFonds, compterFonds } from '$lib/server/catalogue';
+import { prixRemise } from '$lib/promoCalcul';
+
+/** Nom porté sur la carte de membre : le nom du compte, ou à défaut le début de l'e-mail (« jeanne.dupont » → « Jeanne Dupont »). */
+function nomCarte(u: App.Locals['user']): string {
+  if (!u) return '';
+  const nom = u.full_name?.trim() || `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim();
+  if (nom) return nom;
+  return (u.email ?? '').split('@')[0].split(/[._-]+/).filter(Boolean).map((m) => m[0].toUpperCase() + m.slice(1)).join(' ');
+}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   const club = await getClub();
   if (!club.active) throw error(404, { message: 'Page introuvable' });
-  const adhesion = await adhesionActive(locals.user?.id);
-  const client = locals.user ? await clientStripe(locals.user.id) : null;
+  const [adhesion, client, fonds, titresFonds] = await Promise.all([
+    adhesionActive(locals.user?.id),
+    locals.user ? clientStripe(locals.user.id) : Promise.resolve(null),
+    livresDuFonds(club.fond_ans, 6),
+    compterFonds(club.fond_ans)
+  ]);
+  // Le prix membre se calcule avec la règle même qu'applique le panier.
+  const regle = regleClub(club);
   return {
-    club, connecte: !!locals.user, merci: url.searchParams.get('merci') === '1', paiementEnLigne: isStripeEnabled(),
+    club, connecte: !!locals.user, nom: nomCarte(locals.user), merci: url.searchParams.get('merci') === '1', paiementEnLigne: isStripeEnabled(),
     adhesion: adhesion ? { ends_at: adhesion.ends_at, auto_renew: adhesion.auto_renew } : null,
-    portail: !!client && isStripeEnabled()
+    portail: !!client && isStripeEnabled(),
+    rappelJours: RAPPEL_JOURS, titresFonds,
+    fonds: fonds.map((b) => ({ ...b, prix_membre: prixRemise(regle, b.price_paper ?? 0) }))
   };
 };
 
 export const actions: Actions = {
   /** Adhésion en abonnement : renouvelée automatiquement ; un membre déjà actif ne paie qu'à la fin de sa période. */
   adherer: async ({ locals, url }) => {
-    if (!locals.user) throw redirect(303, `/connexion?redirect=${encodeURIComponent('/club')}`);
+    if (!locals.user) throw redirect(303, `/connexion?next=${encodeURIComponent('/club')}`);
     const club = await getClub();
     if (!club.active) return fail(400, { error: 'Le club est fermé.' });
     if (!isStripeEnabled()) return fail(400, { error: 'Le paiement en ligne est indisponible pour le moment : écrivez-nous pour adhérer.' });
@@ -40,7 +58,7 @@ export const actions: Actions = {
   },
   /** Portail Stripe : carte, factures, arrêt du renouvellement. */
   gerer: async ({ locals, url }) => {
-    if (!locals.user) throw redirect(303, `/connexion?redirect=${encodeURIComponent('/club')}`);
+    if (!locals.user) throw redirect(303, `/connexion?next=${encodeURIComponent('/club')}`);
     const client = await clientStripe(locals.user.id);
     if (!client) return fail(400, { error: 'Aucun abonnement en ligne à gérer.' });
     let lien: string | null = null;
