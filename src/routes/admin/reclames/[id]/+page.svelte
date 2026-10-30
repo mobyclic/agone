@@ -47,7 +47,7 @@
           <label class={label}>Fréquence
             <select name="frequency" value={r?.frequency ?? 'day'} class="{input} mt-1">{#each Object.entries(data.frequences) as [k, v] (k)}<option value={k}>{v}</option>{/each}</select>
           </label>
-          <label class={label}>Délai d'apparition (s) <input type="number" name="delay" min="0" max="60" value={r?.delay ?? 2} class="{input} mt-1" /></label>
+          <p class="self-end pb-2 text-xs text-muted-foreground">Apparition en fondu, dès que le visiteur fait défiler la page.</p>
         </div>
       {/if}
     </div>
