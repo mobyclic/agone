@@ -9,9 +9,12 @@
    *
    * La carte n'est jamais la source de vérité : elle réagit à `selection`, elle
    * ne la fixe qu'en la déclarant. Une seule direction, pas de boucle.
+   *
+   * La liste est paginée (`parPage`), la carte porte TOUTES les rencontres : un
+   * clic sur un point ouvre la page de la liste où se trouve la rencontre.
    */
   import { onMount, onDestroy } from 'svelte';
-  import { MapPin, Phone, Globe, X, CalendarBlank } from 'phosphor-svelte';
+  import { MapPin, Phone, Globe, X, CalendarBlank, CaretLeft, CaretRight } from 'phosphor-svelte';
   import { ajouterFondDeCarteAuDefilement, zoomLisible } from '$lib/client/map-tiles';
 
   interface Venue {
@@ -23,7 +26,7 @@
     excerpt?: string; cover_url?: string; author_names: string[]; venue?: Venue;
   }
 
-  let { events = [] }: { events?: Entry[] } = $props();
+  let { events = [], parPage = 5 }: { events?: Entry[]; parPage?: number } = $props();
 
   /** Slug de la rencontre dépliée, ou null pour la vue d'ensemble. */
   let selection = $state<string | null>(null);
@@ -31,6 +34,32 @@
   let listeEl = $state<HTMLDivElement>();
 
   const situees = $derived(events.filter((e) => e.venue?.lat != null && e.venue?.lng != null));
+
+  // ── Pagination de la liste ───────────────────────────────────────────────
+  let pageCourante = $state(0);
+  const nbPages = $derived(Math.max(1, Math.ceil(events.length / parPage)));
+  const visibles = $derived(events.slice(pageCourante * parPage, (pageCourante + 1) * parPage));
+  const pageDe = (slug: string) => Math.max(0, Math.floor(events.findIndex((x) => x.slug === slug) / parPage));
+  /** Numéros affichés : première, dernière, et la page courante entourée de ses voisines. */
+  const numeros = $derived.by(() => {
+    const garder = new Set([0, nbPages - 1, pageCourante - 1, pageCourante, pageCourante + 1]);
+    const out: (number | null)[] = [];
+    for (let i = 0; i < nbPages; i++) {
+      if (garder.has(i)) out.push(i);
+      else if (out[out.length - 1] !== null) out.push(null);
+    }
+    return out;
+  });
+
+  function allerPage(p: number) {
+    const n = Math.min(nbPages - 1, Math.max(0, p));
+    if (n === pageCourante) return;
+    pageCourante = n;
+    // La fiche ouverte n'est plus dans la page affichée : retour à la vue d'ensemble.
+    if (selection && pageDe(selection) !== n) fermer();
+    // Changement de page depuis le bas de la liste : on en remonte le haut dans le champ.
+    if (listeEl && listeEl.getBoundingClientRect().top < 0) listeEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
 
   // ── Dates ────────────────────────────────────────────────────────────────
   const jour = (s?: string) => (s ? new Date(s).getDate() : '');
@@ -96,6 +125,7 @@
   }
 
   function ouvrir(slug: string, depuisCarte = false) {
+    pageCourante = pageDe(slug);
     selection = slug;
     const e = events.find((x) => x.slug === slug);
     if (e?.venue?.lat != null && e.venue?.lng != null && map) {
@@ -163,22 +193,22 @@
     return () => { annule = true; };
   });
 
+  const pagine = 'inline-flex items-center gap-1.5 px-2 py-1.5 font-display text-sm uppercase tracking-wide transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-30';
+
   onDestroy(() => { try { map?.remove(); } catch { /* carte déjà retirée */ } });
 </script>
 
 <div class="grid gap-y-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" style="column-gap: var(--page-gutter)">
   <!-- Carte -->
-  <div id="carte" class="order-2 scroll-mt-24 lg:order-1">
+  <!-- Collée en haut sur grand écran : une fiche dépliée allonge la liste, la carte reste en vue. -->
+  <div id="carte" class="order-2 scroll-mt-24 lg:sticky lg:top-24 lg:order-1 lg:self-start">
     <div bind:this={el} class="ag-map-gray h-[320px] w-full rounded-lg border border-border sm:h-[420px] lg:h-[620px]"></div>
   </div>
 
-  <!-- Liste défilante -->
+  <!-- Liste paginée -->
   <div class="order-1 lg:order-2">
-    <div
-      bind:this={listeEl}
-      class="divide-y divide-border border-t border-border lg:max-h-[620px] lg:overflow-y-auto"
-    >
-      {#each events as e (e.slug)}
+    <div bind:this={listeEl} class="scroll-mt-28 divide-y divide-border border-y border-border">
+      {#each visibles as e (e.slug)}
         {@const ouverte = selection === e.slug}
         <div data-slug={e.slug} class="relative scroll-mt-2 border-l-[3px] transition-colors {ouverte ? 'border-foreground bg-muted/60' : 'border-transparent'}">
           {#if ouverte}
@@ -273,6 +303,32 @@
         <p class="px-2 py-6 text-sm text-muted-foreground">Aucune rencontre à venir pour le moment.</p>
       {/if}
     </div>
+
+    {#if nbPages > 1}
+      <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Pages de l’agenda">
+        <button type="button" onclick={() => allerPage(pageCourante - 1)} disabled={pageCourante === 0} class={pagine}>
+          <CaretLeft size={14} weight="bold" /><span class="hidden sm:inline">Précédentes</span>
+        </button>
+        <div class="flex items-center gap-1">
+          {#each numeros as n, i (n ?? `ellipse-${i}`)}
+            {#if n === null}
+              <span class="px-1 text-muted-foreground" aria-hidden="true">…</span>
+            {:else}
+              <button
+                type="button"
+                onclick={() => allerPage(n)}
+                aria-current={n === pageCourante ? 'page' : undefined}
+                aria-label="Page {n + 1}"
+                class="grid size-8 place-items-center font-display text-sm transition-colors {n === pageCourante ? 'bg-foreground text-background' : 'hover:bg-muted'}"
+              >{n + 1}</button>
+            {/if}
+          {/each}
+        </div>
+        <button type="button" onclick={() => allerPage(pageCourante + 1)} disabled={pageCourante === nbPages - 1} class={pagine}>
+          <span class="hidden sm:inline">Suivantes</span><CaretRight size={14} weight="bold" />
+        </button>
+      </nav>
+    {/if}
   </div>
 </div>
 

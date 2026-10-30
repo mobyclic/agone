@@ -18,8 +18,8 @@ export const load: PageServerLoad = async () => {
     featured,
     feature,
     articles,
-    // Agenda complet : la section Rencontres de l'accueil les porte toutes, la
-    // liste défile et la carte suit (cf. EventsExplorer).
+    // Agenda complet : la carte les porte toutes, la liste les pagine par 5
+    // (cf. EventsExplorer).
     events: upcoming
   };
 };

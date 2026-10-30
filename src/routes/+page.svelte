@@ -133,7 +133,7 @@
   </section>
 {/if}
 
-<!-- RENCONTRES — carte de France (pastilles) + 6 prochaines rencontres -->
+<!-- RENCONTRES — carte de toutes les rencontres à venir + liste paginée par 5 -->
 {#if data.events.length}
   <section class="bg-background">
     <div class="py-14" style="padding-inline: var(--page-gutter)">
