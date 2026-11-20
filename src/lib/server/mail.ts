@@ -1,7 +1,9 @@
 /**
- * Emails transactionnels via Resend.
+ * Emails transactionnels via Resend, ou Brevo.
  *
  * Variables d'env :
+ *   MAIL_PROVIDER    — « brevo » pour envoyer par Brevo (BREVO_API_KEY) ; sinon Resend. La clé Brevo
+ *                      sert aussi à la newsletter : sa seule présence ne change pas de prestataire.
  *   RESEND_API_KEY   — clé API Resend (re_…). Absente → log console (dev).
  *   MAIL_FROM        — expéditeur vérifié ("Agone <hello@agone.org>")
  *   MAIL_REPLY_TO    — (optionnel) adresse de réponse
@@ -18,6 +20,40 @@ function getClient(): Resend | null {
   if (!key) return null;
   _client = new Resend(key);
   return _client;
+}
+
+/** Brevo choisi explicitement (MAIL_PROVIDER=brevo) et clé présente. */
+const BREVO = (env.MAIL_PROVIDER ?? '').trim().toLowerCase() === 'brevo' && !!env.BREVO_API_KEY;
+
+/** « Nom <adresse> » → { email, name } attendu par Brevo. */
+function adresse(v: string): { email: string; name?: string } {
+  const m = v.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  return m ? { email: m[2].trim(), ...(m[1].trim() ? { name: m[1].trim() } : {}) } : { email: v.trim() };
+}
+
+/** Un envoi par l'API Brevo (https://api.brevo.com/v3/smtp/email). */
+async function envoiBrevo(o: SendMailOptions): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const replyTo = o.replyTo || REPLY_TO;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY as string, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        sender: adresse(o.from || FROM),
+        to: (Array.isArray(o.to) ? o.to : [o.to]).map((t) => adresse(t)),
+        subject: o.subject,
+        htmlContent: o.html,
+        ...(o.text ? { textContent: o.text } : {}),
+        ...(replyTo ? { replyTo: adresse(replyTo) } : {}),
+        ...(o.headers ? { headers: o.headers } : {}),
+        ...(o.attachments?.length ? { attachment: o.attachments.map((a) => ({ name: a.filename, content: a.content.toString('base64') })) } : {})
+      })
+    });
+    const j: any = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true, id: j.messageId } : { ok: false, error: `Brevo ${res.status} : ${j.message ?? res.statusText}` };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
 }
 
 const FROM = env.MAIL_FROM || 'Agone <onboarding@resend.dev>';
@@ -62,6 +98,8 @@ export async function sendMail(
     return { ok: true, id: 'preview' };
   }
 
+  if (BREVO) return envoiBrevo(opts);
+
   const client = getClient();
   if (!client) {
     // Dev : pas de clé Resend → on log.
@@ -102,13 +140,22 @@ export async function sendMailBatch(
       ...o, to: dryRunTo, subject: `[DRY-RUN → ${Array.isArray(o.to) ? o.to.join(', ') : o.to}] ${o.subject}`
     }));
   }
+  const erreurs: string[] = [];
+  let ok = 0;
+  if (BREVO) {
+    // Brevo : un appel par message (chaque abonné a son lien de désabonnement), 4 toutes les 2,5 s.
+    for (let i = 0; i < envois.length; i += 4) {
+      const r = await Promise.all(envois.slice(i, i + 4).map((o) => envoiBrevo(o)));
+      for (const x of r) { if (x.ok) ok++; else if (x.error) erreurs.push(x.error); }
+      if (i + 4 < envois.length) await new Promise((f) => setTimeout(f, 2500));
+    }
+    return { ok: DRY_RUN ? lots.length : ok, erreurs };
+  }
   const client = getClient();
   if (!client) {
     console.log(`[mail] (console) lot de ${envois.length} message(s) — ${envois[0]?.subject}`);
     return { ok: lots.length, erreurs: [] };
   }
-  const erreurs: string[] = [];
-  let ok = 0;
   for (let i = 0; i < envois.length; i += 100) {
     const tranche = envois.slice(i, i + 100);
     try {

@@ -6,8 +6,8 @@
  * le paiement, les mails ou le stockage se coupent en silence. Toute nouvelle variable
  * lue par le serveur se déclare ici.
  *
- * - `static: true` : valeur figée au build (comme l'ancien `$env/static/private`).
- * - sinon : lue au démarrage du serveur (comme l'ancien `$env/dynamic/private`).
+ * Toutes sont lues au démarrage du serveur (aucune n'est figée dans le build) ; `facultative` :
+ * absente, elle vaut `undefined`, sinon SvelteKit refuse de démarrer sans elle.
  */
 import { defineEnvVars } from '@sveltejs/kit/env';
 
@@ -15,12 +15,14 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 const facultative = { schema: (v: string | undefined) => v };
 
 export const variables = defineEnvVars({
-  // ── Base de données : figée au build ──────────────────────────
-  SURREAL_URL: { static: true, description: 'Adresse RPC de SurrealDB' },
-  SURREAL_NAMESPACE: { static: true },
-  SURREAL_DATABASE: { static: true },
-  SURREAL_USER: { static: true },
-  SURREAL_PASS: { static: true },
+  // ── Base de données : lue au démarrage. Facultative pour SvelteKit (qui valide aussi au
+  //    build, où aucun secret ne doit entrer) ; c'est la connexion qui en exige la présence. ──
+  SURREAL_URL: { ...facultative, description: 'Adresse RPC de SurrealDB' },
+  SURREAL_NAMESPACE: facultative,
+  SURREAL_DATABASE: facultative,
+  SURREAL_USER: facultative,
+  SURREAL_PASS: facultative,
+  SURREAL_AUTH_LEVEL: { ...facultative, description: '« database » : compte limité à la base (VPS) ; absent : compte root' },
 
   // ── Site ──────────────────────────────────────────────────────
   PUBLIC_SITE_URL: facultative,
@@ -32,6 +34,7 @@ export const variables = defineEnvVars({
   STRIPE_WEBHOOK_SECRET: facultative,
 
   // ── Mails (Resend) et newsletter (Brevo) ──────────────────────
+  MAIL_PROVIDER: { ...facultative, description: '« brevo » pour envoyer par Brevo ; sinon Resend' },
   RESEND_API_KEY: facultative,
   MAIL_FROM: facultative,
   MAIL_REPLY_TO: facultative,
@@ -40,6 +43,14 @@ export const variables = defineEnvVars({
   MAIL_PREVIEW_DIR: facultative,
   BREVO_API_KEY: facultative,
   BREVO_LIST_ID: facultative,
+
+  // ── Stockage Infomaniak (S3) : prioritaire dès que S3_ENDPOINT est défini ──
+  S3_ENDPOINT: facultative,
+  S3_REGION: facultative,
+  S3_BUCKET: facultative,
+  S3_ACCESS_KEY_ID: facultative,
+  S3_SECRET_ACCESS_KEY: facultative,
+  FICHIERS_URL: { ...facultative, description: 'Adresse publique des fichiers servis par l’appli : https://<site>/fichiers' },
 
   // ── Stockage (Cloudflare R2) ──────────────────────────────────
   CLOUDFLARE_ACCOUNT_ID: facultative,

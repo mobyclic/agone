@@ -38,9 +38,29 @@ const PUBLIC_URL  = (env.CLOUDFLARE_R2_PUBLIC_URL ?? '').replace(/\/+$/, '');
 // utilisent l'endpoint <account>.eu.r2.cloudflarestorage.com.
 const JURISDICTION = (env.CLOUDFLARE_R2_JURISDICTION ?? '').trim().toLowerCase();
 
+/**
+ * Infomaniak (S3, Suisse) : dès que S3_ENDPOINT est défini, tout vit dans UN bucket privé
+ * (S3_BUCKET) et l'application sert elle-même les fichiers publics sur /fichiers/<clé>
+ * (route src/routes/fichiers/[...cle]). Sinon : Cloudflare R2 comme avant (Railway).
+ */
+const S3_ENDPOINT = (env.S3_ENDPOINT ?? '').trim();
+const INFOMANIAK = !!S3_ENDPOINT;
+/** Adresse absolue des fichiers servis par l'appli (mails, newsletter) : https://<site>/fichiers */
+const FICHIERS_URL = (env.FICHIERS_URL ?? '').replace(/\/+$/, '');
+
 let _client: S3Client | null = null;
 function getClient(): S3Client {
   if (_client) return _client;
+  if (INFOMANIAK) {
+    if (!env.S3_BUCKET || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) throw new Error('Stockage S3 mal configuré : S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY');
+    _client = new S3Client({
+      region: env.S3_REGION || 'us-east-1',
+      endpoint: S3_ENDPOINT,
+      forcePathStyle: true,
+      credentials: { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY }
+    });
+    return _client;
+  }
   if (!ACCOUNT_ID || !ACCESS_KEY || !SECRET_KEY || !BUCKET) {
     throw new Error('Cloudflare R2 misconfigured — check CLOUDFLARE_* env vars');
   }
@@ -56,7 +76,7 @@ function getClient(): S3Client {
 }
 
 /** Préfixes stockés dans le bucket privé (jamais d'URL publique). */
-const PREFIXES_PRIVES = ['livres/ebooks/', 'contrats/', 'factures/'];
+const PREFIXES_PRIVES = ['livres/ebooks/', 'contrats/', 'factures/', 'carnets/'];
 
 /** Le fichier est-il de ceux qui ne doivent pas être servis en direct ? */
 export function estPrive(key: string): boolean {
@@ -66,11 +86,13 @@ export function estPrive(key: string): boolean {
 
 /** Bucket où vit cette clé : privé pour les ebooks (si configuré), principal sinon. */
 function bucketFor(key: string): string {
+  if (INFOMANIAK) return env.S3_BUCKET as string;
   return estPrive(key) && BUCKET_PRIVE ? BUCKET_PRIVE : (BUCKET as string);
 }
 
 /** Construit l'URL publique d'un fichier stocké (à partir de sa clé). */
 export function publicUrlFor(key: string): string {
+  if (INFOMANIAK) return `${FICHIERS_URL || '/fichiers'}/${key.replace(/^\/+/, '')}`;
   if (!PUBLIC_URL) return key; // fallback : on retourne la clé brute
   return `${PUBLIC_URL}/${key.replace(/^\/+/, '')}`;
 }
@@ -152,12 +174,12 @@ export async function uploadBuffer(opts: {
 }
 
 /** Récupère un objet privé du bucket (pour servir via un endpoint authentifié). Null si absent. */
-export async function getObject(key: string): Promise<{ body: Uint8Array; contentType?: string } | null> {
+export async function getObject(key: string): Promise<{ body: Uint8Array; contentType?: string; cacheControl?: string; etag?: string; lastModified?: Date } | null> {
   const client = getClient();
   try {
     const res: any = await client.send(new GetObjectCommand({ Bucket: bucketFor(key), Key: key }));
     const body = (await res.Body.transformToByteArray()) as Uint8Array;
-    return { body, contentType: res.ContentType };
+    return { body, contentType: res.ContentType, cacheControl: res.CacheControl, etag: res.ETag, lastModified: res.LastModified };
   } catch (e: any) {
     if (e?.name === 'NoSuchKey' || e?.$metadata?.httpStatusCode === 404) return null;
     throw e;

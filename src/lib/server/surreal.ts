@@ -9,8 +9,16 @@ import {
   SURREAL_NAMESPACE,
   SURREAL_DATABASE,
   SURREAL_USER,
-  SURREAL_PASS
+  SURREAL_PASS,
+  SURREAL_AUTH_LEVEL
 } from '$app/env/private';
+
+// SURREAL_AUTH_LEVEL=database : le compte n'existe que sur cette base (moindre privilège,
+// serveur Infomaniak) et se connecte en précisant namespace + database. Sinon : compte root.
+function credentials() {
+  const base = { username: SURREAL_USER as string, password: SURREAL_PASS as string };
+  return SURREAL_AUTH_LEVEL === 'database' ? { namespace: SURREAL_NAMESPACE as string, database: SURREAL_DATABASE as string, ...base } : base;
+}
 
 /** Détecte une erreur de connexion à SurrealDB (DB éteinte, refus, timeout…). */
 function isConnectionError(err: unknown): boolean {
@@ -75,10 +83,13 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 }
 
 async function connect(): Promise<Surreal> {
+  if (!SURREAL_URL || !SURREAL_NAMESPACE || !SURREAL_DATABASE || !SURREAL_USER || !SURREAL_PASS) {
+    throw new Error('SurrealDB non configuré : SURREAL_URL, SURREAL_NAMESPACE, SURREAL_DATABASE, SURREAL_USER, SURREAL_PASS');
+  }
   const instance = new Surreal();
-  await withTimeout(instance.connect(SURREAL_URL, { versionCheck: false }), CONNECT_TIMEOUT_MS, 'connect');
+  await withTimeout(instance.connect(SURREAL_URL as string, { versionCheck: false }), CONNECT_TIMEOUT_MS, 'connect');
   await instance.use({ namespace: SURREAL_NAMESPACE, database: SURREAL_DATABASE });
-  await instance.signin({ username: SURREAL_USER, password: SURREAL_PASS });
+  await instance.signin(credentials());
   return instance;
 }
 

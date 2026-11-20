@@ -1,0 +1,14 @@
+node_modules
+build
+.svelte-kit
+.surrealdata
+.env
+.env.*
+!.env.example
+tmp
+_archive
+scripts/backups
+static/_r2-local
+*.log
+.git
+history.txt
