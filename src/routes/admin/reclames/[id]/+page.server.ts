@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
   const commun = { kinds: KIND_RECLAME, frequences: FREQUENCES };
   if (params.id === 'nouveau') return { reclame: null, kind: (url.searchParams.get('kind') === 'modal' ? 'modal' : 'bandeau') as KindReclame, ...commun };
   const reclame = await getReclame(params.id);
-  if (!reclame) throw error(404, { message: 'Réclame introuvable' });
+  if (!reclame) throw error(404, 'Réclame introuvable');
   return { reclame, kind: reclame.kind, ...commun };
 };
 

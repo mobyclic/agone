@@ -9,7 +9,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   requireAdmin(locals);
   const p = url.searchParams;
   const code = p.get('canal') ?? '';
-  if (!code) throw error(400, { message: 'canal manquant' });
+  if (!code) throw error(400, 'canal manquant');
   try {
     return json(await lignesCanal({
       code, annee: Number(p.get('annee')) || new Date().getUTCFullYear(),
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
       q: p.get('q') ?? '', format: p.get('format') ?? ''
     }));
   } catch (e) {
-    throw error(400, { message: e instanceof Error ? e.message : 'Lecture impossible' });
+    throw error(400, e instanceof Error ? e.message : 'Lecture impossible');
   }
 };
 
@@ -36,5 +36,5 @@ export const PATCH: RequestHandler = async ({ request, locals }) => {
     await modifierNoteCommande(Number(b.number), b.note ?? null);
     return json({ ok: true });
   }
-  throw error(400, { message: 'Requête incomplète' });
+  throw error(400, 'Requête incomplète');
 };

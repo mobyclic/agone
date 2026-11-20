@@ -6,7 +6,7 @@ import { articlesPourAuteur } from '$lib/server/articles';
 
 export const load: PageServerLoad = async ({ params }) => {
   const author = await getAuthorBySlug(params.slug);
-  if (!author) throw error(404, { message: 'Auteur introuvable' });
+  if (!author) throw error(404, 'Auteur introuvable');
   const [rencontres, articles] = await Promise.all([upcomingForAuthor(author.id), articlesPourAuteur(author.id, author.full_name)]);
   return { author, rencontres, articles };
 };

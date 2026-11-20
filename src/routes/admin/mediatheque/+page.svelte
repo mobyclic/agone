@@ -22,7 +22,7 @@
     const merged: Record<string, string | number | undefined> = { usage: data.usage || undefined, q, page: data.page, ...params };
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) if (v !== undefined && v !== '' && !(k === 'page' && v === 1)) sp.set(k, String(v));
-    goto(`/admin/mediatheque${sp.size ? `?${sp}` : ''}`, { keepFocus: true, replaceState: true, noScroll: true });
+    goto(`/admin/mediatheque${sp.size ? `?${sp}` : ''}`, { replace: true, reset: false });
   }
   const onSearch = () => { clearTimeout(timer); timer = setTimeout(() => nav({ q, page: 1 }), 220); };
   const taille = (n?: number) => (n == null ? '' : n > 1e6 ? `${(n / 1e6).toFixed(1)} Mo` : `${Math.round(n / 1e3)} Ko`);

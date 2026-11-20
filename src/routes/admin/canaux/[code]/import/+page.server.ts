@@ -10,8 +10,8 @@ import { journaliser } from '$lib/server/journal';
 export const load: PageServerLoad = async ({ params, locals }) => {
   requireAdmin(locals);
   const canal = await getCanal(params.code);
-  if (!canal) throw error(404, { message: 'Canal introuvable' });
-  if (canal.mode !== 'manuel') throw error(400, { message: 'Ce canal est alimenté par une API, pas par un tableur.' });
+  if (!canal) throw error(404, 'Canal introuvable');
+  if (canal.mode !== 'manuel') throw error(400, 'Ce canal est alimenté par une API, pas par un tableur.');
   return { canal, champs: CHAMPS };
 };
 
@@ -36,7 +36,7 @@ export const actions: Actions = {
   importer: async ({ request, params, locals }) => {
     requireAdmin(locals);
     const canal = await getCanal(params.code!);
-    if (!canal) throw error(404, { message: 'Canal introuvable' });
+    if (!canal) throw error(404, 'Canal introuvable');
     const fd = await request.formData();
     const lecture = lectureEnAttente(String(fd.get('token') ?? ''));
     if (!lecture) return fail(400, { error: 'Le fichier lu a expiré : redéposez-le.' });

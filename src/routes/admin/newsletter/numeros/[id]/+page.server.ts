@@ -11,7 +11,7 @@ import { journaliser } from '$lib/server/journal';
 export const load: PageServerLoad = async ({ params }) => {
   if (params.id === 'nouveau') return { isNew: true, issue: null };
   const issue = await getNewsletterIssue(params.id);
-  if (!issue) throw error(404, { message: 'Numéro introuvable' });
+  if (!issue) throw error(404, 'Numéro introuvable');
   const [stats, envoi] = await Promise.all([
     subscriberStats(),
     query<any>(`SELECT newsletter_sent_at, newsletter_sent_count, newsletter_test_sent_at FROM $id`, { id: recId('article', params.id) })

@@ -8,7 +8,7 @@ import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const user = await getUserForEdit(params.id);
-  if (!user) throw error(404, { message: 'Client introuvable' });
+  if (!user) throw error(404, 'Client introuvable');
   return { client: user };
 };
 
@@ -16,7 +16,7 @@ export const actions: Actions = {
   save: async ({ request, params, locals }) => {
     requireAdmin(locals);
     const id = params.id;
-    if (!id) throw error(404, { message: 'Client introuvable' });
+    if (!id) throw error(404, 'Client introuvable');
     const fd = await request.formData();
     const S = (k: string) => String(fd.get(k) ?? '').trim();
     try {
@@ -40,7 +40,7 @@ export const actions: Actions = {
   password: async ({ request, params, locals, cookies }) => {
     requireAdmin(locals);
     const id = params.id;
-    if (!id) throw error(404, { message: 'Client introuvable' });
+    if (!id) throw error(404, 'Client introuvable');
     const fd = await request.formData();
     const pw = String(fd.get('password') ?? '');
     const confirm = String(fd.get('password_confirm') ?? '');

@@ -7,7 +7,7 @@ import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const statement = await getStatement(params.id);
-  if (!statement) throw error(404, { message: 'Reddition introuvable' });
+  if (!statement) throw error(404, 'Reddition introuvable');
   return { statement };
 };
 
@@ -15,7 +15,7 @@ export const actions: Actions = {
   status: async ({ request, params, locals }) => {
     requireAdmin(locals);
     const id = params.id;
-    if (!id) throw error(400, { message: 'Reddition manquante' });
+    if (!id) throw error(400, 'Reddition manquante');
     const fd = await request.formData();
     const status = String(fd.get('status') || '') as 'draft' | 'issued' | 'paid';
     if (['draft', 'issued', 'paid'].includes(status)) {

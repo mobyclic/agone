@@ -19,7 +19,7 @@
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 const ACCOUNT_ID  = env.CLOUDFLARE_ACCOUNT_ID;
 const ACCESS_KEY  = env.CLOUDFLARE_R2_ACCESS_KEY_ID;

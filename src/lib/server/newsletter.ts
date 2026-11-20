@@ -6,7 +6,7 @@
  */
 import { query, recId } from './surreal';
 import { generateToken } from './auth/password';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 const norm = (email: string) => email.trim().toLowerCase();
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;

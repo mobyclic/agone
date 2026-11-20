@@ -10,7 +10,7 @@ import {
   SURREAL_DATABASE,
   SURREAL_USER,
   SURREAL_PASS
-} from '$env/static/private';
+} from '$app/env/private';
 
 /** Détecte une erreur de connexion à SurrealDB (DB éteinte, refus, timeout…). */
 function isConnectionError(err: unknown): boolean {
@@ -140,7 +140,7 @@ export async function query<T = unknown>(
   } catch (err) {
     invalidate();
     if (isConnectionError(err)) {
-      throw error(503, { code: 'DB_DOWN', message: 'Base de données injoignable' });
+      throw error(503, 'Base de données injoignable', { code: 'DB_DOWN' });
     }
     throw err;
   }
@@ -157,7 +157,7 @@ export async function query<T = unknown>(
     } catch (retryErr) {
       invalidate();
       if (isConnectionError(retryErr)) {
-        throw error(503, { code: 'DB_DOWN', message: 'Base de données injoignable' });
+        throw error(503, 'Base de données injoignable', { code: 'DB_DOWN' });
       }
       throw retryErr;
     }

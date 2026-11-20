@@ -18,7 +18,7 @@
   /** Canaux dépliés : chacun charge son tableau à l'ouverture. */
   let deplies = $state(new SvelteSet<string>());
   const basculer = (code: string) => (deplies.has(code) ? deplies.delete(code) : deplies.add(code));
-  const changerAnnee = (a: number) => goto(`?annee=${a}`, { keepFocus: true, noScroll: true });
+  const changerAnnee = (a: number) => goto(`?annee=${a}`, { reset: false });
   const input = 'h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary';
   const lbl = 'mb-1 block text-xs font-medium text-muted-foreground';
   const fmtP = (s: string, e: string) => `${new Date(s).toLocaleDateString('fr-FR')} → ${new Date(e).toLocaleDateString('fr-FR')}`;

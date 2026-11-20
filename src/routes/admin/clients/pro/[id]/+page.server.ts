@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const remiseDefaut = await remiseDepotDefaut();
   if (params.id === 'nouveau') return { client: null, factures: [], kinds: KINDS_CLIENT, remiseDefaut };
   const client = await getClientPro(params.id);
-  if (!client) throw error(404, { message: 'Client introuvable' });
+  if (!client) throw error(404, 'Client introuvable');
   return { client, factures: await facturesDuClient(params.id), kinds: KINDS_CLIENT, remiseDefaut };
 };
 

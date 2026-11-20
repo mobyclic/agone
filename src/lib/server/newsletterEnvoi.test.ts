@@ -9,7 +9,7 @@ const ABONNES = Array.from({ length: 230 }, (_, i) => ({ email: `a${i}@ex.org`, 
 const envois: any[] = [];
 const updates: any[] = [];
 
-mock.module('$env/dynamic/private', () => ({ env: {} }));
+mock.module('$app/env/private', () => ({}));
 mock.module('./surreal.ts', () => ({
   recId: (t: string, id: string) => `${t}:${id}`,
   query: async (sql: string, vars: any = {}) => {

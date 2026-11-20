@@ -13,7 +13,7 @@ import {
 export const load: PageServerLoad = async ({ params, locals }) => {
   requireAdmin(locals);
   const client = await getClientPro(params.id);
-  if (!client?.depositaire) throw error(404, { message: 'Dépôt introuvable' });
+  if (!client?.depositaire) throw error(404, 'Dépôt introuvable');
   const [stock, mouvements, carnets, remise] = await Promise.all([stockDepot(params.id), mouvementsDepot(params.id), listCarnets(params.id), remisePour(client)]);
   return { client, stock, mouvements, carnets, remise, kinds: KIND_MOUVEMENT };
 };

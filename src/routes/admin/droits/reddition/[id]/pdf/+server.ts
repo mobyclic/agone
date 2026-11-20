@@ -16,6 +16,6 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
       }
     });
   } catch (e) {
-    throw error(500, { message: e instanceof Error ? e.message : 'PDF impossible' });
+    throw error(500, e instanceof Error ? e.message : 'PDF impossible');
   }
 };

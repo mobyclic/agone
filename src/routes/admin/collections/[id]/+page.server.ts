@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ params }) => {
     getCollectionForEdit(params.id),
     booksInCollectionAdmin(params.id)
   ]);
-  if (!collection) throw error(404, { message: 'Collection introuvable' });
+  if (!collection) throw error(404, 'Collection introuvable');
   return { isNew: false, collection, books };
 };
 

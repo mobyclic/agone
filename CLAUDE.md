@@ -9,11 +9,23 @@ Les Belles Lettres). Voir `docs/` : `DISCOVERY-SUMMARY.md` (l'existant), `ARCHIT
 (la cible), `DECISIONS.md` (décisions produit), `docs/discovery/*` (rapports détaillés).
 
 ## Stack
-- **SvelteKit 2 + Svelte 5 (runes)**, `adapter-node`, déploiement Railway. Package manager : **bun**.
+- **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17, déploiement Railway. Package manager : **bun**.
+  Configuration dans `vite.config.ts` (plugin `sveltekit({ adapter, alias, … })`, plus de `svelte.config.js`).
 - **SurrealDB v2/3** (cloud), accès **HTTP** via `src/lib/server/surreal.ts` (connexion en root).
 - **Tailwind v4 + shadcn-svelte** (bits-ui, phosphor-svelte, svelte-sonner).
 - **Cloudflare R2** (couvertures publiques + ebooks privés), **Resend** (mails), **Stripe** (paiement), **Leaflet** (carte des rencontres).
 - **Monolingue français** — PAS d'i18n (pas de `$lib/i18n`, pas de champs `*_i18n`) ; contenu éditorial en texte simple.
+
+**SvelteKit 3 — règles qui piègent** (le build ne dit rien ; seule la première est vue par `bun run check`) :
+- **Variables d'environnement : les déclarer dans `src/env.ts`.** Seules celles-là existent dans
+  `$app/env/private` (`import * as env from '$app/env/private'`) ; une variable lue mais non déclarée
+  vaut `undefined` en silence. `static: true` = figée au build (les `SURREAL_*`), sinon lue au démarrage.
+- **Redirection hors du site** : `redirect(303, url, STRIPE_EXTERNE)` (`$lib/server/stripe`) — sans
+  liste d'origines, SvelteKit lève une erreur. Ne jamais passer `external: true` sur une adresse `?next=`.
+- **CSRF toujours actif en production** : un `POST` venu d'ailleurs sans `Content-Type` est refusé (403).
+  Les tâches planifiées envoient `-H "Content-Type: application/json"` (cf. `docs/CRONS.md`).
+- `$lib` est gardé par `alias` (déprécié, remplacé par `#lib`) ; `error(404, 'message', { code })`
+  (message en 2ᵉ argument) ; `goto(url, { replace: true, reset: false })` remplace `replaceState/keepFocus/noScroll`.
 
 ## Commandes
 ```

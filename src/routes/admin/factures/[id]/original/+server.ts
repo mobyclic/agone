@@ -8,9 +8,9 @@ import { getObject } from '$lib/server/storage';
 export const GET: RequestHandler = async ({ params, locals, url }) => {
   requireAdmin(locals);
   const inv = await getInvoice(params.id);
-  if (!inv?.document_key) throw error(404, { message: 'Pas de document d’origine' });
+  if (!inv?.document_key) throw error(404, 'Pas de document d’origine');
   const obj = await getObject(inv.document_key);
-  if (!obj) throw error(404, { message: 'Fichier introuvable' });
+  if (!obj) throw error(404, 'Fichier introuvable');
   const disposition = url.searchParams.get('dl') ? 'attachment' : 'inline';
   return new Response(obj.body as any, {
     headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `${disposition}; filename="${inv.ref}.pdf"`, 'Cache-Control': 'private, no-store' }

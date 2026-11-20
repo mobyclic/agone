@@ -9,7 +9,7 @@
  *   MAIL_PREVIEW_DIR — (dev) dossier où écrire chaque e-mail en HTML AU LIEU de l'envoyer (aperçu)
  */
 import { Resend } from 'resend';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 let _client: Resend | null = null;
 function getClient(): Resend | null {

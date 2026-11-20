@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     // Appelé avec l'identifiant (liens depuis les sélecteurs d'auteurs) : on renvoie vers le slug.
     const parId = await getAuthorAdmin(params.slug);
     if (parId?.slug) throw redirect(302, `/admin/auteurs/${parId.slug}`);
-    throw error(404, { message: 'Auteur introuvable' });
+    throw error(404, 'Auteur introuvable');
   }
   // Droits d'auteur : réservés aux administrateurs. `canSeeRoyalties` permet à la
   // page de distinguer « aucun relevé » de « relevés masqués ».
@@ -43,7 +43,7 @@ export const actions: Actions = {
     let existing: any = null;
     if (params.slug && params.slug !== 'nouveau') {
       existing = await getAuthorAdminBySlug(params.slug);
-      if (!existing) throw error(404, { message: 'Auteur introuvable' });
+      if (!existing) throw error(404, 'Auteur introuvable');
       editId = existing.pid;
     }
 

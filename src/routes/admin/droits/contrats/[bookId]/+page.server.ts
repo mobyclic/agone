@@ -9,9 +9,9 @@ import { journaliser } from '$lib/server/journal';
 
 /** L'adresse porte le slug du livre ; un ancien lien par identifiant redirige. */
 async function livreDe(param: string | undefined) {
-  if (!param) throw error(404, { message: 'Livre introuvable' });
+  if (!param) throw error(404, 'Livre introuvable');
   const livre = await resoudreLivreAdmin(param);
-  if (!livre) throw error(404, { message: 'Livre introuvable' });
+  if (!livre) throw error(404, 'Livre introuvable');
   return livre;
 }
 
@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const livre = await livreDe(params.bookId);
   if (livre.slug && params.bookId !== livre.slug) throw redirect(301, `/admin/droits/contrats/${livre.slug}`);
   const book = await getBookLite(livre.id);
-  if (!book) throw error(404, { message: 'Livre introuvable' });
+  if (!book) throw error(404, 'Livre introuvable');
   const [contributors, reglages, cessions, directeurs] = await Promise.all([
     bookContributorsWithContracts(livre.id),
     getReglagesDroits(),

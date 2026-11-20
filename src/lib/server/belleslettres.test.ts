@@ -11,7 +11,7 @@ import { expect, mock, test } from 'bun:test';
 
 // Le module lit la configuration du serveur au chargement : on la simule pour
 // pouvoir exercer le parseur seul, sans SvelteKit ni réseau.
-mock.module('$env/dynamic/private', () => ({ env: {} }));
+mock.module('$app/env/private', () => ({}));
 const { parseBlSalesHtml } = await import('./belleslettres');
 
 const PAGE = `

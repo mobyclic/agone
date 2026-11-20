@@ -10,7 +10,7 @@ let BOOKS: any[] = [];
 let CATALOGUE: any[] = [];
 const UPDATES: any[] = [];
 
-mock.module('$env/dynamic/private', () => ({ env: { SUMUP_API_KEY: 'sup_sk_test' } }));
+mock.module('$app/env/private', () => ({ SUMUP_API_KEY: 'sup_sk_test' }));
 mock.module(`${R}/site.ts`, () => ({ getSetting: async () => null, setSetting: async () => {} }));
 mock.module(`${R}/canaux.ts`, () => ({ getCanal: async () => ({ id: 'c1', code: 'sumup' }) }));
 mock.module(`${R}/droits.ts`, () => ({ createReport: async () => 'r1', deleteReport: async () => {} }));

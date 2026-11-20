@@ -7,7 +7,7 @@ import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async ({ params }) => {
   const deal = await getDeal(params.id);
-  if (!deal) throw error(404, { message: 'Cession introuvable' });
+  if (!deal) throw error(404, 'Cession introuvable');
   return { deal, payments: await listPayments(params.id) };
 };
 

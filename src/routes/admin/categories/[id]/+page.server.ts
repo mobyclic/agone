@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   requireStaff(locals);
   if (params.id === 'nouvelle') return { isNew: true, rubrique: null };
   const rubrique = await getRubriqueForEdit(params.id);
-  if (!rubrique) throw error(404, { message: 'Catégorie introuvable' });
+  if (!rubrique) throw error(404, 'Catégorie introuvable');
   return { isNew: false, rubrique };
 };
 

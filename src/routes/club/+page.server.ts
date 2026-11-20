@@ -1,7 +1,7 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getClub, adhesionActive, clientStripe, regleClub, RAPPEL_JOURS } from '$lib/server/club';
-import { isStripeEnabled, createClubSubscriptionCheckout, createBillingPortalSession } from '$lib/server/stripe';
+import { isStripeEnabled, createClubSubscriptionCheckout, createBillingPortalSession, STRIPE_EXTERNE } from '$lib/server/stripe';
 import { livresDuFonds, compterFonds } from '$lib/server/catalogue';
 import { prixRemise } from '$lib/promoCalcul';
 
@@ -15,7 +15,7 @@ function nomCarte(u: App.Locals['user']): string {
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   const club = await getClub();
-  if (!club.active) throw error(404, { message: 'Page introuvable' });
+  if (!club.active) throw error(404, 'Page introuvable');
   const [adhesion, client, fonds, titresFonds] = await Promise.all([
     adhesionActive(locals.user?.id),
     locals.user ? clientStripe(locals.user.id) : Promise.resolve(null),
@@ -54,7 +54,7 @@ export const actions: Actions = {
       return fail(502, { error: 'Le paiement n’a pas pu démarrer. Réessayez dans un instant.' });
     }
     if (!co?.url) return fail(500, { error: 'Paiement impossible pour le moment.' });
-    throw redirect(303, co.url);
+    throw redirect(303, co.url, STRIPE_EXTERNE);
   },
   /** Portail Stripe : carte, factures, arrêt du renouvellement. */
   gerer: async ({ locals, url }) => {
@@ -64,6 +64,6 @@ export const actions: Actions = {
     let lien: string | null = null;
     try { lien = await createBillingPortalSession(client, `${url.origin}/club`); } catch (e) { console.error('[club] portail Stripe', e); }
     if (!lien) return fail(502, { error: 'Le portail de gestion est indisponible pour le moment.' });
-    throw redirect(303, lien);
+    throw redirect(303, lien, STRIPE_EXTERNE);
   }
 };

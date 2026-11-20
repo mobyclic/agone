@@ -9,7 +9,7 @@ import { quoteShippingFor } from '$lib/shipping-calc';
 import { COUNTRIES } from '$lib/countries';
 import { createOrder, sessionPaiementCommande } from '$lib/server/order';
 import { formatVendable } from '$lib/server/catalogue';
-import { isStripeEnabled } from '$lib/server/stripe';
+import { isStripeEnabled, STRIPE_EXTERNE } from '$lib/server/stripe';
 import { query, recId } from '$lib/server/surreal';
 import { withFlash } from '$lib/toasts';
 
@@ -106,7 +106,7 @@ export const actions: Actions = {
       let lien: string | null = null;
       try { lien = await sessionPaiementCommande(order.number, url.origin); }
       catch (e) { console.error('[checkout] session Stripe', e); }
-      if (lien) throw redirect(303, lien);
+      if (lien) throw redirect(303, lien, STRIPE_EXTERNE);
       throw redirect(303, withFlash(`/commande/${order.number}`, 'Commande enregistrée, mais le paiement n’a pas pu démarrer : réessayez depuis cette page.', 'error'));
     }
     throw redirect(303, withFlash(`/commande/${order.number}`, 'Commande enregistrée.', 'success'));

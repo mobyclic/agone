@@ -24,7 +24,7 @@
     const sp = new URLSearchParams();
     const m = { etat: data.etat === 'actives' ? undefined : data.etat, q: q || undefined, ...p };
     for (const [k, v] of Object.entries(m)) if (v) sp.set(k, v);
-    goto(`/admin/club${sp.size ? `?${sp}` : ''}`, { keepFocus: true, replaceState: true, noScroll: true });
+    goto(`/admin/club${sp.size ? `?${sp}` : ''}`, { replace: true, reset: false });
   };
   const dateFr = (s?: string) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
   const SOURCE: Record<string, string> = { stripe: 'en ligne', manuel: 'à la main', offert: 'offerte' };

@@ -15,7 +15,7 @@ const retour = (n: string, message: string, type: 'success' | 'error' | 'info' =
 
 export const load: PageServerLoad = async ({ params }) => {
   const order = await getOrderByNumber(Number(params.number));
-  if (!order) throw error(404, { message: 'Commande introuvable' });
+  if (!order) throw error(404, 'Commande introuvable');
   const invoiceId = await getInvoiceIdForOrder(bareId(order.id));
   return { order, invoiceId, transporteurs: TRANSPORTEURS };
 };
@@ -63,7 +63,7 @@ export const actions: Actions = {
   resend_confirmation: async ({ params, locals }) => {
     requireAdmin(locals);
     const order = await getOrderByNumber(Number(params.number));
-    if (!order) throw error(404, { message: 'Commande introuvable' });
+    if (!order) throw error(404, 'Commande introuvable');
     const r = await sendOrderConfirmation(bareId(order.id), { force: true });
     if (!r.ok) return fail(400, { error: `Envoi impossible : ${r.error}` });
     await journaliser(locals, { action: 'commande.confirmation', cible: { type: 'order', id: params.number!, libelle: `Commande n°${params.number}` }, details: { number: params.number } });

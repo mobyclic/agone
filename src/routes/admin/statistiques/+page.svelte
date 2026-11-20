@@ -20,7 +20,7 @@
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(merged)) if (v !== undefined && v !== '') sp.set(k, String(v));
     const s = sp.toString();
-    goto(`/admin/statistiques${s ? `?${s}` : ''}`, { keepFocus: true, noScroll: true });
+    goto(`/admin/statistiques${s ? `?${s}` : ''}`, { reset: false });
   }
 
   // ── Canaux cochés ──────────────────────────────────────────────────────

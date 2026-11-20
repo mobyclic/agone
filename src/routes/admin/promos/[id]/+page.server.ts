@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const collections = await allCollections();
   if (params.id === 'nouveau') return { isNew: true, promo: null, collections };
   const promo = await getPromoForEdit(params.id);
-  if (!promo) throw error(404, { message: 'Code introuvable' });
+  if (!promo) throw error(404, 'Code introuvable');
   return { isNew: false, promo, collections };
 };
 

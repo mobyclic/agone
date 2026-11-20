@@ -10,7 +10,7 @@ import { journaliser } from '$lib/server/journal';
 export const load: PageServerLoad = async ({ params, locals }) => {
   requireAdmin(locals);
   const doc = await getInvoice(params.id);
-  if (!doc) throw error(404, { message: 'Document introuvable' });
+  if (!doc) throw error(404, 'Document introuvable');
   if (doc.status !== 'draft') throw redirect(303, `/admin/factures/${params.id}`);
   const company = await getCompany();
   return { doc, vatRates: company.vat_rates, defaultVat: company.vat_rate };

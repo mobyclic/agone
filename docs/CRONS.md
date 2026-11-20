@@ -16,8 +16,12 @@ ordonnanceur externe.
 Exemple, tel qu'on le donne à Railway :
 
 ```
-curl -sf -X POST -H "x-cron-secret: $CRON_SECRET" https://agone.org/api/cron/bl-stock
+curl -sf -X POST -H "Content-Type: application/json" -H "x-cron-secret: $CRON_SECRET" https://agone.org/api/cron/bl-stock
 ```
+
+**L'en-tête `Content-Type` est obligatoire** depuis SvelteKit 3 : un `POST` venu d'ailleurs sans
+`Content-Type` (et sans en-tête `Origin`, comme un `curl`) est rejeté en production comme une
+soumission de formulaire forgée (CSRF, 403). Un `POST` en JSON n'est pas un formulaire : il passe.
 
 Chaque route répond en JSON (`{ ok, … }`) et en 500 en cas d'échec, pour que
 l'ordonnanceur puisse alerter. Les emails de compte rendu (diff de stock)

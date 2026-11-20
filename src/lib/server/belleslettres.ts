@@ -12,7 +12,7 @@
  *     En dry-run (défaut) : le fichier est stagé (bl_export status='staged') SANS
  *     upload FTP et SANS changement de statut des commandes → ré-exécutable sans risque.
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { query, recId } from './surreal';
 import { sendMail } from './mail';
 

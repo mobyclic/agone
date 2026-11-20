@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   requireAdmin(locals);
   if (params.id === 'nouvelle') return { isNew: true, zone: null };
   const zone = await getShipZoneForEdit(params.id);
-  if (!zone) throw error(404, { message: 'Zone introuvable' });
+  if (!zone) throw error(404, 'Zone introuvable');
   return { isNew: false, zone };
 };
 

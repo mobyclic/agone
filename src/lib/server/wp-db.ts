@@ -11,7 +11,7 @@
  * La connexion est PARESSEUSE : rien n'est ouvert tant qu'un import n'est pas lancé,
  * et l'outil s'affiche « non configuré » si les variables manquent.
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import mysql from 'mysql2/promise';
 
 export function wpConfigured(): boolean {

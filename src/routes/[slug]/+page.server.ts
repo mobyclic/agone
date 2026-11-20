@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ params }) => {
   // articles de l'Antichambre vivaient à la racine). On redirige pour de bon.
   const cible = await cibleAncienneAdresse(params.slug);
   if (cible) throw redirect(301, cible);
-  throw error(404, { message: 'Page introuvable' });
+  throw error(404, 'Page introuvable');
 };
 
 export const actions: Actions = {
@@ -20,12 +20,12 @@ export const actions: Actions = {
   save: async ({ request, params, locals }) => {
     requireStaff(locals);
     const slug = params.slug;
-    if (!slug) throw error(404, { message: 'Page introuvable' });
+    if (!slug) throw error(404, 'Page introuvable');
     const fd = await request.formData();
     const title = String(fd.get('title') ?? '').trim();
     if (!title) return fail(400, { error: 'Le titre est requis.' });
     const ok = await savePage(slug, { title, body_html: String(fd.get('body_html') ?? '') });
-    if (!ok) throw error(404, { message: 'Page introuvable' });
+    if (!ok) throw error(404, 'Page introuvable');
     throw redirect(303, withFlash(`/${slug}`, 'Page enregistrée.', 'success'));
   }
 };

@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { releverEncaissements, sumupConfigure } from '$lib/server/sumup';
 
 // Cron : relève les encaissements SumUp des dix derniers jours (chevauchement
@@ -8,7 +8,7 @@ import { releverEncaissements, sumupConfigure } from '$lib/server/sumup';
 // les nouveaux. Gardé par CRON_SECRET.
 export const POST: RequestHandler = async ({ request, url }) => {
   const secret = request.headers.get('x-cron-secret') || url.searchParams.get('secret');
-  if (!env.CRON_SECRET || secret !== env.CRON_SECRET) throw error(401, { message: 'unauthorized' });
+  if (!env.CRON_SECRET || secret !== env.CRON_SECRET) throw error(401, 'unauthorized');
   if (!sumupConfigure()) return json({ ok: false, error: 'SUMUP_API_KEY absente' }, { status: 500 });
   try {
     const fin = new Date();

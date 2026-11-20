@@ -8,7 +8,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   requireStaff(locals);
   const rows = await query<any>(`SELECT filename, body FROM bl_export WHERE id = $id LIMIT 1`, { id: recId('bl_export', params.id) });
   const e = rows[0];
-  if (!e) throw error(404, { message: 'Export introuvable' });
+  if (!e) throw error(404, 'Export introuvable');
   return new Response(e.body, {
     headers: {
       'Content-Type': 'text/plain; charset=us-ascii',

@@ -1,4 +1,4 @@
-import type { SubmitFunction } from '@sveltejs/kit';
+import type { SubmitFunction } from '$app/forms';
 
 /**
  * Confirmation avant l'envoi d'un formulaire amélioré : `use:enhance={confirmer('Supprimer ?')}`.

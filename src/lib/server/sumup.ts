@@ -15,7 +15,7 @@
  * API : https://developer.sumup.com/api — clé `SUMUP_API_KEY` (sup_sk_…), code
  * marchand lu une fois sur le profil (ou `SUMUP_MERCHANT_CODE`).
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { query, recId } from './surreal';
 import { getSetting, setSetting } from './site';
 

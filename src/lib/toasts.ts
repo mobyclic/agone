@@ -12,7 +12,8 @@ let lastFlash = '';
  * une redirection serveur, puis nettoie l'URL (via replaceState SvelteKit pour
  * que `page.url` reflète la suppression). Appelé dans le +layout racine.
  */
-export function consumeUrlFlash(url: URL) {
+/** `page.url` est en lecture seule depuis SvelteKit 3 : on n'en lit que l'adresse et les paramètres. */
+export function consumeUrlFlash(url: { readonly href: string; readonly searchParams: { get(name: string): string | null } }) {
   const msg = url.searchParams.get('flash');
   if (!msg) {
     lastFlash = '';
@@ -27,7 +28,7 @@ export function consumeUrlFlash(url: URL) {
   fn(msg);
 
   // Retire flash/flash_type de l'URL SvelteKit (met à jour page.url → pas de re-toast).
-  const clean = new URL(url);
+  const clean = new URL(url.href);
   clean.searchParams.delete('flash');
   clean.searchParams.delete('flash_type');
   try {

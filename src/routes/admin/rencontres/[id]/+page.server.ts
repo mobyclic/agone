@@ -8,7 +8,7 @@ import { heureParisVersDate } from '$lib/dates';
 export const load: PageServerLoad = async ({ params }) => {
   if (params.id === 'nouvelle') return { isNew: true, event: null };
   const event = await getEventForEdit(params.id);
-  if (!event) throw error(404, { message: 'Rencontre introuvable' });
+  if (!event) throw error(404, 'Rencontre introuvable');
   return { isNew: false, event };
 };
 

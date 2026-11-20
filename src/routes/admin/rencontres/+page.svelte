@@ -26,7 +26,7 @@
       sp.set(k, String(v));
     }
     const s = sp.toString();
-    goto(`/admin/rencontres${s ? `?${s}` : ''}`, { keepFocus: true, replaceState: true, noScroll: true });
+    goto(`/admin/rencontres${s ? `?${s}` : ''}`, { replace: true, reset: false });
   }
   function onSearch() {
     clearTimeout(timer);

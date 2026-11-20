@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { importMouvementsBldd } from '$lib/server/droits';
 
 /**
@@ -11,7 +11,7 @@ import { importMouvementsBldd } from '$lib/server/droits';
  */
 export const POST: RequestHandler = async ({ request, url }) => {
   const secret = request.headers.get('x-cron-secret') || url.searchParams.get('secret');
-  if (!env.CRON_SECRET || secret !== env.CRON_SECRET) throw error(401, { message: 'unauthorized' });
+  if (!env.CRON_SECRET || secret !== env.CRON_SECRET) throw error(401, 'unauthorized');
   const maintenant = new Date();
   const debut = new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth() - 1, 1));
   const fin = new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), 0));

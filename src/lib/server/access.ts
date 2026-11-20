@@ -18,13 +18,13 @@ export function requireUser(locals: App.Locals, next?: string): NonNullable<User
 /** Exige un membre de l'équipe Agone (back-office : admin ou éditorial). */
 export function requireStaff(locals: App.Locals, next?: string): NonNullable<User> {
   const u = requireUser(locals, next);
-  if (!isStaff(u.role)) throw error(403, { code: 'FORBIDDEN', message: 'Accès réservé à l’équipe Agone.' });
+  if (!isStaff(u.role)) throw error(403, 'Accès réservé à l’équipe Agone.', { code: 'FORBIDDEN' });
   return u;
 }
 
 /** Exige un administrateur (droits sensibles : droits d'auteur, paramètres, comptes). */
 export function requireAdmin(locals: App.Locals, next?: string): NonNullable<User> {
   const u = requireUser(locals, next);
-  if (!isAdmin(u.role)) throw error(403, { code: 'FORBIDDEN', message: 'Accès réservé aux administrateurs.' });
+  if (!isAdmin(u.role)) throw error(403, 'Accès réservé aux administrateurs.', { code: 'FORBIDDEN' });
   return u;
 }

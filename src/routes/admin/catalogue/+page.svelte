@@ -47,7 +47,7 @@
       sp.set(k, String(v));
     }
     const s = sp.toString();
-    goto(`/admin/catalogue${s ? `?${s}` : ''}`, { keepFocus: true, replaceState: true, noScroll: true });
+    goto(`/admin/catalogue${s ? `?${s}` : ''}`, { replace: true, reset: false });
   }
 
   function onSearch() {

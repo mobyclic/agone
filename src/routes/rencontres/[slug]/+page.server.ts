@@ -5,7 +5,7 @@ import { bookCardsBySlugs } from '$lib/server/catalogue';
 
 export const load: PageServerLoad = async ({ params }) => {
   const event = await getEventBySlug(params.slug);
-  if (!event) throw error(404, { message: 'Rencontre introuvable' });
+  if (!event) throw error(404, 'Rencontre introuvable');
   const books = await bookCardsBySlugs(event.books.map((b) => b.slug));
   return { event, books };
 };

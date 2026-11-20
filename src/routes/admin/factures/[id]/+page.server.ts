@@ -16,7 +16,7 @@ import { journaliser } from '$lib/server/journal';
 export const load: PageServerLoad = async ({ params, locals }) => {
   requireAdmin(locals);
   const invoice = await getInvoice(params.id);
-  if (!invoice) throw error(404, { message: 'Facture introuvable' });
+  if (!invoice) throw error(404, 'Facture introuvable');
   if (invoice.status === 'draft') throw redirect(303, `/admin/factures/${params.id}/modifier`);
   const [payments, historique, imputables, ventes] = await Promise.all([
     listPayments(params.id),
@@ -126,7 +126,7 @@ export const actions: Actions = {
   credit_note: async ({ params, locals }) => {
     requireAdmin(locals);
     const inv = await getInvoice(params.id!);
-    if (!inv) throw error(404, { message: 'Facture introuvable' });
+    if (!inv) throw error(404, 'Facture introuvable');
     if (inv.kind !== 'invoice') throw retour(params.id!, 'Un avoir ne peut porter que sur une facture.', 'error');
     const ht = inv.price_mode === 'ht';
     const id = await createManualInvoice({

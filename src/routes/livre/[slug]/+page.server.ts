@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
     // Livre renommé : l'ancienne adresse redirige vers la nouvelle.
     const actuel = await slugActuelLivre(params.slug);
     if (actuel) throw redirect(301, `/livre/${actuel}`);
-    throw error(404, { message: 'Livre introuvable' });
+    throw error(404, 'Livre introuvable');
   }
 
   const authorSlug = book.authors?.[0]?.slug;

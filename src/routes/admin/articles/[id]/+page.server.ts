@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ params }) => {
   const rubriques = await listAllRubriques();
   if (params.id === 'nouveau') return { isNew: true, article: null, rubriques, rencontres: [] };
   const [article, rencontres] = await Promise.all([getArticleForEdit(params.id), rencontresLiees(params.id)]);
-  if (!article) throw error(404, { message: 'Article introuvable' });
+  if (!article) throw error(404, 'Article introuvable');
   return { isNew: false, article, rubriques, rencontres };
 };
 

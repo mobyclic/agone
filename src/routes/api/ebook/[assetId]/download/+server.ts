@@ -9,13 +9,13 @@ import { query, recId } from '$lib/server/surreal';
 export const GET: RequestHandler = async ({ params, locals, getClientAddress }) => {
   const user = requireUser(locals);
   const asset = await getEbookAsset(params.assetId);
-  if (!asset) throw error(404, { message: 'Ebook introuvable' });
+  if (!asset) throw error(404, 'Ebook introuvable');
 
   const owns = await userOwnsAsset(user.id, params.assetId);
-  if (!owns && !isStaff(user.role)) throw error(403, { code: 'FORBIDDEN', message: 'Vous ne possédez pas cet ebook.' });
+  if (!owns && !isStaff(user.role)) throw error(403, 'Vous ne possédez pas cet ebook.', { code: 'FORBIDDEN' });
 
   const obj = await getObject(asset.r2_key);
-  if (!obj) throw error(404, { message: 'Fichier momentanément indisponible.' });
+  if (!obj) throw error(404, 'Fichier momentanément indisponible.');
 
   query(`CREATE download_log CONTENT { user: $u, ebook_asset: $a, ip: $ip }`, {
     u: recId('user', user.id), a: recId('ebook_asset', params.assetId), ip: getClientAddress()

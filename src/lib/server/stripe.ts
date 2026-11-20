@@ -4,7 +4,7 @@
  * consultable, seul le passage en caisse est désactivé.
  */
 import Stripe from 'stripe';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 let _stripe: Stripe | null = null;
 export function getStripe(): Stripe | null {
@@ -21,6 +21,12 @@ export function isStripeEnabled(): boolean {
 }
 
 export const STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET || '';
+
+/**
+ * SvelteKit 3 refuse par défaut une redirection hors du site : `redirect(303, url, STRIPE_EXTERNE)`
+ * l'autorise vers la caisse (Checkout) et le portail client de Stripe, et nulle part ailleurs.
+ */
+export const STRIPE_EXTERNE = { external: ['https://checkout.stripe.com', 'https://billing.stripe.com'] };
 
 /**
  * Crée une session Checkout pour un abonnement.

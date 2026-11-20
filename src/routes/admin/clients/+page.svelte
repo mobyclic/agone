@@ -31,7 +31,7 @@
       sp.set(k, String(v));
     }
     const s = sp.toString();
-    goto(`/admin/clients${s ? `?${s}` : ''}`, { keepFocus: true, replaceState: true, noScroll: true });
+    goto(`/admin/clients${s ? `?${s}` : ''}`, { replace: true, reset: false });
   }
   function onSearch() { clearTimeout(timer); timer = setTimeout(() => nav({ q, page: 1 }), 220); }
 </script>

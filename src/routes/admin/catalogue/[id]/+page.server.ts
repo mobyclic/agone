@@ -17,10 +17,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   }
   // Adresse lisible : /admin/catalogue/<slug>. Les anciens liens par id redirigent.
   const livre = await resoudreLivreAdmin(params.id);
-  if (!livre) throw error(404, { message: 'Livre introuvable' });
+  if (!livre) throw error(404, 'Livre introuvable');
   if (livre.slug && params.id !== livre.slug) throw redirect(301, `/admin/catalogue/${livre.slug}`);
   const data = await getBookAdmin(livre.id);
-  if (!data) throw error(404, { message: 'Livre introuvable' });
+  if (!data) throw error(404, 'Livre introuvable');
   const contributors = (data.contributors ?? []).map((c: any) => ({
     authorId: String(c.author_id),
     authorName: c.author_name,

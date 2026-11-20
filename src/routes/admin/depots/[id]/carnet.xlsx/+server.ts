@@ -8,7 +8,7 @@ import { gabaritCarnet } from '$lib/server/depots';
 export const GET: RequestHandler = async ({ params, locals }) => {
   requireAdmin(locals);
   const client = await getClientPro(params.id);
-  if (!client?.depositaire) throw error(404, { message: 'Dépôt introuvable' });
+  if (!client?.depositaire) throw error(404, 'Dépôt introuvable');
   const buf = await gabaritCarnet(client);
   const nom = `carnet-${client.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`;
   return new Response(new Uint8Array(buf), {

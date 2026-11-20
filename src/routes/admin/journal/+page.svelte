@@ -26,7 +26,7 @@
   const nav = (p: Record<string, string | number | undefined>) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries({ q: data.q, type: data.type, page: data.page, ...p })) if (v !== undefined && v !== '' && !(k === 'page' && v === 1)) sp.set(k, String(v));
-    goto(`/admin/journal${sp.size ? `?${sp}` : ''}`, { keepFocus: true, noScroll: true });
+    goto(`/admin/journal${sp.size ? `?${sp}` : ''}`, { reset: false });
   };
   const pages = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
 </script>
