@@ -1,6 +1,6 @@
 # Paiement en ligne (Stripe) — mise en service
 
-État au 10 octobre 2026 : le code est prêt (SDK `stripe` 23, API `2026-10-28.endive`), mais **aucune clé Stripe
+État au 10 octobre 2026 : le code est prêt (SDK `stripe` 23, API `2026-11-18.endive`), mais **aucune clé Stripe
 n'est configurée en production** : la caisse affiche « Le paiement en ligne sera activé prochainement » et les
 commandes du site restent « en attente ».
 
@@ -13,7 +13,7 @@ commandes du site restent « en attente ».
 
 ## 2. Endpoint webhook (tableau de bord Stripe › Développeurs › Webhooks)
 
-URL : `https://<domaine>/api/stripe/webhook` — **version d'API de l'endpoint : `2026-10-28.endive`** (la plus
+URL : `https://<domaine>/api/stripe/webhook` — **version d'API de l'endpoint : `2026-11-18.endive`** (la plus
 récente ; le compte est par défaut en `2023-10-16`, format d'événements que le webhook sait lire mais qui
 n'est pas celui du code) — événements :
 
