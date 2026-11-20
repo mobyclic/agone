@@ -15,7 +15,7 @@ for (const l of ['.env.local', '.env'].flatMap((f) => { try { return readFileSyn
 const db = new Surreal();
 await db.connect(process.env.SURREAL_URL!, { versionCheck: false });
 await db.use({ namespace: process.env.SURREAL_NAMESPACE!, database: process.env.SURREAL_DATABASE! });
-await db.signin({ username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! } as any);
+await db.signin((process.env.SURREAL_AUTH_LEVEL === 'database' ? { namespace: process.env.SURREAL_NAMESPACE!, database: process.env.SURREAL_DATABASE!, username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! } : { username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! }) as any);
 const q = async (s: string, v?: any) => (await db.query(s, v))[0] as any[];
 
 // Filets de sécurité : champs non-optionnels qui pourraient valoir NONE (sinon

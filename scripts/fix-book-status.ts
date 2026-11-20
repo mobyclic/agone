@@ -45,7 +45,7 @@ console.log(`WP : ${draftIds.length} brouillons, ${pubIds.length} publiés.`);
 const db = new Surreal();
 await db.connect(E.SURREAL_URL!, { versionCheck: false });
 await db.use({ namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE! });
-await db.signin({ username: E.SURREAL_USER!, password: E.SURREAL_PASS! });
+await db.signin((E.SURREAL_AUTH_LEVEL === 'database' ? { namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE!, username: E.SURREAL_USER!, password: E.SURREAL_PASS! } : { username: E.SURREAL_USER!, password: E.SURREAL_PASS! }));
 
 // brouillons WP mal classés en published (ceux publiés par erreur)
 const [wrong] = await db.query<[{ n: number }[]]>(

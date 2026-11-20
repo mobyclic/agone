@@ -50,7 +50,9 @@ export const variables = defineEnvVars({
   S3_BUCKET: facultative,
   S3_ACCESS_KEY_ID: facultative,
   S3_SECRET_ACCESS_KEY: facultative,
-  FICHIERS_URL: { ...facultative, description: 'Adresse publique des fichiers servis par l’appli : https://<site>/fichiers' },
+  S3_BUCKET_PUBLIC: { ...facultative, description: 'Bucket des fichiers publics (lecture anonyme, sans listage)' },
+  S3_PUBLIC_URL: { ...facultative, description: 'Adresse publique de ce bucket : https://s3.gva2.infomaniak.cloud/swift/v1/AUTH_<projet>/<bucket>' },
+  FICHIERS_URL: { ...facultative, description: 'Repli sans bucket public : https://<site>/fichiers (servis par l’appli)' },
 
   // ── Stockage (Cloudflare R2) ──────────────────────────────────
   CLOUDFLARE_ACCOUNT_ID: facultative,

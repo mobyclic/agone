@@ -39,14 +39,26 @@ const PUBLIC_URL  = (env.CLOUDFLARE_R2_PUBLIC_URL ?? '').replace(/\/+$/, '');
 const JURISDICTION = (env.CLOUDFLARE_R2_JURISDICTION ?? '').trim().toLowerCase();
 
 /**
- * Infomaniak (S3, Suisse) : dès que S3_ENDPOINT est défini, tout vit dans UN bucket privé
- * (S3_BUCKET) et l'application sert elle-même les fichiers publics sur /fichiers/<clé>
- * (route src/routes/fichiers/[...cle]). Sinon : Cloudflare R2 comme avant (Railway).
+ * Infomaniak (S3, Suisse) : dès que S3_ENDPOINT est défini.
+ * - Fichiers privés (ebooks, contrats, factures, carnets) : bucket privé S3_BUCKET, servis par
+ *   l'appli après vérification des droits.
+ * - Fichiers publics (couvertures, portraits, images) : bucket S3_BUCKET_PUBLIC, lus DIRECTEMENT
+ *   chez Infomaniak à S3_PUBLIC_URL/<clé> — l'appli n'est pas dans le chemin du contenu.
+ * Sans bucket public, repli : l'appli les sert sur /fichiers/<clé> (FICHIERS_URL).
+ * Sans S3_ENDPOINT : Cloudflare R2 comme avant.
  */
 const S3_ENDPOINT = (env.S3_ENDPOINT ?? '').trim();
 const INFOMANIAK = !!S3_ENDPOINT;
-/** Adresse absolue des fichiers servis par l'appli (mails, newsletter) : https://<site>/fichiers */
+const BUCKET_PUBLIC_S3 = (env.S3_BUCKET_PUBLIC ?? '').trim();
+/** Adresse publique du bucket public : https://s3.gva2.infomaniak.cloud/swift/v1/AUTH_<projet>/<bucket> */
+const S3_PUBLIC_URL = (env.S3_PUBLIC_URL ?? '').replace(/\/+$/, '');
+/** Repli : adresse absolue des fichiers servis par l'appli, https://<site>/fichiers */
 const FICHIERS_URL = (env.FICHIERS_URL ?? '').replace(/\/+$/, '');
+
+/** Adresse publique directe d'un fichier public chez Infomaniak, si le bucket public est configuré. */
+export function urlPubliqueDirecte(key: string): string | null {
+  return INFOMANIAK && BUCKET_PUBLIC_S3 && S3_PUBLIC_URL ? `${S3_PUBLIC_URL}/${key.replace(/^\/+/, '')}` : null;
+}
 
 let _client: S3Client | null = null;
 function getClient(): S3Client {
@@ -86,13 +98,13 @@ export function estPrive(key: string): boolean {
 
 /** Bucket où vit cette clé : privé pour les ebooks (si configuré), principal sinon. */
 function bucketFor(key: string): string {
-  if (INFOMANIAK) return env.S3_BUCKET as string;
+  if (INFOMANIAK) return estPrive(key) || !BUCKET_PUBLIC_S3 ? (env.S3_BUCKET as string) : BUCKET_PUBLIC_S3;
   return estPrive(key) && BUCKET_PRIVE ? BUCKET_PRIVE : (BUCKET as string);
 }
 
 /** Construit l'URL publique d'un fichier stocké (à partir de sa clé). */
 export function publicUrlFor(key: string): string {
-  if (INFOMANIAK) return `${FICHIERS_URL || '/fichiers'}/${key.replace(/^\/+/, '')}`;
+  if (INFOMANIAK) return urlPubliqueDirecte(key) ?? `${FICHIERS_URL || '/fichiers'}/${key.replace(/^\/+/, '')}`;
   if (!PUBLIC_URL) return key; // fallback : on retourne la clé brute
   return `${PUBLIC_URL}/${key.replace(/^\/+/, '')}`;
 }

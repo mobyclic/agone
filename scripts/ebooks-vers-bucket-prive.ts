@@ -40,7 +40,7 @@ const s3 = new S3Client({
 const db = new Surreal();
 await db.connect(E.SURREAL_URL!, { versionCheck: false });
 await db.use({ namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE! });
-await db.signin({ username: E.SURREAL_USER!, password: E.SURREAL_PASS! });
+await db.signin((E.SURREAL_AUTH_LEVEL === 'database' ? { namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE!, username: E.SURREAL_USER!, password: E.SURREAL_PASS! } : { username: E.SURREAL_USER!, password: E.SURREAL_PASS! }));
 const assets: any[] = ((await db.query(`SELECT r2_key, filename FROM ebook_asset`)) as any[])[0] ?? [];
 console.log(`Base : ${E.SURREAL_URL}`);
 console.log(`→ ${assets.length} fichier(s) ebook · public « ${PUBLIC_BUCKET} » → privé « ${PRIVE} »`);

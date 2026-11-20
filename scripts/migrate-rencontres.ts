@@ -52,7 +52,7 @@ function phpField(blob: string, key: string): string | undefined {
 const db = new Surreal();
 await db.connect(process.env.SURREAL_URL!, { versionCheck: false });
 await db.use({ namespace: process.env.SURREAL_NAMESPACE!, database: process.env.SURREAL_DATABASE! });
-await db.signin({ username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! });
+await db.signin((process.env.SURREAL_AUTH_LEVEL === 'database' ? { namespace: process.env.SURREAL_NAMESPACE!, database: process.env.SURREAL_DATABASE!, username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! } : { username: process.env.SURREAL_USER!, password: process.env.SURREAL_PASS! }));
 console.log('→ Migration rencontres', process.env.SURREAL_NAMESPACE, '/', process.env.SURREAL_DATABASE);
 
 await db.query('DELETE event; DELETE venue;');

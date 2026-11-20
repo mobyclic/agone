@@ -30,7 +30,9 @@ case "${1:-start}" in
     EP=$(echo "$SURREAL_URL" | sed -E 's#/rpc/?$##')
     mkdir -p "$DATA/dumps"
     F="$DATA/dumps/agone-cloud-$(date +%Y%m%d-%H%M).surql"
-    "$BIN" export --endpoint "$EP" --username "$SURREAL_USER" --password "$SURREAL_PASS" \
+    # Compte limité à la base (VPS Infomaniak) : SURREAL_AUTH_LEVEL=database.
+    AUTH=""; [ "${SURREAL_AUTH_LEVEL:-}" = "database" ] && AUTH="--auth-level database"
+    "$BIN" export --endpoint "$EP" $AUTH --username "$SURREAL_USER" --password "$SURREAL_PASS" \
       --namespace "$SURREAL_NAMESPACE" --database "$SURREAL_DATABASE" "$F"
     NS=$(grep '^SURREAL_NAMESPACE=' .env.local | cut -d= -f2- | tr -d '"')
     DB=$(grep '^SURREAL_DATABASE=' .env.local | cut -d= -f2- | tr -d '"')

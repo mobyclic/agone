@@ -40,7 +40,7 @@ const PUBLIC = (E.CLOUDFLARE_R2_PUBLIC_URL ?? '').replace(/\/+$/, '');
 const db = new Surreal();
 await db.connect(E.SURREAL_URL!, { versionCheck: false });
 await db.use({ namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE! });
-await db.signin({ username: E.SURREAL_USER!, password: E.SURREAL_PASS! });
+await db.signin((E.SURREAL_AUTH_LEVEL === 'database' ? { namespace: E.SURREAL_NAMESPACE!, database: E.SURREAL_DATABASE!, username: E.SURREAL_USER!, password: E.SURREAL_PASS! } : { username: E.SURREAL_USER!, password: E.SURREAL_PASS! }));
 const q = async (s: string, v?: any) => ((await db.query(s, v)) as any[])[0];
 console.log(`Base : ${E.SURREAL_URL}${DRY ? '  (simulation)' : ''}`);
 

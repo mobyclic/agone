@@ -1,5 +1,6 @@
 /**
- * Copie les fichiers de Cloudflare R2 (buckets public ET privé) vers le bucket Infomaniak « agone » :
+ * Copie les fichiers de Cloudflare R2 (buckets public ET privé) vers Infomaniak : les privés (ebooks,
+ * contrats, factures, carnets) dans « agone », les publics dans « agone-public » (lecture directe) ;
  * mêmes clés, type et cache conservés. Rejouable : un fichier déjà présent (même taille) est sauté.
  *
  *   railway variables --service agone --json | bun run scripts/copier-fichiers-r2-vers-s3.ts
@@ -14,7 +15,8 @@ const s3env = Object.fromEntries((await Bun.file(process.env.HOME + '/.infomania
 const host = r2.CLOUDFLARE_R2_JURISDICTION ? `${r2.CLOUDFLARE_ACCOUNT_ID}.${r2.CLOUDFLARE_R2_JURISDICTION}.r2.cloudflarestorage.com` : `${r2.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 const src = new S3Client({ region: 'auto', endpoint: `https://${host}`, credentials: { accessKeyId: r2.CLOUDFLARE_R2_ACCESS_KEY_ID, secretAccessKey: r2.CLOUDFLARE_R2_SECRET_ACCESS_KEY } });
 const dst = new S3Client({ endpoint: s3env.S3_ENDPOINT, region: s3env.S3_REGION, forcePathStyle: true, credentials: { accessKeyId: s3env.S3_ACCESS_KEY_ID, secretAccessKey: s3env.S3_SECRET_ACCESS_KEY } });
-const DEST = 'agone';
+const PRIVES = ['livres/ebooks/', 'contrats/', 'factures/', 'carnets/']; // = PREFIXES_PRIVES de storage.ts
+const dest = (k: string) => (PRIVES.some((p) => k.startsWith(p)) ? 'agone' : 'agone-public');
 for (const [nom, bucket] of [['public', r2.CLOUDFLARE_R2_BUCKET_NAME], ['privé', r2.CLOUDFLARE_R2_BUCKET_PRIVATE]] as const) {
   if (!bucket) { console.log(`${nom} : non configuré`); continue; }
   const cles: { Key: string; Size: number }[] = []; let token: string | undefined;
@@ -23,10 +25,10 @@ for (const [nom, bucket] of [['public', r2.CLOUDFLARE_R2_BUCKET_NAME], ['privé'
   for (let i = 0; i < cles.length; i += 8) {
     await Promise.all(cles.slice(i, i + 8).map(async (o) => {
       try {
-        try { const h = await dst.send(new HeadObjectCommand({ Bucket: DEST, Key: o.Key })); if (h.ContentLength === o.Size) { deja++; return; } } catch { /* absent */ }
+        try { const h = await dst.send(new HeadObjectCommand({ Bucket: dest(o.Key), Key: o.Key })); if (h.ContentLength === o.Size) { deja++; return; } } catch { /* absent */ }
         const g: any = await src.send(new GetObjectCommand({ Bucket: bucket, Key: o.Key }));
         const body = await g.Body.transformToByteArray();
-        await dst.send(new PutObjectCommand({ Bucket: DEST, Key: o.Key, Body: body, ContentType: g.ContentType, CacheControl: g.CacheControl }));
+        await dst.send(new PutObjectCommand({ Bucket: dest(o.Key), Key: o.Key, Body: body, ContentType: g.ContentType, CacheControl: g.CacheControl }));
         copies++; octets += body.byteLength;
       } catch (e: any) { echecs.push(`${o.Key} (${e?.name ?? e})`); }
     }));

@@ -1,6 +1,6 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getObject, estPrive } from '$lib/server/storage';
+import { getObject, estPrive, urlPubliqueDirecte } from '$lib/server/storage';
 
 /**
  * Fichiers publics (couvertures, portraits, images d'articles…) servis depuis le bucket
@@ -10,6 +10,9 @@ import { getObject, estPrive } from '$lib/server/storage';
 export const GET: RequestHandler = async ({ params, request }) => {
   const cle = params.cle;
   if (!cle || cle.includes('..') || estPrive(cle)) throw error(404, 'Fichier introuvable');
+  // Bucket public Infomaniak configuré : les anciennes adresses /fichiers renvoient vers le stockage.
+  const directe = urlPubliqueDirecte(cle);
+  if (directe) throw redirect(301, directe, { external: [new URL(directe).origin] });
   const obj = await getObject(cle);
   if (!obj) throw error(404, 'Fichier introuvable');
   const entetes: Record<string, string> = {
