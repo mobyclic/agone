@@ -11,7 +11,7 @@ Les Belles Lettres). Voir `docs/` : `DISCOVERY-SUMMARY.md` (l'existant), `ARCHIT
 ## Stack
 - **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17 (Node 26 en image Docker). Hébergement **Infomaniak** :
   Coolify sur le VPS, `Dockerfile`, https://agone.dev.mobyclic.com (Tinyauth) depuis la branche `majeures`, redéployé à chaque
-  push — cf. `docs/INFOMANIAK.md`. Railway est arrêté (21/11/2026). Package manager : **bun** 1.4.5.
+  push — cf. `docs/INFOMANIAK.md`. Railway est arrêté (20/11/2026). Package manager : **bun** 1.4.5.
   Configuration dans `vite.config.ts` (plugin `sveltekit({ adapter, alias, … })`, plus de `svelte.config.js`).
 - **SurrealDB 3.3.5 du VPS** : base **unique** `mobyclic/agone` (pas de base de dev), compte limité (`SURREAL_AUTH_LEVEL=database`),
   accès HTTP via `src/lib/server/surreal.ts` ; depuis le poste par https://surreal.mobyclic.com (IP d'Alistair seulement). Surreal Cloud n'est plus utilisé.

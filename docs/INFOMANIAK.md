@@ -1,6 +1,6 @@
 # Hébergement Infomaniak (VPS, Coolify)
 
-État au 21 novembre 2026 : AGONE tourne **uniquement** chez Infomaniak, sur https://agone.dev.mobyclic.com,
+État au 20 novembre 2026 : AGONE tourne **uniquement** chez Infomaniak, sur https://agone.dev.mobyclic.com,
 protégé par Tinyauth (connexion auth.mobyclic.com), construit depuis la branche **`majeures`** et redéployé
 à chaque push. **Railway est arrêté** (déploiement retiré, service conservé) ; Surreal Cloud et R2 ne sont
 plus utilisés mais pas encore supprimés. agone.org est toujours le WordPress.

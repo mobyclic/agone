@@ -42,7 +42,7 @@ images (R2), intégrations Instagram. Le reste du site fonctionne.
 
 ## Détails techniques
 
-- Binaire : `~/.local/bin/surreal-3.2.4` — **à passer en 3.3.5**, la version du VPS depuis le 21/11/2026 (un export
+- Binaire : `~/.local/bin/surreal-3.2.4` — **à passer en 3.3.5**, la version du VPS depuis le 20/11/2026 (un export
   3.2 réimporté en 3.0 peut échouer). Le `surreal` global (3.0.5) n'est pas touché.
 - Données : `~/.local/share/agone-surreal/data` (SurrealKV), exports dans `dumps/`.
 - Médias : `static/_r2-local/` (ignoré par git) ; en base LOCALE, `media.url`
