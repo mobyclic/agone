@@ -9,7 +9,8 @@ Les Belles Lettres). Voir `docs/` : `DISCOVERY-SUMMARY.md` (l'existant), `ARCHIT
 (la cible), `DECISIONS.md` (décisions produit), `docs/discovery/*` (rapports détaillés).
 
 ## Stack
-- **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17, déploiement Railway. Package manager : **bun**.
+- **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17 (Node 26 en image Docker), déploiement Railway ;
+  essai Infomaniak (Coolify, `Dockerfile`) sur agone.dev.mobyclic.com — cf. `docs/INFOMANIAK.md`. Package manager : **bun** 1.4.5.
   Configuration dans `vite.config.ts` (plugin `sveltekit({ adapter, alias, … })`, plus de `svelte.config.js`).
 - **SurrealDB v2/3** (cloud), accès **HTTP** via `src/lib/server/surreal.ts` (connexion en root).
 - **Tailwind v4 + shadcn-svelte** (bits-ui, phosphor-svelte, svelte-sonner).
