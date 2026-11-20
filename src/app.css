@@ -312,6 +312,19 @@
   text-transform: uppercase;
 }
 
+/* — Texte courant en Oswald, comme l'ancien site (essai réversible : Paramètres › Apparence).
+     Oswald est étroit : un corps un peu plus grand et plus d'interligne pour rester lisible ;
+     graisse légère (300) comme l'ancien site, gras modéré (500) pour les questions. — */
+.typo-oswald .prose-agone {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 1.1875rem;
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+}
+.typo-oswald .prose-agone :is(strong, b) { font-weight: 500; }
+.typo-oswald .prose-agone :is(h2, h3, h4) { font-weight: 600; }
+
 /* — Titre d'affichage en lien (listes d'articles), souligné au survol de la carte.
      À 0.95 d'interligne, le trait tombait sur les capitales de la ligne suivante :
      un peu d'air entre les lignes, un trait fin, collé au texte. — */

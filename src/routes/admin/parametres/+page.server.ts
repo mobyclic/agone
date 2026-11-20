@@ -9,8 +9,8 @@ import { withFlash } from '$lib/toasts';
 import { journaliser } from '$lib/server/journal';
 
 export const load: PageServerLoad = async () => {
-  const [contact, banner, company, tracking, syncState, stock, depots] = await Promise.all([
-    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking'), getSetting('sync_state'), getSetting('stock'), getSetting('depots')
+  const [contact, banner, company, tracking, syncState, stock, depots, apparence] = await Promise.all([
+    getSetting('contact'), getSetting('banner'), getCompany(), getSetting('tracking'), getSetting('sync_state'), getSetting('stock'), getSetting('depots'), getSetting('apparence')
   ]);
   const c = (contact ?? {}) as Record<string, any>;
   const b = (banner ?? {}) as Record<string, any>;
@@ -28,6 +28,7 @@ export const load: PageServerLoad = async () => {
     syncState: (syncState ?? {}) as Record<string, any>,
     stock: { alert_threshold: Number((stock as any)?.alert_threshold ?? 10) },
     depots: { remise: Number((depots as any)?.remise ?? 30) },
+    apparence: { texte: (apparence as any)?.texte === 'oswald' ? 'oswald' : 'roboto' },
     company
   };
 };
@@ -53,6 +54,15 @@ export const actions: Actions = {
     await journaliser(locals, { action: 'depots.remise', cible: { type: 'site_setting', id: 'depots', libelle: 'Remise par défaut des dépôts' }, details: { remise: n } });
     throw redirect(303, withFlash('/admin/parametres', 'Remise des dépôts enregistrée.', 'success'));
   },
+  /** Police du texte courant (articles, fiches…) : Roboto, ou Oswald comme l'ancien site. Réversible d'un clic. */
+  apparence: async ({ request, locals }) => {
+    requireAdmin(locals);
+    const texte = String((await request.formData()).get('texte')) === 'oswald' ? 'oswald' : 'roboto';
+    await setSetting('apparence', { texte });
+    await journaliser(locals, { action: 'apparence.texte', cible: { type: 'site_setting', id: 'apparence', libelle: 'Police du texte' }, details: { texte } });
+    throw redirect(303, withFlash('/admin/parametres', texte === 'oswald' ? 'Texte en Oswald, comme l’ancien site.' : 'Texte en Roboto.', 'success'));
+  },
+
   stock: async ({ request, locals }) => {
     requireAdmin(locals);
     const fd = await request.formData();

@@ -85,6 +85,18 @@
 
   <!-- Le bandeau d'information et la fenêtre promotionnelle se règlent dans Boutique en ligne › Réclames. -->
 
+  <form method="POST" action="?/apparence" use:enhance class="rounded-lg border border-border bg-card p-5">
+    <h3 class="eyebrow mb-1">Apparence</h3>
+    <p class="mb-3 text-xs text-muted-foreground">
+      Police du texte courant : articles, fiches livres et auteurs, rencontres, collections, pages. Les titres ne changent pas.
+    </p>
+    <div class="space-y-2 text-sm">
+      <label class="flex items-center gap-2"><input type="radio" name="texte" value="roboto" checked={data.apparence.texte === 'roboto'} class="accent-foreground" /> Roboto <span class="text-muted-foreground">(actuelle)</span></label>
+      <label class="flex items-center gap-2"><input type="radio" name="texte" value="oswald" checked={data.apparence.texte === 'oswald'} class="accent-foreground" /> <span class="font-display text-base font-light">Oswald</span> <span class="text-muted-foreground">(comme l'ancien site)</span></label>
+    </div>
+    <div class="mt-4"><Button type="submit"><FloppyDisk size={16} /> Enregistrer</Button></div>
+  </form>
+
   <!-- Traceurs & consentement -->
   <form method="POST" action="?/stock" use:enhance class="rounded-lg border border-border bg-card p-5">
     <h3 class="eyebrow mb-1">Alerte de stock</h3>
