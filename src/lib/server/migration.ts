@@ -197,7 +197,6 @@ export async function importUsers(opts: ImportOpts = {}): Promise<ImportResult> 
         const { sql, vars } = buildSet(fields);
         await query(`UPDATE $id SET ${sql}`, { ...vars, id: recId('user', existing) });
         userPid = existing;
-        updated++;
       } else {
         const slug = await uniqueSlug('user', full || email);
         const { sql, vars } = buildSet({
@@ -207,13 +206,19 @@ export async function importUsers(opts: ImportOpts = {}): Promise<ImportResult> 
         });
         const rows = await query<any>(`CREATE user SET ${sql}`, vars);
         userPid = String(rows[0].id).replace(/^user:/, '');
-        created++;
       }
-      // Sens inverse : rattacher les commandes orphelines (même e-mail, sans client).
-      await query(
-        `UPDATE order SET customer = $u WHERE string::lowercase(email) = $em AND customer = NONE`,
-        { u: recId('user', userPid), em: email }
-      );
+      existing ? updated++ : created++;
+      // Sens inverse : rattacher les commandes orphelines (même e-mail, sans client). Une commande
+      // peut n'avoir aucun e-mail : `?? ''` (SurrealDB 3.3 refuse string::lowercase(NONE)).
+      // Un échec ici n'annule pas le compte : simple avertissement.
+      try {
+        await query(
+          `UPDATE order SET customer = $u WHERE string::lowercase(email ?? '') = $em AND customer = NONE`,
+          { u: recId('user', userPid), em: email }
+        );
+      } catch (e) {
+        warnings.push(`Utilisateur WP #${wpId} (${email}) : commandes sans compte non rattachées — ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
+      }
     } catch (e) {
       skipped++;
       warnings.push(`Utilisateur WP #${wpId} (${email}) ignoré : ${e instanceof Error ? e.message.split('\n')[0] : 'erreur'}`);
@@ -329,7 +334,7 @@ export async function importOrders(opts: ImportOpts = {}): Promise<ImportResult>
   const emailMap = new Map<string, string>();
   if (orderEmails.size) {
     const rows = await query<any>(
-      `SELECT meta::id(id) AS pid, string::lowercase(email) AS em FROM user WHERE string::lowercase(email) IN $emails`,
+      `SELECT meta::id(id) AS pid, string::lowercase(email ?? '') AS em FROM user WHERE string::lowercase(email ?? '') IN $emails`,
       { emails: [...orderEmails] }
     );
     for (const r of rows) if (r.em) emailMap.set(r.em, r.pid);
