@@ -2,8 +2,9 @@
 
 État au 20 novembre 2026 : AGONE tourne **uniquement** chez Infomaniak, sur https://agone.dev.mobyclic.com,
 protégé par Tinyauth (connexion auth.mobyclic.com), construit depuis la branche **`majeures`** et redéployé
-à chaque push. **Railway est arrêté** (déploiement retiré, service conservé) ; Surreal Cloud et R2 ne sont
-plus utilisés mais pas encore supprimés. agone.org est toujours le WordPress.
+à chaque push. **Railway (service), la base Surreal Cloud et les fichiers R2 ont été supprimés** le 20/11/2026
+(dernier export de la base cloud : `~/.local/share/agone-surreal/dumps/agone-cloud-final-20261120-1942.surql` ; les deux buckets R2 sont vides, leur suppression
+se fait dans le tableau de bord Cloudflare). agone.org est toujours le WordPress.
 
 ## Ce qui tourne
 
@@ -15,7 +16,8 @@ plus utilisés mais pas encore supprimés. agone.org est toujours le WordPress.
 | Fichiers privés | bucket **`agone`** | ebooks, contrats, factures, carnets : servis par l'appli après contrôle des droits |
 | Mails | Resend (`MAIL_PROVIDER=resend`), `MAIL_DRY_RUN=true` | le code Brevo est prêt (`MAIL_PROVIDER=brevo`) : il faudra un compte Brevo pour Agone et agone.org authentifié (DKIM, DMARC) |
 | Paiement | Stripe **mode test** | endpoint `we_1UdvodRrPqwVOBCQr0P1JZYQ`, version `2026-11-18.endive`, 4 événements ; secret dans `~/.agone-stripe-webhook-essai.txt` |
-| Sauvegarde | `/opt/backup/backup-surreal.sh`, chaque nuit à 2 h 15 UTC | `mobyclic/agone` est prise d'office (seules les bases `_dev` / `_test` sont ignorées) |
+| Sauvegarde de la base | `/opt/backup/backup-surreal.sh`, chaque nuit à 2 h 15 UTC | `mobyclic/agone` est prise d'office (seules les bases `_dev` / `_test` sont ignorées) |
+| Sauvegarde des fichiers | `/opt/backup/backup-fichiers.sh`, chaque nuit à 3 h UTC | tous les buckets → Swiss Backup `vps-sauvegardes/fichiers/<bucket>` ; fichiers modifiés ou supprimés gardés 30 jours dans `fichiers-anciens/` (cf. `/opt/backup/LISEZMOI.txt`) |
 
 L'adresse publique d'un fichier est de la forme
 `https://s3.gva2.infomaniak.cloud/swift/v1/AUTH_<projet>/agone-public/livres/couvertures/<isbn>.webp`
@@ -52,10 +54,7 @@ La base et les fichiers sont déjà en place : il ne reste que l'adresse et les 
    avec `Content-Type: application/json`).
 5. **DNS** d'agone.org vers le VPS (200.234.65.237), vérifier le certificat et le site.
 6. **Fusion** de `majeures` dans `main` (et brancher Coolify sur `main`).
-7. **Railway, bucket R2, base Surreal Cloud** : supprimés seulement avec accord.
 
 ## Scripts liés
 
 - `scripts/reecrire-adresses-fichiers.ts` : réécrit `media.url` d'une racine à l'autre (refuse Surreal Cloud).
-- `scripts/copier-fichiers-r2-vers-s3.ts` : copie R2 → Infomaniak (publics vers `agone-public`, privés vers `agone`) ;
-  ne sert plus que si l'on rapatriait de nouveaux fichiers de R2.
