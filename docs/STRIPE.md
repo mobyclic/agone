@@ -4,7 +4,7 @@
 n'est configurée en production** : la caisse affiche « Le paiement en ligne sera activé prochainement » et les
 commandes du site restent « en attente ».
 
-## 1. Variables Railway (service AGONE)
+## 1. Variables de l'appli (Coolify, appli `agone` — cf. docs/INFOMANIAK.md)
 
 | Variable | Valeur |
 |---|---|

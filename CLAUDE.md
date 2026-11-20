@@ -9,12 +9,16 @@ Les Belles Lettres). Voir `docs/` : `DISCOVERY-SUMMARY.md` (l'existant), `ARCHIT
 (la cible), `DECISIONS.md` (décisions produit), `docs/discovery/*` (rapports détaillés).
 
 ## Stack
-- **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17 (Node 26 en image Docker), déploiement Railway ;
-  essai Infomaniak (Coolify, `Dockerfile`) sur agone.dev.mobyclic.com — cf. `docs/INFOMANIAK.md`. Package manager : **bun** 1.4.5.
+- **SvelteKit 3 + Svelte 5 (runes)**, `adapter-node` 6, Node ≥ 22.17 (Node 26 en image Docker). Hébergement **Infomaniak** :
+  Coolify sur le VPS, `Dockerfile`, https://agone.dev.mobyclic.com (Tinyauth) depuis la branche `majeures`, redéployé à chaque
+  push — cf. `docs/INFOMANIAK.md`. Railway est arrêté (21/11/2026). Package manager : **bun** 1.4.5.
   Configuration dans `vite.config.ts` (plugin `sveltekit({ adapter, alias, … })`, plus de `svelte.config.js`).
-- **SurrealDB v2/3** (cloud), accès **HTTP** via `src/lib/server/surreal.ts` (connexion en root).
+- **SurrealDB 3.3.5 du VPS** : base **unique** `mobyclic/agone` (pas de base de dev), compte limité (`SURREAL_AUTH_LEVEL=database`),
+  accès HTTP via `src/lib/server/surreal.ts` ; depuis le poste par https://surreal.mobyclic.com (IP d'Alistair seulement). Surreal Cloud n'est plus utilisé.
 - **Tailwind v4 + shadcn-svelte** (bits-ui, phosphor-svelte, svelte-sonner).
-- **Cloudflare R2** (couvertures publiques + ebooks privés), **Resend** (mails), **Stripe** (paiement), **Leaflet** (carte des rencontres).
+- **Stockage Infomaniak (S3)** : `agone-public` (couvertures, portraits, images ; lues directement chez Infomaniak, sans passer
+  par l'appli) et `agone` (privé : ebooks, contrats, factures, carnets, servis par l'appli après contrôle des droits).
+  **Resend** (mails ; Brevo prêt, `MAIL_PROVIDER`), **Stripe** (paiement), **Leaflet** (carte des rencontres).
 - **Monolingue français** — PAS d'i18n (pas de `$lib/i18n`, pas de champs `*_i18n`) ; contenu éditorial en texte simple.
 
 **SvelteKit 3 — règles qui piègent** (le build ne dit rien ; seule la première est vue par `bun run check`) :
@@ -36,9 +40,9 @@ bun run schema     # applique src/lib/server/schema.surql au cloud (idempotent)
 bun run seed       # compte admin + collections de référence
 bun run build
 bun run db:local       # SurrealDB local hors connexion (cf. docs/LOCAL-DB.md)
-bun run db:local:pull  # recopie la base cloud en local (écrase le local)
+bun run db:local:pull  # recopie la base du VPS en local (écrase le local)
 ```
-**`.env.local` présent ⇒ tout vise la base LOCALE** (site et scripts). Aucune synchro local → cloud.
+**`.env.local` présent ⇒ tout vise la base LOCALE** (site et scripts). Sinon, `.env` vise la base unique du VPS : c'est la production. Aucune synchro local → VPS.
 Admin de dev (seed) : `alistair.marca@gmail.com` / `agone2026` (rôle `admin`).
 
 ## Rôles & accès — `src/lib/roles.ts` + `src/lib/server/access.ts`
